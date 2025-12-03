@@ -1,7 +1,7 @@
 use aksel::{Float, Tick};
 use derivative::Derivative;
 use iced::{
-    Padding, Pixels, Point, Rectangle, Size,
+    Pixels, Point, Rectangle, Size,
     advanced::{
         Layout, Text,
         graphics::{color, mesh::SolidVertex2D},

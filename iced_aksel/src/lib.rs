@@ -13,6 +13,7 @@ use iced::{
     },
     mouse::ScrollDelta,
     touch,
+    wgpu::hal::Rect,
 };
 
 mod action;
@@ -72,12 +73,14 @@ pub struct DragDelta {
 // Plot/Chart handlers
 type ErrorHandler<AxisId, Message> = Box<dyn Fn(Error<AxisId>) -> Message>;
 type ClickHandler<Message> = Box<dyn Fn(Point) -> Message>;
+type DoubleClickHandler<Message> = Box<dyn Fn(Point) -> Message>;
 type DragHandler<Message> = Box<dyn Fn(DragDelta) -> Message>;
 type HoverHandler<Message> = Box<dyn Fn(Point) -> Message>;
 type ScrollHandler<Message> = Box<dyn Fn(Point, ScrollDelta) -> Message>;
 
 // Axis handlers
 type AxisClickHandler<AxisId, Message> = Box<dyn Fn(AxisId, f32) -> Message>;
+type AxisDoubleClickHandler<AxisId, Message> = Box<dyn Fn(AxisId, f32) -> Message>;
 type AxisDragHandler<AxisId, Message> = Box<dyn Fn(AxisId, f32) -> Message>;
 type AxisHoverHandler<AxisId, Message> = Box<dyn Fn(AxisId, f32) -> Message>;
 type AxisScrollHandler<AxisId, Message> = Box<dyn Fn(AxisId, f32, ScrollDelta) -> Message>;
@@ -85,12 +88,18 @@ type AxisScrollHandler<AxisId, Message> = Box<dyn Fn(AxisId, f32, ScrollDelta) -
 /// Internal chart memory
 struct Memory<AxisId> {
     action: Action<AxisId>,
+    bounds: Rectangle,
+    cursor_position: Option<Point>,
+    previous_click: Option<mouse::Click>,
 }
 
 impl<AxisId> Default for Memory<AxisId> {
     fn default() -> Self {
         Self {
             action: Action::default(),
+            bounds: Rectangle::default(),
+            cursor_position: None,
+            previous_click: None,
         }
     }
 }
@@ -110,12 +119,16 @@ where
     errors: Vec<Error<AxisId>>, // Throw these into the shell at each update
     drag_deadband: f32,
     padding: Padding,
+
+    // Interactions
     on_error: Option<ErrorHandler<AxisId, Message>>,
     on_click: Option<ClickHandler<Message>>,
+    on_double_click: Option<DoubleClickHandler<Message>>,
     on_drag: Option<DragHandler<Message>>,
     on_hover: Option<HoverHandler<Message>>,
     on_scroll: Option<ScrollHandler<Message>>,
     on_axis_click: Option<AxisClickHandler<AxisId, Message>>,
+    on_axis_double_click: Option<AxisDoubleClickHandler<AxisId, Message>>,
     on_axis_drag: Option<AxisDragHandler<AxisId, Message>>,
     on_axis_hover: Option<AxisHoverHandler<AxisId, Message>>,
     on_axis_scroll: Option<AxisScrollHandler<AxisId, Message>>,
@@ -141,10 +154,12 @@ where
             padding: Padding::new(10.0),
             on_error: None,
             on_click: None,
+            on_double_click: None,
             on_drag: None,
             on_hover: None,
             on_scroll: None,
             on_axis_click: None,
+            on_axis_double_click: None,
             on_axis_drag: None,
             on_axis_hover: None,
             on_axis_scroll: None,
@@ -204,6 +219,14 @@ where
         self
     }
 
+    pub fn on_double_click<F>(mut self, f: F) -> Self
+    where
+        F: Fn(Point) -> Message + 'static,
+    {
+        self.on_double_click = Some(Box::new(f));
+        self
+    }
+
     pub fn on_drag<F>(mut self, f: F) -> Self
     where
         F: Fn(DragDelta) -> Message + 'static,
@@ -233,6 +256,14 @@ where
         F: Fn(AxisId, f32) -> Message + 'static,
     {
         self.on_axis_click = Some(Box::new(f));
+        self
+    }
+
+    pub fn on_axis_double_click<F>(mut self, f: F) -> Self
+    where
+        F: Fn(AxisId, f32) -> Message + 'static,
+    {
+        self.on_axis_double_click = Some(Box::new(f));
         self
     }
 
@@ -629,7 +660,7 @@ where
             return;
         }
 
-        let Memory::<AxisId> { action } = tree.state.downcast_mut();
+        let Memory::<AxisId> { action, .. } = tree.state.downcast_mut();
 
         // Handle input events
         match event {
