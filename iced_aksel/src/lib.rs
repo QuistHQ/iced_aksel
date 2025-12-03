@@ -13,7 +13,6 @@ use iced::{
     },
     mouse::ScrollDelta,
     touch,
-    wgpu::hal::Rect,
 };
 
 mod action;
@@ -88,8 +87,6 @@ type AxisScrollHandler<AxisId, Message> = Box<dyn Fn(AxisId, f32, ScrollDelta) -
 /// Internal chart memory
 struct Memory<AxisId> {
     action: Action<AxisId>,
-    bounds: Rectangle,
-    cursor_position: Option<Point>,
     previous_click: Option<mouse::Click>,
 }
 
@@ -97,8 +94,6 @@ impl<AxisId> Default for Memory<AxisId> {
     fn default() -> Self {
         Self {
             action: Action::default(),
-            bounds: Rectangle::default(),
-            cursor_position: None,
             previous_click: None,
         }
     }
@@ -190,6 +185,16 @@ where
             }
         }
 
+        self
+    }
+
+    pub const fn width(mut self, width: iced::Length) -> Self {
+        self.width = width;
+        self
+    }
+
+    pub const fn height(mut self, height: iced::Length) -> Self {
+        self.height = height;
         self
     }
 
@@ -293,13 +298,13 @@ where
 
     fn handle_mouse_press(
         &self,
-        action: &mut Action<AxisId>,
+        memory: &mut Memory<AxisId>,
         layout: Layout,
         cursor: mouse::Cursor,
         shell: &mut iced::advanced::Shell<'_, Message>,
     ) {
         // If we click during any other action than idle, we must return
-        if Action::Idle != *action {
+        if Action::Idle != memory.action {
             return;
         }
 
@@ -309,35 +314,74 @@ where
         // Which means it is safe to unwrap.
         if cursor.position_over(plot_bounds).is_some() {
             shell.capture_event();
-            *action = Action::DraggingPlot {
+
+            memory.action = Action::DraggingPlot {
                 origin: cursor.position().unwrap(),
                 last_position: cursor.position().unwrap(),
                 total_delta: 0.0,
             };
+
+            // Now we check for a double-click
+            let Some((position, handler)) = cursor.position().zip(self.on_double_click.as_ref())
+            else {
+                return;
+            };
+
+            let new_click = mouse::Click::new(position, mouse::Button::Left, memory.previous_click);
+
+            if new_click.kind() == mouse::click::Kind::Double {
+                shell.publish(handler(position));
+            }
+
+            memory.previous_click = Some(new_click);
+
             return;
         }
 
         for (i, (id, axis)) in self.state.visible_axes().enumerate() {
             let axis_bounds = layout.children().nth(i).unwrap().bounds();
-            if cursor.position_over(axis_bounds).is_none() {
+
+            let Some(position) = cursor.position() else {
+                continue;
+            };
+
+            if !axis_bounds.contains(position) {
                 continue;
             }
 
             // We should be able to ensure that a cursor position exists after the first if statement
             // Which means it is safe to unwrap.
             let origin = match axis.orientation() {
-                Orientation::Horizontal => cursor.position().unwrap().x,
-                Orientation::Vertical => cursor.position().unwrap().y,
+                Orientation::Horizontal => position.x,
+                Orientation::Vertical => position.y,
             };
 
-            *action = Action::DraggingAxis {
+            shell.capture_event();
+
+            memory.action = Action::DraggingAxis {
                 id: id.clone(),
                 origin,
                 last_position: origin,
                 total_delta: 0.0,
             };
 
-            shell.capture_event();
+            // Now we check for a double-click
+            let Some((position, handler)) =
+                cursor.position().zip(self.on_axis_double_click.as_ref())
+            else {
+                return;
+            };
+
+            let new_click = mouse::Click::new(position, mouse::Button::Left, memory.previous_click);
+
+            if new_click.kind() == mouse::click::Kind::Double {
+                shell.publish(handler(
+                    id.clone(),
+                    axis.screen_to_normalized(origin, &axis_bounds),
+                ));
+            }
+
+            memory.previous_click = Some(new_click);
 
             // we can only be over one axis at a time, so we break the loop after capturing
             break;
@@ -346,11 +390,13 @@ where
 
     fn handle_mouse_release(
         &self,
-        action: &mut Action<AxisId>,
+        memory: &mut Memory<AxisId>,
         layout: Layout,
         _cursor: mouse::Cursor,
         shell: &mut iced::advanced::Shell<'_, Message>,
     ) {
+        let Memory { action, .. } = memory;
+
         // If delta is OVER deadband, we shouldn't send click-events
         if let Some(total_drag_delta) = action.total_drag_delta()
             && total_drag_delta > self.drag_deadband
@@ -392,11 +438,12 @@ where
 
     fn handle_mouse_moved(
         &self,
-        action: &mut Action<AxisId>,
+        memory: &mut Memory<AxisId>,
         layout: Layout,
         cursor: mouse::Cursor,
         shell: &mut iced::advanced::Shell<'_, Message>,
     ) {
+        let Memory { action, .. } = memory;
         let plot_bounds = self.get_plot_layout(layout).bounds();
 
         // We should be able to ensure that a cursor position exists after the first if statement
@@ -660,23 +707,23 @@ where
             return;
         }
 
-        let Memory::<AxisId> { action, .. } = tree.state.downcast_mut();
+        let memory: &mut Memory<AxisId> = tree.state.downcast_mut();
 
         // Handle input events
         match event {
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
             | Event::Touch(touch::Event::FingerPressed { .. }) => {
-                self.handle_mouse_press(action, layout, cursor, shell);
+                self.handle_mouse_press(memory, layout, cursor, shell);
             }
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
             | Event::Touch(touch::Event::FingerLifted { .. })
             | Event::Touch(touch::Event::FingerLost { .. }) => {
-                self.handle_mouse_release(action, layout, cursor, shell);
-                *action = Action::Idle;
+                self.handle_mouse_release(memory, layout, cursor, shell);
+                memory.action = Action::Idle;
             }
             Event::Mouse(mouse::Event::CursorMoved { .. })
             | Event::Touch(touch::Event::FingerMoved { .. }) => {
-                self.handle_mouse_moved(action, layout, cursor, shell);
+                self.handle_mouse_moved(memory, layout, cursor, shell);
             }
             Event::Mouse(mouse::Event::WheelScrolled { delta }) => {
                 if let Some(cursor_pos) = cursor.position() {

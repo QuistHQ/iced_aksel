@@ -11,7 +11,7 @@ use std::{collections::BTreeMap, ops::RangeInclusive};
 use aksel::{PlotPoint, scale::Linear};
 use chrono::TimeZone;
 use iced::{
-    Color, Element, Subscription, Task, Theme,
+    Color, Element, Point, Subscription, Task, Theme,
     mouse::ScrollDelta,
     theme::palette::Extended,
     time::Instant,
@@ -47,9 +47,11 @@ enum Message {
     UpdateChart,
     /// A message sent when the main plot area is dragged.
     OnPlotDrag(DragDelta),
+    OnPlotDoubleClick(Point),
     OnPlotScroll(iced::Point, ScrollDelta),
     /// A message sent when an axis is dragged (for zooming).
     OnAxisDrag(AxisId, f32),
+    OnAxisDoubleClick(AxisId, f32),
 
     // --- New Messages for UI Settings ---
     /// Toggles the visibility of the Volume panel.
@@ -209,7 +211,9 @@ impl ExampleApp {
             .view()
             .on_drag(Message::OnPlotDrag)
             .on_scroll(Message::OnPlotScroll)
-            .on_axis_drag(Message::OnAxisDrag);
+            .on_axis_drag(Message::OnAxisDrag)
+            .on_double_click(Message::OnPlotDoubleClick)
+            .on_axis_double_click(Message::OnAxisDoubleClick);
 
         // --- Build the Settings UI ---
         let settings_bar = self.build_settings_ui();
@@ -456,6 +460,12 @@ impl CandlestickChart {
             Message::OnAxisDrag(id, delta) => {
                 self.handle_axis_drag(id, delta);
                 self.rebuild_layers();
+            }
+            Message::OnPlotDoubleClick(point) => {
+                println!("Doubleclicked plot at {point:?}")
+            }
+            Message::OnAxisDoubleClick(id, point) => {
+                println!("Doubleclicked axis '{id}' at {point:?}")
             }
             // Other messages are handled by ExampleApp
             _ => {}
