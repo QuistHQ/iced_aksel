@@ -189,7 +189,8 @@ impl<D: Float> Axis<D> {
                 }
                 .into(),
             });
-            if ctx.tick.level != 0 {
+
+            if ctx.tick.level == 0 {
                 result = result.grid_line(GridLine {
                     thickness: 1.0.into(),
                 });
@@ -507,23 +508,23 @@ impl<D: Float> Axis<D> {
         for tick in self.ticks().into_iter() {
             let pos_norm = self.normalize(&tick.value);
 
-            if self.is_visible() {
-                let tick_result = self.tick_renderer.as_ref().map(|renderer| {
-                    renderer.borrow_mut()(TickContext {
-                        tick,
-                        normalized_position: pos_norm,
-                        axis_bounds: bounds,
-                        scale_domain: (d_max, d_min),
-                        orientation,
-                    })
-                });
+            let tick_result = self.tick_renderer.as_ref().map(|renderer| {
+                renderer.borrow_mut()(TickContext {
+                    tick,
+                    normalized_position: pos_norm,
+                    axis_bounds: bounds,
+                    scale_domain: (d_max, d_min),
+                    orientation,
+                })
+            });
 
-                if let Some(TickResult {
-                    mut label,
-                    mut tick_line,
-                    mut grid_line,
-                }) = tick_result
-                {
+            if let Some(TickResult {
+                mut label,
+                mut tick_line,
+                mut grid_line,
+            }) = tick_result
+            {
+                if self.is_visible() {
                     if let Some(label) = label.take() {
                         label_candidates.push(LabelCandidate {
                             tick,
@@ -535,10 +536,12 @@ impl<D: Float> Axis<D> {
                     if let Some(line) = tick_line.take() {
                         self.draw_tick_line(&theme, line, &bounds, mesh_buffer, pos_norm);
                     }
+                }
 
-                    if let Some(line) = grid_line.take() {
-                        self.draw_grid_line(style, plot_bounds, line, mesh_buffer, pos_norm);
-                    }
+                if self.render_grid
+                    && let Some(line) = grid_line.take()
+                {
+                    self.draw_grid_line(style, plot_bounds, line, mesh_buffer, pos_norm);
                 }
             }
         }

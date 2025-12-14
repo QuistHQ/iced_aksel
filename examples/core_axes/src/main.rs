@@ -4,7 +4,7 @@ use iced::{
 };
 use iced_aksel::{
     Axis, Chart, Measure, PlotPoint, State, Stroke,
-    axis::{self, GridLine, LabelDecision, TickContext, TickLine, TickResult},
+    axis::{self, GridLine, LabelDecision, TickLine, TickResult},
     plot::{Plot, PlotData},
     scale::Linear,
     shape::Polyline,

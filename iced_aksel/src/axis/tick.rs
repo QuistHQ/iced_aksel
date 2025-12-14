@@ -9,29 +9,37 @@ pub mod label;
 
 pub use label::*;
 
-#[derive(Default)]
 pub struct TickResult {
     pub tick_line: Option<TickLine>,
     pub grid_line: Option<GridLine>,
     pub label: Option<Label>,
 }
 
-impl TickResult {
-    /// Creates a new [TickResult]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Creates a new empty tick-result
-    pub fn empty() -> Self {
-        Self::default()
-    }
-
-    /// Creates a new [TickResult] with a label
-    pub fn with_label(label: Label) -> Self {
+impl Default for TickResult {
+    fn default() -> Self {
         Self {
-            label: Some(label),
-            ..Default::default()
+            tick_line: Some(TickLine::default()),
+            grid_line: Some(GridLine::default()),
+            label: None,
+        }
+    }
+}
+
+impl TickResult {
+    /// Creates a new empty [TickResult]
+    pub const fn new() -> Self {
+        Self {
+            tick_line: None,
+            grid_line: None,
+            label: None,
+        }
+    }
+
+    /// Creates a new empty [TickResult] with a label
+    pub fn with_label<L: Into<Label>>(label: L) -> Self {
+        Self {
+            label: Some(label.into()),
+            ..Self::new()
         }
     }
 
@@ -39,7 +47,7 @@ impl TickResult {
     pub fn with_tick_line(line: TickLine) -> Self {
         Self {
             tick_line: Some(line),
-            ..Default::default()
+            ..Self::new()
         }
     }
 
@@ -47,7 +55,7 @@ impl TickResult {
     pub fn with_grid_line(line: GridLine) -> Self {
         Self {
             grid_line: Some(line),
-            ..Default::default()
+            ..Self::new()
         }
     }
 

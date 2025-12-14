@@ -61,6 +61,15 @@ impl From<String> for Label {
     }
 }
 
+impl<'a> From<&'a String> for Label {
+    fn from(content: &'a String) -> Self {
+        Self {
+            content: content.clone(),
+            ..Default::default()
+        }
+    }
+}
+
 impl From<&str> for Label {
     fn from(content: &str) -> Self {
         Self {

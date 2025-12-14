@@ -5,7 +5,7 @@ use iced::{
 };
 use iced_aksel::{
     Axis, Chart, Measure, PlotPoint, State, Stroke,
-    axis::{self, TickLine},
+    axis::{self, TickLine, TickResult},
     plot::{Plot, PlotData},
     scale::Linear,
     shape::{Label, Polygon, Polyline, Rectangle},
@@ -494,29 +494,23 @@ impl LineChart {
 
     fn update_x_axis_labels(&mut self) {
         let labels = self.labels.clone();
-        let x_key = Self::X.to_string();
+        let x_axis = self.state.axis_mut(&Self::X.to_string()).unwrap();
 
-        let (min, max) = self.state.axis(&x_key).map_or((0.0, 1.0), |a| {
-            let d = a.domain();
-            (*d.0, *d.1)
+        x_axis.set_tick_renderer(move |ctx| {
+            let mut result = TickResult::new();
+            let idx = ctx.tick.value.round();
+            if (ctx.tick.value - idx).abs() > 0.001 {
+                return result;
+            }
+            let idx = idx as usize;
+            if idx < labels.len() {
+                return result
+                    .label(labels[idx].clone())
+                    .tick_line(TickLine::default());
+            }
+
+            result
         });
-
-        let axis = Axis::new(Linear::new(min, max), axis::Position::Bottom).with_tick_renderer(
-            move |ctx| {
-                let idx = ctx.tick.value.round();
-                if (ctx.tick.value - idx).abs() > 0.001 {
-                    return None;
-                }
-                let idx = idx as usize;
-                if idx < labels.len() {
-                    Some(TickLine::simple(labels[idx].clone()))
-                } else {
-                    None
-                }
-            },
-        );
-
-        self.state.set_axis(x_key, axis);
     }
 
     fn ensure_axes_exist(&mut self, series: &LineSeries) {
@@ -660,11 +654,8 @@ impl PlotData<f64> for LineChart {
 fn y_axis(min_y: f64, max_y: f64) -> Axis<f64> {
     Axis::new(Linear::new(min_y, max_y), axis::Position::Left).with_tick_renderer(|ctx| {
         match ctx.tick.level {
-            0 => {
-                let line = TickLine::simple(format!("{:.2}", ctx.tick.value));
-                Some(line)
-            }
-            _ => None,
+            0 => TickResult::default().label(format!("{:.2}", ctx.tick.value)),
+            _ => TickResult::new(),
         }
     })
 }

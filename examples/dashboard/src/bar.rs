@@ -1,7 +1,7 @@
 use iced::{Theme, time::Instant};
 use iced_aksel::{
     Axis, Chart, Measure, PlotPoint, Scale, State,
-    axis::{self, TickLine},
+    axis::{self, TickLine, TickResult},
     plot::{Plot, PlotData},
     scale::{Linear, Tick, TickIter},
     shape::Rectangle,
@@ -53,7 +53,7 @@ impl BarChart {
     pub fn new(orientation: Orientation) -> Self {
         let mut state = State::new();
 
-        Self::setup_scales(&mut state, &orientation);
+        Self::setup_axes(&mut state, &orientation);
 
         let mut chart = Self {
             state,
@@ -97,7 +97,7 @@ impl BarChart {
             Orientation::Vertical => Orientation::Horizontal,
         };
 
-        Self::setup_scales(&mut self.state, &self.orientation);
+        Self::setup_axes(&mut self.state, &self.orientation);
         self.refresh();
     }
 
@@ -196,7 +196,7 @@ impl BarChart {
         }
     }
 
-    fn setup_scales(state: &mut State<AxisId, f64>, orientation: &Orientation) {
+    fn setup_axes(state: &mut State<AxisId, f64>, orientation: &Orientation) {
         let bar_scale = Linear::new_with_tick_generator(0.0, 1.0, |scale| {
             let (&start, &end) = scale.domain();
             TickIter::new((start as i64..(end + 1.0) as i64).map(|n| Tick {
@@ -215,8 +215,8 @@ impl BarChart {
             Self::VALUE_AXIS,
             Axis::new(value_scale, value_pos)
                 .with_tick_renderer(|tlc| match tlc.tick.level {
-                    0 => Some(TickLine::simple(format!("{:.2}", tlc.tick.value))),
-                    _ => None,
+                    0 => TickResult::default().label(format!("{:.2}", tlc.tick.value)),
+                    _ => TickResult::new(),
                 })
                 .skip_overlapping_labels(6.),
         );
@@ -234,22 +234,23 @@ impl BarChart {
             .axis_mut(&Self::BAR_AXIS)
             .unwrap()
             .set_tick_renderer(move |ctx| {
+                let result = TickResult::new();
                 let idx = ctx.tick.value;
                 if idx <= 0. {
-                    return None;
+                    return result;
                 }
 
                 // Round to find nearest whole bar index
                 let index = idx.round() as usize;
                 if index == 0 {
-                    return None;
+                    return result;
                 }
 
                 if let Some(label) = labels.get(index - 1) {
-                    return Some(TickLine::simple(label.clone()));
+                    return result.label(label).tick_line(TickLine::default());
                 }
 
-                None
+                result
             });
     }
 }

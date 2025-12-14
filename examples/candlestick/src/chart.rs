@@ -4,7 +4,7 @@ use chrono::{Datelike, TimeZone, Timelike};
 use iced::mouse::ScrollDelta;
 use iced_aksel::{
     Axis, Chart, Measure, State,
-    axis::{self, GridLine, Label, Position, TickContext, TickLine, TickResult},
+    axis::{self, GridLine, Position, TickContext, TickLine, TickResult},
     plot::DragDelta,
     scale::Linear,
 };
@@ -439,7 +439,7 @@ impl CandlestickChart {
             let timestamp_seconds = ctx.tick.value as i64 * 60; // Assuming 1 unit = 1 minute
 
             let Some(datetime) = chrono::Utc.timestamp_opt(timestamp_seconds, 0).single() else {
-                return TickResult::empty();
+                return TickResult::new();
             };
 
             let text = match span {
@@ -463,7 +463,7 @@ impl CandlestickChart {
                     let is_midnight = datetime.minute() == 0 && datetime.hour() == 0;
 
                     if !is_midnight && datetime.minute() % step != 0 {
-                        return TickResult::empty();
+                        return TickResult::new();
                     }
 
                     // 3. Format the text

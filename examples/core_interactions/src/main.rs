@@ -69,15 +69,14 @@ impl Interactions {
         let axis_x = Axis::new(linear_x, axis::Position::Bottom).with_tick_renderer(|ctx| {
             // If it's a Major tick (Level 0), show it.
             if ctx.tick.level == 0 {
-                TickResult {
-                    tick_line: Some(TickLine::default()),
+                return TickResult {
                     label: Some(format!("{:.1}s", ctx.tick.value).into()),
                     ..Default::default()
-                }
-            } else {
-                // Otherwise, hide everything (Line and Label).
-                TickResult::default()
+                };
             }
+
+            // Otherwise, hide everything (Line and Label).
+            TickResult::new()
         });
 
         // ---------------------------------------------------------------------
@@ -89,22 +88,21 @@ impl Interactions {
         let axis_y = Axis::new(linear_y, axis::Position::Left).with_tick_renderer(|ctx| {
             if ctx.tick.level == 0 {
                 // Major: Full visibility
-                TickResult {
+                return TickResult {
                     tick_line: Some(TickLine::default()),
                     label: Some(format!("{:.1}V", ctx.tick.value).into()),
                     ..Default::default()
-                }
-            } else {
-                // Minor: Small tick line, no text
-                TickResult {
-                    tick_line: Some(TickLine {
-                        thickness: 0.5.into(),
-                        length: 2.5.into(),
-                        ..Default::default()
-                    }),
-                    label: None, // Explicitly no label
-                    ..Default::default()
-                }
+                };
+            }
+
+            // Minor and below: Small tick line, no text
+            TickResult {
+                tick_line: Some(TickLine {
+                    thickness: 0.5.into(),
+                    length: 2.5.into(),
+                }),
+                label: None, // Explicitly no label
+                ..Default::default()
             }
         });
 

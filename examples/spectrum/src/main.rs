@@ -13,8 +13,8 @@ use iced::{
 };
 use iced_aksel::{
     Axis, Chart, Measure, Plot, PlotData, PlotPoint, State, Stroke,
-    axis::{GridLine, Label, Position, TickContext, TickLine},
-    plot, scale, shape,
+    axis::{GridLine, Label, Position, TickContext, TickLine, TickResult},
+    scale, shape,
 };
 
 pub mod audio;
@@ -236,11 +236,6 @@ fn create_frequency_axis() -> Axis<f64> {
         scale::Logarithmic::new(10.0, MIN_FREQ, MAX_FREQ),
         Position::Bottom,
     )
-    .with_grid_renderer(|_tick| {
-        Some(GridLine {
-            thickness: 1.0.into(),
-        })
-    })
     .with_cursor_formatter(|value| {
         Some(Label {
             content: format_frequency_label(value),
@@ -253,11 +248,6 @@ fn create_frequency_axis() -> Axis<f64> {
 
 fn create_db_axis() -> Axis<f64> {
     Axis::new(scale::Linear::new(MIN_DB, MAX_DB), Position::Left)
-        .with_grid_renderer(|_tick| {
-            Some(GridLine {
-                thickness: 1.0.into(),
-            })
-        })
         .with_cursor_formatter(|value| {
             Some(Label {
                 content: format_db_label(value),
@@ -269,34 +259,26 @@ fn create_db_axis() -> Axis<f64> {
         .skip_overlapping_labels(8.0)
 }
 
-fn frequency_tick_renderer(ctx: TickContext<f64>) -> Option<TickLine> {
-    let mut line = TickLine {
+fn frequency_tick_renderer(ctx: TickContext<f64>) -> TickResult {
+    let line = TickLine {
         thickness: Pixels(1.0),
         length: Pixels(if ctx.tick.level == 0 { 12.0 } else { 6.0 }),
-        label: None,
     };
-
-    line.label = Some(Label {
-        content: format_frequency_label(ctx.tick.value),
-        ..Default::default()
-    });
-
-    Some(line)
+    let label = format_frequency_label(ctx.tick.value);
+    TickResult::with_label(label)
+        .tick_line(line)
+        .grid_line(GridLine::default())
 }
 
-fn db_tick_renderer(ctx: TickContext<f64>) -> Option<TickLine> {
-    let mut line = TickLine {
+fn db_tick_renderer(ctx: TickContext<f64>) -> TickResult {
+    let line = TickLine {
         thickness: Pixels(1.0),
-        label: None,
         ..Default::default()
     };
-
-    line.label = Some(Label {
-        content: format_db_label(ctx.tick.value),
-        ..Default::default()
-    });
-
-    Some(line)
+    let label = format_db_label(ctx.tick.value);
+    TickResult::with_label(label)
+        .tick_line(line)
+        .grid_line(GridLine::default())
 }
 
 fn format_frequency_label(value: f64) -> String {

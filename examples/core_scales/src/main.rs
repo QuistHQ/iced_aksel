@@ -5,7 +5,7 @@ use iced::{
 };
 use iced_aksel::{
     Axis, Chart, PlotPoint, State, Stroke,
-    axis::{self, GridLine, TickContext, TickLine, TickResult},
+    axis::{self, TickContext, TickResult},
     plot::{Plot, PlotData},
     scale::{Linear, Logarithmic},
     shape::{Circle, Polyline},
@@ -226,13 +226,13 @@ impl PlotData<f64> for ExponentialData {
 fn x_axis_tick_renderer(ctx: TickContext<f64>) -> TickResult {
     // Only show Major ticks
     if ctx.tick.level != 0 {
-        return TickResult::empty();
+        return TickResult::new();
     }
-    TickResult::with_tick_line(TickLine::default()).label(format!("{:.0}", ctx.tick.value))
+    TickResult::default().label(format!("{:.0}", ctx.tick.value))
 }
 
 fn y_axis_tick_renderer(ctx: TickContext<f64>) -> TickResult {
-    let result = TickResult::with_grid_line(GridLine::new(1.0));
+    let result = TickResult::default();
 
     // Only show tick-lines and labels on Major ticks
     if ctx.tick.level != 0 {
@@ -246,7 +246,7 @@ fn y_axis_tick_renderer(ctx: TickContext<f64>) -> TickResult {
         format!("{:.0}", val)
     };
 
-    result.label(label).tick_line(TickLine::default())
+    result.label(label)
 }
 
 // -----------------------------------------------------------------------------
