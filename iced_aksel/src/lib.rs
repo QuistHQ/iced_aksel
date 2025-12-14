@@ -72,7 +72,7 @@
 //! - **[`PlotData`]**: Trait for drawable data types
 //! - **[`Shape`](crate::shape)**: Primitives for rendering (lines, circles, rectangles, etc.)
 
-use std::{fmt::Debug, hash::Hash, ops::Deref};
+use std::{cell::RefCell, fmt::Debug, hash::Hash, ops::Deref};
 
 use aksel::ScreenRect;
 use derive_more::{Display, Error};
@@ -157,6 +157,8 @@ type AxisScrollHandler<AxisId, Message> = Box<dyn Fn(AxisId, f32, ScrollDelta) -
 struct Memory<AxisId> {
     action: Action<AxisId>,
     previous_click: Option<mouse::Click>,
+    // Add the persistent tessellators here
+    tessellators: RefCell<render::Tessellators>,
 }
 
 impl<AxisId> Default for Memory<AxisId> {
@@ -164,6 +166,8 @@ impl<AxisId> Default for Memory<AxisId> {
         Self {
             action: Action::default(),
             previous_click: None,
+            // Initialize them once. Lyon will reuse the internal Vec capacities.
+            tessellators: RefCell::new(render::Tessellators::default()),
         }
     }
 }
@@ -986,7 +990,7 @@ where
 
     fn draw(
         &self,
-        _tree: &Tree,
+        tree: &Tree,
         renderer: &mut Renderer,
         theme: &Theme,
         _style: &Style,
@@ -1007,8 +1011,13 @@ where
             Color::TRANSPARENT,
         );
 
+        // 1. Retrieve the Memory from the Tree directly
+        let memory = tree.state.downcast_ref::<Memory<AxisId>>();
+
+        // 2. Lock the tessellators for the duration of this draw call
+        let mut tessellators = memory.tessellators.borrow_mut();
+
         // Init mesh-rendering dependencies
-        let mut tessellators = render::Tessellators::default();
         let mut mesh_buffer = render::MeshBuffer::new(100_000);
         let screen_rect = ScreenRect {
             x: plot_bounds.x,
@@ -1040,8 +1049,10 @@ where
             let x_axis = self.state.axis(&layer.horizontal_axis_id).unwrap();
             let y_axis = self.state.axis(&layer.vertical_axis_id).unwrap();
             let transform = Transform::new(&screen_rect, x_axis.deref(), y_axis.deref());
+
+            // Pass the dereferenced mut borrow of tessellators
             let mut plot: Plot<Domain, Renderer> = Plot::new(
-                &mut tessellators,
+                &mut *tessellators,
                 renderer,
                 &plot_bounds,
                 &mut mesh_buffer,
