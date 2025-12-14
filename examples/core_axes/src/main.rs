@@ -4,7 +4,7 @@ use iced::{
 };
 use iced_aksel::{
     Axis, Chart, Measure, PlotPoint, State, Stroke,
-    axis::{self, GridLine, LabelDecision, TickLine},
+    axis::{self, GridLine, LabelDecision, TickContext, TickLine, TickResult},
     plot::{Plot, PlotData},
     scale::Linear,
     shape::Polyline,
@@ -130,59 +130,61 @@ impl AxesExample {
     }
 
     /// A helper that acts as a factory for Axis configuration.
-    /// It goes through the standard pipeline:
+    /// It demonstrates the standard pipeline:
     /// Scale -> Position -> Dimensions -> Logic -> Visuals
     fn configure_axis(&self, kind: AxisKind) -> Axis<f64> {
         let s = self.settings;
 
         // ---------------------------------------------------------------------
         // 1. BASE CONFIGURATION
-        //    Define the Domain (Linear/Log) and the Screen Position.
+        //    Set up the scale (domain) and where the axis sits on the screen.
         // ---------------------------------------------------------------------
         let (scale, position) = match kind {
             AxisKind::X => (Linear::new(0.0, 100.0), axis::Position::Bottom),
-            AxisKind::Y => (
-                Linear::new(-50.0, 50.0),
-                if s.y_position_right {
+            AxisKind::Y => {
+                let pos = if s.y_position_right {
                     axis::Position::Right
                 } else {
                     axis::Position::Left
-                },
-            ),
+                };
+                (Linear::new(-50.0, 50.0), pos)
+            }
         };
 
         let mut axis = Axis::new(scale, position)
             .with_thickness(s.thickness)
             .with_label_spacing(s.label_spacing)
-            .without_grid(); // Start clean so toggling grid works reliably
+            .without_grid(); // Start clean so we can toggle it conditionally later
 
         // ---------------------------------------------------------------------
         // 2. VISIBILITY
         // ---------------------------------------------------------------------
+        // If the user wants this axis hidden, we hide it and stop configuring.
         let is_visible = match kind {
             AxisKind::X => s.x_visible,
             AxisKind::Y => s.y_visible,
         };
 
         if !is_visible {
-            axis = axis.invisible();
+            return axis.invisible();
         }
 
         // ---------------------------------------------------------------------
         // 3. LABEL POLICY (Collision Avoidance)
         // ---------------------------------------------------------------------
         if s.sparse_labels {
-            // OPTION A: Custom Logic
-            // We manually decide which ticks to Render or Skip based on context.
+            // OPTION A: Manual Logic
+            // "I want full control over exactly which numbers appear."
             axis = axis.with_custom_label_policy(move |ctx| {
                 let val = ctx.tick.value as i32;
-                // Example logic: Skip odd numbers on X, skip non-10s on Y
-                let should_render = match kind {
+
+                // Example: Only show even numbers on X, multiples of 10 on Y
+                let keep_label = match kind {
                     AxisKind::X => val % 2 == 0,
                     AxisKind::Y => val % 10 == 0,
                 };
 
-                if should_render {
+                if keep_label {
                     LabelDecision::Render
                 } else {
                     LabelDecision::Skip
@@ -190,16 +192,15 @@ impl AxesExample {
             });
         } else if s.skip_overlap {
             // OPTION B: Automatic Logic
-            // The chart will measure text and hide labels that collide.
+            // "Just make sure they don't touch each other."
             axis = axis.skip_overlapping_labels(10.0);
         }
 
         // ---------------------------------------------------------------------
-        // 4. INTERACTIVITY (Cursor Labels)
+        // 4. INTERACTIVITY
         // ---------------------------------------------------------------------
         if s.show_cursor {
             axis = axis.with_cursor_formatter(|val| {
-                // Renders a floating label on the axis when hovering the plot
                 Some(axis::Label {
                     content: format!("{:.1}", val),
                     size: 10.into(),
@@ -209,46 +210,49 @@ impl AxesExample {
         }
 
         // ---------------------------------------------------------------------
-        // 5. VISUALS (Ticks & Grids)
+        // 5. VISUALS (Ticks, Grids & Labels)
+        //    This uses the modern `TickResult` pattern to return all parts at once.
         // ---------------------------------------------------------------------
-
-        // A. Tick Renderer
         axis = match s.tick_style {
-            TickStyle::Simple => axis.with_tick_renderer(|ctx| {
-                // Standard: render everything
-                Some(TickLine::simple(format!("{:.0}", ctx.tick.value)))
-            }),
-            TickStyle::OnlyMajor => axis.with_tick_renderer(|ctx| {
-                // Filtered: Only render Level 0 (Major) ticks
-                if ctx.tick.level == 0 {
-                    Some(TickLine {
-                        thickness: 1.5.into(),
-                        length: 8.0.into(),
-                        label: Some(axis::Label {
-                            content: format!("{:.0}", ctx.tick.value),
-                            size: 10.into(),
-                            ..Default::default()
-                        }),
-                    })
+            // STYLE 1: Render everything
+            TickStyle::Simple => axis.with_tick_renderer(move |ctx| {
+                // 1. Prepare the Grid (only if enabled)
+                let grid = if s.show_grid {
+                    Some(GridLine::default())
                 } else {
-                    None // Hides both the line and the label for minor ticks
+                    None
+                };
+
+                // 2. Return the result
+                TickResult {
+                    tick_line: Some(TickLine::default()),
+                    grid_line: grid,
+                    label: Some(format!("{:.0}", ctx.tick.value).into()),
+                }
+            }),
+
+            // STYLE 2: Only render Major ticks (Level 0)
+            TickStyle::OnlyMajor => axis.with_tick_renderer(move |ctx| {
+                // 1. Filter: If this is a minor tick (level > 0), render nothing.
+                if ctx.tick.level > 0 {
+                    return TickResult::default();
+                }
+
+                // 2. Prepare the Grid (only if enabled)
+                let grid = if s.show_grid {
+                    Some(GridLine::default())
+                } else {
+                    None
+                };
+
+                // 3. Return the result (Major ticks only)
+                TickResult {
+                    tick_line: Some(TickLine::default()),
+                    grid_line: grid,
+                    label: Some(format!("{:.0}", ctx.tick.value).into()),
                 }
             }),
         };
-
-        // B. Grid Renderer
-        if s.show_grid {
-            axis = axis.with_grid_renderer(|tick| {
-                // Only draw grid lines for major ticks
-                if tick.level == 0 {
-                    Some(GridLine {
-                        thickness: 1.0.into(),
-                    })
-                } else {
-                    None
-                }
-            });
-        }
 
         axis
     }
