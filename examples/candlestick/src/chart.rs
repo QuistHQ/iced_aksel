@@ -428,28 +428,52 @@ impl CandlestickChart {
         }
     }
 
-    /// Factory for creating the main X-axis (with labels).
+    // Factory for creating the main X-axis (with labels).
     fn create_x_axis(range: (f64, f64)) -> Axis<f64> {
         let scale = Linear::new(range.0, range.1);
         let mut current_month = u32::MAX;
         let mut shown_month = false;
+
         let tick_renderer = move |ctx: TickContext<f64>| -> TickResult {
             let span = ctx.scale_span() as i64;
             let timestamp_seconds = ctx.tick.value as i64 * 60; // Assuming 1 unit = 1 minute
+
             let Some(datetime) = chrono::Utc.timestamp_opt(timestamp_seconds, 0).single() else {
                 return TickResult::empty();
             };
 
             let text = match span {
+                // Under 1 week (showing minutes/hours)
                 ..10080 => {
                     shown_month = false;
-                    if datetime.minute() == 0 && datetime.hour() == 0 {
+
+                    // 1. Determine the Tick Interval (Step) based on Zoom level (span)
+                    // span is in minutes.
+                    // 180 mins = 3 hours
+                    // 720 mins = 12 hours
+                    let step = match span {
+                        0..=180 => 5,     // If zoomed in < 3 hours, show every 5 mins
+                        181..=720 => 15,  // If < 12 hours, show every 15 mins
+                        721..=1440 => 30, // If < 24 hours, show every 30 mins
+                        _ => 60,          // Otherwise show hourly
+                    };
+
+                    // 2. Filter: If the minute is not a multiple of the step, hide it.
+                    // Exception: Always show the start of a new day (00:00) regardless of step.
+                    let is_midnight = datetime.minute() == 0 && datetime.hour() == 0;
+
+                    if !is_midnight && datetime.minute() % step != 0 {
+                        return TickResult::empty();
+                    }
+
+                    // 3. Format the text
+                    if is_midnight {
                         datetime.format("%a").to_string()
                     } else {
                         datetime.format("%H:%M").to_string()
                     }
                 }
-                // 10080 minutes = 7 day
+                // 10080 minutes = 7 days (showing days/months)
                 10080.. => {
                     if datetime.month() != current_month {
                         current_month = datetime.month();
@@ -465,6 +489,7 @@ impl CandlestickChart {
                 }
             };
 
+            // Standard label generation
             let label = match ctx.tick.level {
                 0 => Some(text.into()),
                 1 => Some(text.into()),
@@ -487,13 +512,14 @@ impl CandlestickChart {
                 tick_line,
             }
         };
+
         Axis::new(scale, Position::Bottom)
             .with_tick_renderer(tick_renderer)
             .with_cursor_formatter(|x| {
                 let timestamp_seconds = x as i64 * 60;
                 let datetime = chrono::Utc.timestamp_opt(timestamp_seconds, 0).single()?;
                 Some(axis::Label {
-                    content: datetime.format("%a %d %b '%g").to_string(),
+                    content: datetime.format("%a %d %b '%g %H:%M").to_string(), // Added %H:%M to cursor for precision
                     ..Default::default()
                 })
             })
