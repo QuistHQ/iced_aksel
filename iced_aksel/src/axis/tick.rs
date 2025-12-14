@@ -1,12 +1,74 @@
-use aksel::Tick;
-use iced_core::{
-    Pixels, Point,
-    text::{self, paragraph::Plain},
-};
+use crate::axis::GridLine;
 
-use crate::axis::tick::label::{Label, LabelBounds};
+use super::Orientation;
+
+use aksel::{Float, Tick};
+use iced_core::{Pixels, Rectangle};
 
 pub mod label;
+
+pub use label::*;
+
+#[derive(Default)]
+pub struct TickResult {
+    pub tick_line: Option<TickLine>,
+    pub grid_line: Option<GridLine>,
+    pub label: Option<Label>,
+}
+
+impl TickResult {
+    /// Creates a new [TickResult]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Creates a new empty tick-result
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    /// Creates a new [TickResult] with a label
+    pub fn with_label(label: Label) -> Self {
+        Self {
+            label: Some(label),
+            ..Default::default()
+        }
+    }
+
+    /// Creates a new [TickResult] with a tick-line
+    pub fn with_tick_line(line: TickLine) -> Self {
+        Self {
+            tick_line: Some(line),
+            ..Default::default()
+        }
+    }
+
+    /// Creates a new [TickResult] with a grid-line
+    pub fn with_grid_line(line: GridLine) -> Self {
+        Self {
+            grid_line: Some(line),
+            ..Default::default()
+        }
+    }
+
+    /// Adds a label to the [TickResult]
+    pub fn label<L: Into<Label>>(mut self, label: L) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+
+    /// Adds a tick-line to the [TickResult]
+    pub const fn tick_line(mut self, line: TickLine) -> Self {
+        self.tick_line = Some(line);
+        self
+    }
+
+    /// Adds a grid-line to the [TickResult]
+    pub const fn grid_line(mut self, line: GridLine) -> Self {
+        self.grid_line = Some(line);
+        self
+    }
+}
 
 /// Defines the visual styling and content of a single tick mark on an Axis.
 ///
@@ -68,12 +130,6 @@ pub struct TickLine {
 
     /// The length of the tick line perpendicular to the axis.
     pub length: Pixels,
-
-    /// The optional text label associated with this tick.
-    ///
-    /// If `None`, the tick will be drawn as a simple line with no text.
-    /// If provided, the text is usually rendered at the end of the tick line.
-    pub label: Option<Label>,
 }
 
 impl Default for TickLine {
@@ -82,71 +138,30 @@ impl Default for TickLine {
         Self {
             thickness: Pixels(1.0),
             length: Pixels(5.0),
-            label: None,
         }
     }
 }
 
-impl TickLine {
-    #[inline(always)]
-    pub fn simple(content: String) -> Self {
-        Self {
-            label: Some(Label {
-                content,
-                ..Default::default()
-            }),
-            ..Default::default()
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct PlacedLabelInfo<D> {
+/// This is all the information you would need to define a `TickLine` properly.
+#[derive(Debug, Clone, Copy)]
+pub struct TickContext<D> {
     pub tick: Tick<D>,
     pub normalized_position: f32,
-    pub bounds: LabelBounds,
+    pub axis_bounds: Rectangle,
+    pub scale_domain: (D, D),
+    pub orientation: Orientation,
 }
 
-/// Decision on whether to render or skip a tick label.
-///
-/// Used by custom label policies provided to [`Axis::with_custom_label_policy`](crate::Axis::with_custom_label_policy).
-///
-/// # Example
-///
-/// ```rust
-/// use iced_aksel::{Axis, axis::LabelDecision, scale::Linear};
-///
-/// // Only show labels for even values
-/// let axis = Axis::new(Linear::new(0.0, 100.0), iced_aksel::axis::Position::Bottom)
-///     .with_custom_label_policy(|ctx| {
-///         if ctx.tick.value as i32 % 2 == 0 {
-///             LabelDecision::Render
-///         } else {
-///             LabelDecision::Skip
-///         }
-///     });
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LabelDecision {
-    /// Render this label at its position.
-    Render,
-    /// Skip rendering this label (e.g., due to overlap or custom filtering).
-    Skip,
-}
+impl<D: Float> TickContext<D> {
+    pub const fn axis_span(&self) -> f32 {
+        match self.orientation {
+            Orientation::Horizontal => self.axis_bounds.width,
+            Orientation::Vertical => self.axis_bounds.height,
+        }
+    }
 
-pub struct LabelCandidate<D> {
-    pub(crate) tick: Tick<D>,
-    pub(crate) normalized_position: f32,
-    pub(crate) label: Label,
-}
-
-pub struct ResolvedLabelCandidate<Renderer, D>
-where
-    Renderer: text::Renderer,
-{
-    pub(crate) tick: Tick<D>,
-    pub(crate) normalized_position: f32,
-    pub(crate) bounds: LabelBounds,
-    pub(crate) paragraph: Plain<Renderer::Paragraph>,
-    pub(crate) position: Point,
+    pub fn scale_span(&self) -> D {
+        let (min, max) = self.scale_domain;
+        min.abs_sub(max)
+    }
 }

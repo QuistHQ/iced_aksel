@@ -13,7 +13,7 @@ use iced::{
 };
 use iced_aksel::{
     Axis, Chart, Measure, Plot, PlotPoint, State, Stroke,
-    axis::{GridLine, Label, Position, TickLabelContext, TickLine},
+    axis::{GridLine, Label, Position, TickContext, TickLine},
     plot, scale, shape,
 };
 
@@ -269,7 +269,7 @@ fn create_db_axis() -> Axis<f64> {
         .skip_overlapping_labels(8.0)
 }
 
-fn frequency_tick_renderer(ctx: TickLabelContext<f64>) -> Option<TickLine> {
+fn frequency_tick_renderer(ctx: TickContext<f64>) -> Option<TickLine> {
     let mut line = TickLine {
         thickness: Pixels(1.0),
         length: Pixels(if ctx.tick.level == 0 { 12.0 } else { 6.0 }),
@@ -284,7 +284,7 @@ fn frequency_tick_renderer(ctx: TickLabelContext<f64>) -> Option<TickLine> {
     Some(line)
 }
 
-fn db_tick_renderer(ctx: TickLabelContext<f64>) -> Option<TickLine> {
+fn db_tick_renderer(ctx: TickContext<f64>) -> Option<TickLine> {
     let mut line = TickLine {
         thickness: Pixels(1.0),
         label: None,

@@ -5,7 +5,7 @@ use iced::{
 };
 use iced_aksel::{
     Axis, Chart, PlotPoint, State, Stroke,
-    axis::{self, GridLine, TickLine},
+    axis::{self, GridLine, TickContext, TickLine, TickResult},
     plot::{Plot, PlotData},
     scale::{Linear, Logarithmic},
     shape::{Circle, Polyline},
@@ -59,35 +59,13 @@ impl ScalesExample {
         linear_view.set_axis(
             Self::AXIS_X,
             Axis::new(Linear::new(x_min, x_max), axis::Position::Bottom)
-                .with_tick_renderer(|ctx| {
-                    // Only show Major ticks
-                    if ctx.tick.level != 0 {
-                        return None;
-                    }
-                    Some(TickLine::simple(format!("{:.0}", ctx.tick.value)))
-                })
+                .with_tick_renderer(x_axis_tick_renderer)
                 .skip_overlapping_labels(6.0),
         );
         linear_view.set_axis(
             Self::AXIS_Y,
             Axis::new(Linear::new(y_min, y_max), axis::Position::Left)
-                .with_tick_renderer(|ctx| {
-                    // Only show Major ticks
-                    if ctx.tick.level != 0 {
-                        return None;
-                    }
-                    let val = ctx.tick.value;
-                    if val >= 1000.0 {
-                        Some(TickLine::simple(format!("{:.0}k", val / 1000.0)))
-                    } else {
-                        Some(TickLine::simple(format!("{:.0}", val)))
-                    }
-                })
-                .with_grid_renderer(|_| {
-                    Some(GridLine {
-                        thickness: 1.0.into(),
-                    })
-                })
+                .with_tick_renderer(y_axis_tick_renderer)
                 .skip_overlapping_labels(6.0),
         );
 
@@ -97,36 +75,14 @@ impl ScalesExample {
         log_view.set_axis(
             Self::AXIS_X,
             Axis::new(Linear::new(x_min, x_max), axis::Position::Bottom)
-                .with_tick_renderer(|ctx| {
-                    // Only show Major ticks
-                    if ctx.tick.level != 0 {
-                        return None;
-                    }
-                    Some(TickLine::simple(format!("{:.0}", ctx.tick.value)))
-                })
+                .with_tick_renderer(x_axis_tick_renderer)
                 .skip_overlapping_labels(6.0),
         );
         log_view.set_axis(
             Self::AXIS_Y,
             // Notice: Logarithmic scale here
             Axis::new(Logarithmic::new(10.0, y_min, y_max), axis::Position::Left)
-                .with_tick_renderer(|ctx| {
-                    // Only show Major ticks
-                    if ctx.tick.level != 0 {
-                        return None;
-                    }
-                    let val = ctx.tick.value;
-                    if val >= 1000.0 {
-                        Some(TickLine::simple(format!("{:.0}k", val / 1000.0)))
-                    } else {
-                        Some(TickLine::simple(format!("{:.0}", val)))
-                    }
-                })
-                .with_grid_renderer(|_| {
-                    Some(GridLine {
-                        thickness: 1.0.into(),
-                    })
-                })
+                .with_tick_renderer(y_axis_tick_renderer)
                 .skip_overlapping_labels(6.0),
         );
 
@@ -261,6 +217,36 @@ impl PlotData<f64, iced::Renderer, Theme> for ExponentialData {
             );
         }
     }
+}
+
+// -----------------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------------
+
+fn x_axis_tick_renderer(ctx: TickContext<f64>) -> TickResult {
+    // Only show Major ticks
+    if ctx.tick.level != 0 {
+        return TickResult::empty();
+    }
+    TickResult::with_tick_line(TickLine::default()).label(format!("{:.0}", ctx.tick.value))
+}
+
+fn y_axis_tick_renderer(ctx: TickContext<f64>) -> TickResult {
+    let result = TickResult::with_grid_line(GridLine::new(1.0));
+
+    // Only show tick-lines and labels on Major ticks
+    if ctx.tick.level != 0 {
+        return result;
+    }
+
+    let val = ctx.tick.value;
+    let label = if val >= 1000.0 {
+        format!("{:.0}k", val / 1000.0)
+    } else {
+        format!("{:.0}", val)
+    };
+
+    result.label(label).tick_line(TickLine::default())
 }
 
 // -----------------------------------------------------------------------------

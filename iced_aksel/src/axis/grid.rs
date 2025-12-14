@@ -31,3 +31,11 @@ impl Default for GridLine {
         }
     }
 }
+
+impl GridLine {
+    pub fn new<I: Into<Pixels>>(thickness: I) -> Self {
+        Self {
+            thickness: thickness.into(),
+        }
+    }
+}

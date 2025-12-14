@@ -31,7 +31,7 @@ use std::{
     rc::Rc,
 };
 
-use aksel::{Float, Tick};
+use aksel::{Float, Scale};
 use derivative::Derivative;
 use iced_core::{
     Layout, Pixels, Point, Rectangle, Size, Text,
@@ -44,6 +44,12 @@ use iced_core::{
 };
 use iced_graphics::{color, mesh::SolidVertex2D};
 
+use crate::{
+    plot,
+    render::MeshBuffer,
+    style::{AxisStyle, Style},
+};
+
 mod grid;
 mod position;
 mod tick;
@@ -51,25 +57,55 @@ mod tick;
 pub use grid::GridLine;
 pub use position::{Orientation, Position};
 pub use tick::{
-    LabelDecision, TickLine,
-    label::{Label, LabelBounds},
+    Label, LabelBounds, LabelCandidate, LabelDecision, LabelDecisionContext, PlacedLabelInfo,
+    ResolvedLabelCandidate, TickContext, TickLine, TickResult,
 };
 
-use tick::{LabelCandidate, PlacedLabelInfo, ResolvedLabelCandidate};
-
-use crate::{
-    plot,
-    render::MeshBuffer,
-    style::{AxisStyle, Style},
-};
-
-use super::Scale;
+// TODO: Can we, somehow, refactor out Rc<RefCell<T>>? Or is it okay as it is?
+type TickRendererFn<D> = Rc<RefCell<dyn FnMut(TickContext<D>) -> TickResult>>;
+type LabelFormatter<D> = Box<dyn Fn(D) -> Option<Label>>;
 
 type LabelPolicyFn<D> = dyn for<'a> Fn(LabelDecisionContext<'a, D>) -> LabelDecision + 'static;
-// TODO: Can we, somehow, refactor out Rc<RefCell<T>>? Or is it okay as it is?
-type TickRendererFn<D> = Rc<RefCell<dyn FnMut(TickLabelContext<D>) -> Option<TickLine>>>;
-type LabelFormatter<D> = Box<dyn Fn(D) -> Option<Label>>;
-type GridRendererFn<D> = Box<dyn Fn(Tick<D>) -> Option<GridLine>>;
+
+// Making this inaccessible to user for simplicity.
+#[derive(Derivative, Default)]
+#[derivative(Debug)]
+pub enum LabelPolicy<D> {
+    #[default]
+    All,
+    SkipOverlapping {
+        min_gap: f32,
+    },
+    Custom(#[derivative(Debug = "ignore")] Box<LabelPolicyFn<D>>),
+}
+
+impl<D> LabelPolicy<D> {
+    pub const fn all() -> Self {
+        Self::All
+    }
+
+    pub const fn skip_overlapping(min_gap: f32) -> Self {
+        Self::SkipOverlapping { min_gap }
+    }
+
+    pub fn custom<F>(policy: F) -> Self
+    where
+        F: for<'a> Fn(LabelDecisionContext<'a, D>) -> LabelDecision + 'static,
+    {
+        Self::Custom(Box::new(policy))
+    }
+
+    fn should_render(&self, context: LabelDecisionContext<'_, D>) -> bool {
+        match self {
+            Self::All => true,
+            Self::SkipOverlapping { min_gap } => context
+                .accepted
+                .iter()
+                .all(|placed| !context.bounds.overlaps_with_gap(&placed.bounds, *min_gap)),
+            Self::Custom(policy) => matches!(policy(context), LabelDecision::Render),
+        }
+    }
+}
 
 /// An axis that maps data values to screen coordinates.
 ///
@@ -103,12 +139,11 @@ pub struct Axis<D> {
     thickness: Pixels,
     invisible: bool,
     render_cursor: bool,
+    render_grid: bool,
     label_spacing: Pixels,
 
     #[derivative(Debug = "ignore")]
     scale: Box<dyn Scale<Domain = D, Normalized = f32>>,
-    #[derivative(Debug = "ignore")]
-    pub(crate) grid_renderer: Option<GridRendererFn<D>>,
     #[derivative(Debug = "ignore")]
     pub(crate) tick_renderer: Option<TickRendererFn<D>>,
     #[derivative(Debug = "ignore")]
@@ -145,37 +180,33 @@ impl<D: Float> Axis<D> {
         scale: impl Scale<Domain = D, Normalized = f32> + 'static,
         position: Position,
     ) -> Self {
-        // Default grid renderer - only render major ticks (level 0)
-        let grid_renderer = Box::new(|tick: Tick<D>| {
-            if tick.level != 0 {
-                return None;
-            }
-            Some(GridLine {
-                thickness: 1.0.into(),
-            })
-        });
-
-        let tick_renderer = Rc::new(RefCell::new(|ctx: TickLabelContext<D>| {
-            Some(TickLine {
+        let tick_renderer = Rc::new(RefCell::new(|ctx: TickContext<D>| {
+            let mut result = TickResult::with_tick_line(TickLine {
                 thickness: 1.0.into(),
                 length: match ctx.tick.level {
                     0 => 10.0,
                     _ => 5.0,
                 }
                 .into(),
-                label: None,
-            })
+            });
+            if ctx.tick.level != 0 {
+                result = result.grid_line(GridLine {
+                    thickness: 1.0.into(),
+                });
+            }
+
+            result
         }));
 
         Self {
             position,
             thickness: 50.0.into(),
             render_cursor: true,
+            render_grid: true,
             invisible: false,
             label_spacing: 5.0.into(),
 
             scale: Box::new(scale),
-            grid_renderer: Some(grid_renderer),
             tick_renderer: Some(tick_renderer),
             cursor_formatter: None,
             label_policy: LabelPolicy::default(),
@@ -217,32 +248,6 @@ impl<D: Float> Axis<D> {
         self
     }
 
-    /// Sets a custom grid line renderer.
-    ///
-    /// The renderer receives tick information and returns `Some(GridLine)` to draw a grid line,
-    /// or `None` to skip it. Typically you filter by `tick.level` to only draw major ticks.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # use iced_aksel::{Axis, axis::{self, GridLine}, scale::Linear};
-    /// let axis = Axis::new(Linear::new(0.0, 100.0), axis::Position::Bottom)
-    ///     .with_grid_renderer(|tick| {
-    ///         if tick.level == 0 {
-    ///             Some(GridLine { thickness: 1.0.into() })
-    ///         } else {
-    ///             None
-    ///         }
-    ///     });
-    /// ```
-    pub fn with_grid_renderer<F>(mut self, renderer: F) -> Self
-    where
-        F: Fn(Tick<D>) -> Option<GridLine> + 'static,
-    {
-        self.grid_renderer = Some(Box::new(renderer));
-        self
-    }
-
     /// Sets a custom tick renderer.
     ///
     /// The renderer receives tick context and returns `Some(TickLine)` with optional label,
@@ -259,7 +264,7 @@ impl<D: Float> Axis<D> {
     /// ```
     pub fn with_tick_renderer<F>(mut self, renderer: F) -> Self
     where
-        F: FnMut(TickLabelContext<D>) -> Option<TickLine> + 'static,
+        F: FnMut(TickContext<D>) -> TickResult + 'static,
     {
         self.tick_renderer = Some(Rc::new(RefCell::new(renderer)));
         self
@@ -274,8 +279,8 @@ impl<D: Float> Axis<D> {
     /// let axis = Axis::new(Linear::new(0.0, 100.0), axis::Position::Bottom)
     ///     .without_grid();
     /// ```
-    pub fn without_grid(mut self) -> Self {
-        self.grid_renderer = None;
+    pub const fn without_grid(mut self) -> Self {
+        self.render_grid = false;
         self
     }
 
@@ -373,7 +378,7 @@ impl<D: Float> Axis<D> {
     /// are allowed to have labels & grid lines.
     pub fn set_tick_renderer<F>(&mut self, renderer: F)
     where
-        F: Fn(TickLabelContext<D>) -> Option<TickLine> + 'static,
+        F: Fn(TickContext<D>) -> TickResult + 'static,
     {
         self.tick_renderer = Some(Rc::new(RefCell::new(renderer)));
     }
@@ -486,7 +491,7 @@ impl<D: Float> Axis<D> {
     ) where
         Renderer: plot::Renderer,
     {
-        if self.invisible && self.grid_renderer.is_none() {
+        if self.invisible && !self.render_grid {
             return; // We don't need to render anything
         }
 
@@ -503,8 +508,8 @@ impl<D: Float> Axis<D> {
             let pos_norm = self.normalize(&tick.value);
 
             if self.is_visible() {
-                let tick_line = self.tick_renderer.as_ref().and_then(|renderer| {
-                    renderer.borrow_mut()(TickLabelContext {
+                let tick_result = self.tick_renderer.as_ref().map(|renderer| {
+                    renderer.borrow_mut()(TickContext {
                         tick,
                         normalized_position: pos_norm,
                         axis_bounds: bounds,
@@ -513,22 +518,34 @@ impl<D: Float> Axis<D> {
                     })
                 });
 
-                if let Some(mut line) = tick_line {
-                    if let Some(label) = line.label.take() {
+                if let Some(TickResult {
+                    mut label,
+                    mut tick_line,
+                    mut grid_line,
+                }) = tick_result
+                {
+                    if let Some(label) = label.take() {
                         label_candidates.push(LabelCandidate {
                             tick,
                             normalized_position: pos_norm,
                             label,
                         });
                     }
-                    self.draw_tick_line(&theme, line, &bounds, mesh_buffer, pos_norm);
+
+                    if let Some(line) = tick_line.take() {
+                        self.draw_tick_line(&theme, line, &bounds, mesh_buffer, pos_norm);
+                    }
+
+                    if let Some(line) = grid_line.take() {
+                        self.draw_grid_line(style, plot_bounds, line, mesh_buffer, pos_norm);
+                    }
                 }
             }
-
-            if let Some(line) = self.grid_renderer.as_ref().and_then(|f| f(tick)) {
-                self.draw_grid_line(style, plot_bounds, line, mesh_buffer, pos_norm);
-            }
         }
+
+        // Sort so the lowest tick levels (major) get processed first - E.g. they have higher
+        // priority
+        label_candidates.sort_by_key(LabelCandidate::priority);
 
         self.layout_labels(
             renderer,
@@ -911,79 +928,5 @@ impl<D: Float> Axis<D> {
                 },
             ],
         );
-    }
-}
-
-#[derive(Debug)]
-pub struct LabelDecisionContext<'a, D> {
-    pub tick: Tick<D>,
-    pub normalized_position: f32,
-    pub bounds: LabelBounds,
-    pub orientation: Orientation,
-    pub accepted: &'a [PlacedLabelInfo<D>],
-}
-
-// Making this inaccessible to user for simplicity.
-// TODO: Make better implementation later
-#[derive(Derivative, Default)]
-#[derivative(Debug)]
-pub enum LabelPolicy<D> {
-    #[default]
-    All,
-    SkipOverlapping {
-        min_gap: f32,
-    },
-    Custom(#[derivative(Debug = "ignore")] Box<LabelPolicyFn<D>>),
-}
-
-impl<D> LabelPolicy<D> {
-    pub const fn all() -> Self {
-        Self::All
-    }
-
-    pub const fn skip_overlapping(min_gap: f32) -> Self {
-        Self::SkipOverlapping { min_gap }
-    }
-
-    pub fn custom<F>(policy: F) -> Self
-    where
-        F: for<'a> Fn(LabelDecisionContext<'a, D>) -> LabelDecision + 'static,
-    {
-        Self::Custom(Box::new(policy))
-    }
-
-    fn should_render(&self, context: LabelDecisionContext<'_, D>) -> bool {
-        match self {
-            Self::All => true,
-            Self::SkipOverlapping { min_gap } => context
-                .accepted
-                .iter()
-                .all(|placed| !context.bounds.overlaps_with_gap(&placed.bounds, *min_gap)),
-            Self::Custom(policy) => matches!(policy(context), LabelDecision::Render),
-        }
-    }
-}
-
-/// This is all the information you would need to define a `TickLine` properly.
-#[derive(Debug, Clone, Copy)]
-pub struct TickLabelContext<D> {
-    pub tick: Tick<D>,
-    pub normalized_position: f32,
-    pub axis_bounds: Rectangle,
-    pub scale_domain: (D, D),
-    pub orientation: Orientation,
-}
-
-impl<D: Float> TickLabelContext<D> {
-    pub const fn axis_span(&self) -> f32 {
-        match self.orientation {
-            Orientation::Horizontal => self.axis_bounds.width,
-            Orientation::Vertical => self.axis_bounds.height,
-        }
-    }
-
-    pub fn scale_span(&self) -> D {
-        let (min, max) = self.scale_domain;
-        min.abs_sub(max)
     }
 }

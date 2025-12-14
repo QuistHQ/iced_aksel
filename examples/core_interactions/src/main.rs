@@ -6,7 +6,7 @@ use iced::{
 };
 use iced_aksel::{
     Axis, Chart, PlotPoint, State, Stroke,
-    axis::{self, TickLine},
+    axis::{self, TickLine, TickResult},
     plot::{self, Plot, PlotData},
     scale::Linear,
     shape::Polyline,
@@ -64,7 +64,10 @@ impl Interactions {
         let axis_x =
             Axis::new(linear_x, axis::Position::Bottom).with_tick_renderer(|ctx| {
                 match ctx.tick.level {
-                    0 => Some(TickLine::simple(format!("{:.1}s", ctx.tick.value))),
+                    0 => TickResult::with_tick_line(TickLine::simple(format!(
+                        "{:.1}s",
+                        ctx.tick.value
+                    ))),
                     _ => None,
                 }
             });

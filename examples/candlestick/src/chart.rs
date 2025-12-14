@@ -4,7 +4,7 @@ use chrono::{Datelike, TimeZone, Timelike};
 use iced::mouse::ScrollDelta;
 use iced_aksel::{
     Axis, Chart, Measure, State,
-    axis::{self, Position, TickLabelContext, TickLine},
+    axis::{self, Position, TickContext, TickLine},
     plot::DragDelta,
     scale::Linear,
 };
@@ -433,7 +433,7 @@ impl CandlestickChart {
         let scale = Linear::new(range.0, range.1);
         let mut current_month = u32::MAX;
         let mut shown_month = false;
-        let tick_renderer = move |ctx: TickLabelContext<f64>| -> Option<TickLine> {
+        let tick_renderer = move |ctx: TickContext<f64>| -> Option<TickLine> {
             let span = ctx.scale_span() as i64;
             let timestamp_seconds = ctx.tick.value as i64 * 60; // Assuming 1 unit = 1 minute
             let datetime = chrono::Utc.timestamp_opt(timestamp_seconds, 0).single()?;
@@ -481,7 +481,7 @@ impl CandlestickChart {
     /// Factory for creating the Price Y-axis.
     fn create_y_axis(range: (f64, f64)) -> Axis<f64> {
         let scale = Linear::new(range.0, range.1);
-        let tick_renderer = |ctx: TickLabelContext<f64>| -> Option<TickLine> {
+        let tick_renderer = |ctx: TickContext<f64>| -> Option<TickLine> {
             Some(TickLine::simple(format!("{:.2}", ctx.tick.value)))
         };
         Axis::new(scale, Position::Right)
