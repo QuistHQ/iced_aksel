@@ -66,8 +66,8 @@ use iced_aksel::{
     shape::Circle,
 };
 
-const X_ID: &'static = "x_id";
-const Y_ID: &'static = "y_id";
+const X_ID: &'static str = "x_id";
+const Y_ID: &'static str = "y_id";
 
 struct App {
     chart: State<&'static str, f64>,
