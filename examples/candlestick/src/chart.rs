@@ -4,7 +4,7 @@ use chrono::{Datelike, TimeZone, Timelike};
 use iced::mouse::ScrollDelta;
 use iced_aksel::{
     Axis, Chart, Measure, State,
-    axis::{self, Position, TickContext, TickLine},
+    axis::{self, GridLine, Label, Position, TickContext, TickLine, TickResult},
     plot::DragDelta,
     scale::Linear,
 };
@@ -433,10 +433,12 @@ impl CandlestickChart {
         let scale = Linear::new(range.0, range.1);
         let mut current_month = u32::MAX;
         let mut shown_month = false;
-        let tick_renderer = move |ctx: TickContext<f64>| -> Option<TickLine> {
+        let tick_renderer = move |ctx: TickContext<f64>| -> TickResult {
             let span = ctx.scale_span() as i64;
             let timestamp_seconds = ctx.tick.value as i64 * 60; // Assuming 1 unit = 1 minute
-            let datetime = chrono::Utc.timestamp_opt(timestamp_seconds, 0).single()?;
+            let Some(datetime) = chrono::Utc.timestamp_opt(timestamp_seconds, 0).single() else {
+                return TickResult::empty();
+            };
 
             let text = match span {
                 ..10080 => {
@@ -463,7 +465,27 @@ impl CandlestickChart {
                 }
             };
 
-            Some(TickLine::simple(text))
+            let label = match ctx.tick.level {
+                0 => Some(text.into()),
+                1 => Some(text.into()),
+                _ => None,
+            };
+
+            let grid_line = match ctx.tick.level {
+                0 => Some(GridLine::default()),
+                _ => None,
+            };
+
+            let tick_line = match ctx.tick.level {
+                0 => Some(TickLine::default()),
+                _ => None,
+            };
+
+            TickResult {
+                label,
+                grid_line,
+                tick_line,
+            }
         };
         Axis::new(scale, Position::Bottom)
             .with_tick_renderer(tick_renderer)
@@ -481,8 +503,11 @@ impl CandlestickChart {
     /// Factory for creating the Price Y-axis.
     fn create_y_axis(range: (f64, f64)) -> Axis<f64> {
         let scale = Linear::new(range.0, range.1);
-        let tick_renderer = |ctx: TickContext<f64>| -> Option<TickLine> {
-            Some(TickLine::simple(format!("{:.2}", ctx.tick.value)))
+        let tick_renderer = |ctx: TickContext<f64>| -> TickResult {
+            TickResult {
+                label: Some(format!("{:.2}", ctx.tick.value).into()),
+                ..Default::default()
+            }
         };
         Axis::new(scale, Position::Right)
             .with_tick_renderer(tick_renderer)
