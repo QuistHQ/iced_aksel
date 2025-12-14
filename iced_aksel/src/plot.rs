@@ -60,7 +60,7 @@ impl<T> Renderer for T where
 /// }
 ///
 /// impl PlotData<f64> for DataPoints {
-///     fn draw(&self, plot: &mut Plot<f64, iced::Renderer>, theme: &Theme) {
+///     fn draw(&self, plot: &mut Plot<f64>, theme: &Theme) {
 ///         for point in &self.points {
 ///             plot.add_shape(
 ///                 Circle::new(*point, Measure::Screen(3.0))
@@ -105,7 +105,7 @@ impl<Renderer: iced_core::text::Renderer> TextRenderer<'_, Renderer> {
     }
 }
 
-pub struct Context<'a, D: Float, Renderer: self::Renderer> {
+pub struct Context<'a, D: Float, Renderer: self::Renderer = iced_renderer::Renderer> {
     transform: &'a Transform<'a, D, f32, f32>,
     clip_bounds: &'a iced_core::Rectangle,
     renderer: &'a mut Renderer,
@@ -160,7 +160,7 @@ impl<'a, D: Float, Renderer: self::Renderer> Context<'a, D, Renderer> {
 ///
 /// This is passed to your [`PlotData::draw`] implementation. Use [`Plot::add_shape`]
 /// to render visual elements.
-pub struct Plot<'a, D: Float, R: self::Renderer> {
+pub struct Plot<'a, D: Float, R: self::Renderer = iced_renderer::Renderer> {
     context: Context<'a, D, R>,
 }
 
@@ -199,7 +199,7 @@ where
     /// # use iced_aksel::plot::{Plot, PlotData};
     /// # struct MyData;
     /// # impl PlotData<f64> for MyData {
-    /// #     fn draw(&self, plot: &mut Plot<f64, iced::Renderer>, theme: &iced::Theme) {
+    /// #     fn draw(&self, plot: &mut Plot<f64>, theme: &iced::Theme) {
     /// let bounds = plot.bounds();
     /// let (x_min, x_max) = (bounds.min_x(), bounds.max_x());
     /// let (y_min, y_max) = (bounds.min_y(), bounds.max_y());
@@ -219,7 +219,7 @@ where
     /// # use iced::Color;
     /// # struct MyData;
     /// # impl PlotData<f64> for MyData {
-    /// #     fn draw(&self, plot: &mut Plot<f64, iced::Renderer>, theme: &iced::Theme) {
+    /// #     fn draw(&self, plot: &mut Plot<f64>, theme: &iced::Theme) {
     /// plot.add_shape(
     ///     Circle::new(PlotPoint::new(5.0, 10.0), Measure::Screen(5.0))
     ///         .fill(Color::from_rgb(1.0, 0.0, 0.0))

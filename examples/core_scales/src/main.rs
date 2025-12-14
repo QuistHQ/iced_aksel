@@ -202,8 +202,8 @@ impl ExponentialData {
     }
 }
 
-impl PlotData<f64, iced::Renderer, Theme> for ExponentialData {
-    fn draw(&self, plot: &mut Plot<f64, iced::Renderer>, theme: &Theme) {
+impl PlotData<f64> for ExponentialData {
+    fn draw(&self, plot: &mut Plot<f64>, theme: &Theme) {
         // Draw the line
         plot.add_shape(Polyline::new(
             self.line.clone(),

@@ -392,8 +392,8 @@ impl DataLayer {
     }
 }
 
-impl PlotData<f64, iced::Renderer, Theme> for DataLayer {
-    fn draw(&self, plot: &mut Plot<f64, iced::Renderer>, theme: &Theme) {
+impl PlotData<f64> for DataLayer {
+    fn draw(&self, plot: &mut Plot<f64>, theme: &Theme) {
         plot.add_shape(Polyline::new(
             self.points.clone(),
             Stroke::new(theme.palette().primary, Measure::Screen(2.0)),

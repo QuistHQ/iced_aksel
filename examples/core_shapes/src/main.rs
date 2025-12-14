@@ -59,12 +59,12 @@ impl ShapeGallery {
 }
 
 impl PlotData<f64> for ShapeGallery {
-    fn draw(&self, plot: &mut Plot<f64, iced::Renderer>, theme: &Theme) {
+    fn draw(&self, plot: &mut Plot<f64>, theme: &Theme) {
         let palette = theme.palette();
         let text_color = palette.text;
 
         // --- Helpers ---
-        let draw_row_label = |plot: &mut Plot<f64, iced::Renderer>, y: f64, title: &str| {
+        let draw_row_label = |plot: &mut Plot<f64>, y: f64, title: &str| {
             plot.add_shape(
                 Label::new(title, PlotPoint::new(-10.0, y))
                     .size(14.0)
@@ -73,7 +73,7 @@ impl PlotData<f64> for ShapeGallery {
             );
         };
 
-        let draw_col_header = |plot: &mut Plot<f64, iced::Renderer>, x: f64, title: &str| {
+        let draw_col_header = |plot: &mut Plot<f64>, x: f64, title: &str| {
             plot.add_shape(
                 Label::new(title, PlotPoint::new(x, 180.0))
                     .size(12.0)
@@ -447,7 +447,7 @@ impl PlotData<f64> for ShapeGallery {
         draw_row_label(plot, y, "Label Align");
 
         // Helper to draw an anchor point
-        let draw_anchor = |plot: &mut Plot<f64, iced::Renderer>, pt: PlotPoint| {
+        let draw_anchor = |plot: &mut Plot<f64>, pt: PlotPoint| {
             plot.add_shape(
                 Rectangle::new(
                     pt,

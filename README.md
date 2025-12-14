@@ -110,7 +110,7 @@ impl Scatter {
 }
 
 impl PlotData<f64> for Scatter {
-    fn draw(&self, plot: &mut Plot<f64, iced::Renderer>, theme: &Theme) {
+    fn draw(&self, plot: &mut Plot<f64>, theme: &Theme) {
         for point in &self.points {
             plot.add_shape(
                 Circle::new(*point, Measure::Screen(5.0))

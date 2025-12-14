@@ -308,8 +308,8 @@ impl SignalData {
     }
 }
 
-impl PlotData<f64, iced::Renderer, Theme> for SignalData {
-    fn draw(&self, plot: &mut Plot<f64, iced::Renderer>, theme: &Theme) {
+impl PlotData<f64> for SignalData {
+    fn draw(&self, plot: &mut Plot<f64>, theme: &Theme) {
         plot.add_shape(Polyline::new(
             self.points.clone(),
             Stroke::new(theme.palette().primary, iced_aksel::Measure::Screen(1.5)),

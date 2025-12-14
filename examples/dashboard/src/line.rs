@@ -552,7 +552,7 @@ impl LineChart {
 
 // Unified Renderer
 impl PlotData<f64> for LineChart {
-    fn draw(&self, plot: &mut Plot<f64, iced::Renderer>, theme: &Theme) {
+    fn draw(&self, plot: &mut Plot<f64>, theme: &Theme) {
         let chart_floor = self
             .state
             .axis(&Self::Y.to_string())

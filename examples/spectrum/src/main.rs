@@ -12,7 +12,7 @@ use iced::{
     window,
 };
 use iced_aksel::{
-    Axis, Chart, Measure, Plot, PlotPoint, State, Stroke,
+    Axis, Chart, Measure, Plot, PlotData, PlotPoint, State, Stroke,
     axis::{GridLine, Label, Position, TickContext, TickLine},
     plot, scale, shape,
 };
@@ -200,8 +200,8 @@ struct SpectrumLayer {
     pub curve: Vec<PlotPoint<f64>>,
 }
 
-impl<R: plot::Renderer> plot::PlotData<f64, R> for SpectrumLayer {
-    fn draw(&self, plot: &mut Plot<'_, f64, R>, theme: &iced::Theme) {
+impl PlotData<f64> for SpectrumLayer {
+    fn draw(&self, plot: &mut Plot<f64>, theme: &iced::Theme) {
         if self.curve.len() < 2 {
             return;
         }

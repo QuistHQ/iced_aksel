@@ -1,5 +1,5 @@
 use iced::{Color, theme::palette::Extended};
-use iced_aksel::{Measure, Plot, PlotPoint, Stroke, plot, shape, stroke::StrokeStyle};
+use iced_aksel::{Measure, Plot, PlotData, PlotPoint, Stroke, shape, stroke::StrokeStyle};
 
 /// Represents a single candlestick.
 #[derive(Debug, Clone, Copy)]
@@ -47,8 +47,8 @@ pub struct CandleItems {
     pub candle_width: Measure<f64>,
 }
 
-impl<R: plot::Renderer> plot::PlotData<f64, R> for CandleItems {
-    fn draw(&self, plot: &mut Plot<'_, f64, R>, theme: &iced::Theme) {
+impl PlotData<f64> for CandleItems {
+    fn draw(&self, plot: &mut Plot<f64>, theme: &iced::Theme) {
         let palette = theme.extended_palette();
         // Create rectangles from candle data during draw
         for (time, candle) in &self.candles {
@@ -82,8 +82,8 @@ pub struct VolumeItems {
     pub bar_width: Measure<f64>,
 }
 
-impl<R: plot::Renderer> plot::PlotData<f64, R> for VolumeItems {
-    fn draw(&self, plot: &mut Plot<'_, f64, R>, theme: &iced::Theme) {
+impl PlotData<f64> for VolumeItems {
+    fn draw(&self, plot: &mut Plot<f64>, theme: &iced::Theme) {
         let palette = theme.extended_palette();
         // Create volume bars from candle data during draw
         for (time, candle) in &self.candles {
@@ -107,8 +107,8 @@ pub struct SmaItems {
     pub points: Vec<PlotPoint<f64>>,
 }
 
-impl<R: plot::Renderer> plot::PlotData<f64, R> for SmaItems {
-    fn draw(&self, plot: &mut Plot<'_, f64, R>, theme: &iced::Theme) {
+impl PlotData<f64> for SmaItems {
+    fn draw(&self, plot: &mut Plot<f64>, theme: &iced::Theme) {
         let palette = theme.palette();
 
         if !self.points.is_empty() {
@@ -132,8 +132,8 @@ pub struct BbandsItems {
     pub lower: Vec<PlotPoint<f64>>,
 }
 
-impl<R: plot::Renderer> plot::PlotData<f64, R> for BbandsItems {
-    fn draw(&self, plot: &mut Plot<'_, f64, R>, theme: &iced::Theme) {
+impl PlotData<f64> for BbandsItems {
+    fn draw(&self, plot: &mut Plot<f64>, theme: &iced::Theme) {
         let palette = theme.palette();
 
         if !self.upper.is_empty() {

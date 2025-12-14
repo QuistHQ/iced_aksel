@@ -76,7 +76,7 @@ pub use triangle::Triangle;
 /// }
 ///
 /// impl Shape<f64> for MyCustomShape {
-///     fn render(self, ctx: &mut plot::Context<'_, f64, iced::Renderer>) {
+///     fn render(self, ctx: &mut plot::Context<'_, f64>) {
 ///         // Use ctx.render_mesh() for geometric shapes
 ///         // or ctx.render_text() for text rendering
 ///     }

@@ -16,7 +16,7 @@ use iced::{
     widget::{Slider, button, checkbox, column, radio, row, text},
 };
 use iced_aksel::{
-    Axis, Chart, Measure, Plot, PlotPoint, State, Stroke,
+    Axis, Chart, Measure, Plot, PlotData, PlotPoint, State, Stroke,
     axis::Position,
     plot::{self, DragDelta},
     scale::Linear,
@@ -107,8 +107,8 @@ struct StressRectangles {
     stroke_style: StrokeStyle,
 }
 
-impl<R: plot::Renderer> plot::PlotData<f64, R> for StressRectangles {
-    fn draw(&self, plot: &mut Plot<'_, f64, R>, _theme: &iced::Theme) {
+impl PlotData<f64> for StressRectangles {
+    fn draw(&self, plot: &mut Plot<f64>, _theme: &iced::Theme) {
         for (base_rect, &color) in self.geometry.iter().zip(self.colors.iter()) {
             let mut rect = base_rect.clone();
 
@@ -145,8 +145,8 @@ struct StressCircles {
     stroke_style: StrokeStyle,
 }
 
-impl<R: plot::Renderer> plot::PlotData<f64, R> for StressCircles {
-    fn draw(&self, plot: &mut Plot<'_, f64, R>, _theme: &iced::Theme) {
+impl PlotData<f64> for StressCircles {
+    fn draw(&self, plot: &mut Plot<f64>, _theme: &iced::Theme) {
         for (base_circle, &color) in self.geometry.iter().zip(self.colors.iter()) {
             let mut circle = base_circle.clone();
 
@@ -183,8 +183,8 @@ struct StressTriangles {
     stroke_style: StrokeStyle,
 }
 
-impl<R: plot::Renderer> plot::PlotData<f64, R> for StressTriangles {
-    fn draw(&self, plot: &mut Plot<'_, f64, R>, _theme: &iced::Theme) {
+impl PlotData<f64> for StressTriangles {
+    fn draw(&self, plot: &mut Plot<f64>, _theme: &iced::Theme) {
         for (base_tri, &color) in self.geometry.iter().zip(self.colors.iter()) {
             let mut tri = base_tri.clone();
 
@@ -225,8 +225,8 @@ struct StressLines {
     stroke_style: StrokeStyle,
 }
 
-impl<R: plot::Renderer> plot::PlotData<f64, R> for StressLines {
-    fn draw(&self, plot: &mut Plot<'_, f64, R>, _theme: &iced::Theme) {
+impl PlotData<f64> for StressLines {
+    fn draw(&self, plot: &mut Plot<f64>, _theme: &iced::Theme) {
         if !self.show_fill {
             return;
         }
@@ -264,8 +264,8 @@ struct StressPolylines {
     stroke_style: StrokeStyle,
 }
 
-impl<R: plot::Renderer> plot::PlotData<f64, R> for StressPolylines {
-    fn draw(&self, plot: &mut Plot<'_, f64, R>, _theme: &iced::Theme) {
+impl PlotData<f64> for StressPolylines {
+    fn draw(&self, plot: &mut Plot<f64>, _theme: &iced::Theme) {
         if !self.show_fill {
             return;
         }
@@ -299,8 +299,8 @@ struct StressArcs {
     stroke_style: StrokeStyle,
 }
 
-impl<R: plot::Renderer> plot::PlotData<f64, R> for StressArcs {
-    fn draw(&self, plot: &mut Plot<'_, f64, R>, _theme: &iced::Theme) {
+impl PlotData<f64> for StressArcs {
+    fn draw(&self, plot: &mut Plot<f64>, _theme: &iced::Theme) {
         for (base_arc, &color) in self.geometry.iter().zip(self.colors.iter()) {
             let mut arc = base_arc.clone();
 
@@ -337,8 +337,8 @@ struct StressPolygons {
     stroke_style: StrokeStyle,
 }
 
-impl<R: plot::Renderer> plot::PlotData<f64, R> for StressPolygons {
-    fn draw(&self, plot: &mut Plot<'_, f64, R>, _theme: &iced::Theme) {
+impl plot::PlotData<f64> for StressPolygons {
+    fn draw(&self, plot: &mut Plot<f64>, _theme: &iced::Theme) {
         for (base_poly, &color) in self.geometry.iter().zip(self.colors.iter()) {
             let mut poly = base_poly.clone();
 
@@ -372,8 +372,8 @@ struct StressLabels {
     font_size: f32,
 }
 
-impl<R: plot::Renderer> plot::PlotData<f64, R> for StressLabels {
-    fn draw(&self, plot: &mut Plot<'_, f64, R>, _theme: &iced::Theme) {
+impl PlotData<f64> for StressLabels {
+    fn draw(&self, plot: &mut Plot<f64>, _theme: &iced::Theme) {
         if !self.show_labels {
             return;
         }

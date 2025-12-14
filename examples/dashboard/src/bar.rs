@@ -255,7 +255,7 @@ impl BarChart {
 }
 
 impl PlotData<f64> for BarChart {
-    fn draw(&self, plot: &mut Plot<f64, iced::Renderer>, theme: &Theme) {
+    fn draw(&self, plot: &mut Plot<f64>, theme: &Theme) {
         let palette = theme.palette();
         let bar_color = palette.primary;
 

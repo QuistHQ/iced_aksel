@@ -53,7 +53,7 @@
 //!
 //! // Implement PlotData to define how your data is drawn
 //! impl PlotData<f64> for ScatterData {
-//!     fn draw(&self, plot: &mut Plot<f64, iced::Renderer>, theme: &Theme) {
+//!     fn draw(&self, plot: &mut Plot<f64>, theme: &Theme) {
 //!         for point in &self.points {
 //!             plot.add_shape(
 //!                 Circle::new(*point, Measure::Screen(5.0))
@@ -183,7 +183,7 @@ impl<AxisId> Default for Memory<AxisId> {
 /// # enum Message { Scroll(iced::Point, iced::mouse::ScrollDelta) }
 /// # struct MyData;
 /// # impl PlotData<f64> for MyData {
-/// #     fn draw(&self, plot: &mut iced_aksel::Plot<f64, iced::Renderer>, theme: &iced::Theme) {}
+/// #     fn draw(&self, plot: &mut iced_aksel::Plot<f64>, theme: &iced::Theme) {}
 /// # }
 /// let mut state: State<&str, f64> = State::new();
 /// state.set_axis("x_axis", Axis::new(Linear::new(0.0, 100.0), axis::Position::Bottom));
@@ -281,7 +281,7 @@ where
     /// # #[derive(Clone)] enum Message {}
     /// # struct MyData;
     /// # impl PlotData<f64> for MyData {
-    /// #     fn draw(&self, plot: &mut iced_aksel::Plot<f64, iced::Renderer>, theme: &iced::Theme) {}
+    /// #     fn draw(&self, plot: &mut iced_aksel::Plot<f64>, theme: &iced::Theme) {}
     /// # }
     /// # let mut state: State<&str, f64> = State::new();
     /// # state.set_axis("x_axis", Axis::new(Linear::new(0.0, 100.0), axis::Position::Bottom));

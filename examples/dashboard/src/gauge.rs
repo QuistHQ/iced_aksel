@@ -400,7 +400,7 @@ impl Gauge {
 // --- Drawing Logic ---
 
 impl PlotData<f64> for Gauge {
-    fn draw(&self, plot: &mut Plot<f64, iced::Renderer>, theme: &Theme) {
+    fn draw(&self, plot: &mut Plot<f64>, theme: &Theme) {
         // Debug Overlay
         if self.debug_mode {
             let limit = GAUGE_RADIUS + self.padding;

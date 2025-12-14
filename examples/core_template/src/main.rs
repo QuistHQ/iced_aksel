@@ -167,8 +167,8 @@ impl StarField {
     }
 }
 
-impl PlotData<f64, iced::Renderer, Theme> for StarField {
-    fn draw(&self, plot: &mut Plot<f64, iced::Renderer>, _theme: &Theme) {
+impl PlotData<f64> for StarField {
+    fn draw(&self, plot: &mut Plot<f64>, _theme: &Theme) {
         // Very small fixed size (1 screen pixel)
         let size = Measure::Screen(1.0);
 
