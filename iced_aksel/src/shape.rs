@@ -50,6 +50,7 @@ mod polygon;
 mod polyline;
 mod rectangle;
 mod triangle;
+mod zone;
 
 pub use arc::Arc;
 pub use circle::Circle;
@@ -59,6 +60,7 @@ pub use polygon::Polygon;
 pub use polyline::Polyline;
 pub use rectangle::Rectangle;
 pub use triangle::Triangle;
+pub use zone::Zone;
 
 /// Trait for shapes that can be rendered on a plot.
 ///
