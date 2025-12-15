@@ -612,8 +612,6 @@ impl PlotData<f64> for LineChart {
 
             if s.show_markers {
                 for point in &points {
-                    // Changed from Rectangle to Polygon (Diamond) for markers
-                    // radius ~ width + 2.0 (comparable to old box size)
                     let marker_radius = Measure::Screen(s.width + 2.0);
                     plot.add_shape(
                         Polygon::new(*point, marker_radius, 4)
