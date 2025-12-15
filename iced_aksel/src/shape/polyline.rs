@@ -229,7 +229,6 @@ impl<D: Float> Polyline<D> {
         }
     }
 
-    /// THE KEY OPTIMIZATION:
     /// Creates a lazy iterator that projects points from Plot Space to Screen Space.
     /// This avoids allocating a `Vec<Point>` unless absolutely necessary.
     fn project_points<'a>(
