@@ -1070,6 +1070,7 @@ impl StressTestApp {
 
     fn view(&self) -> Element<'_, Message> {
         let chart = Chart::new(&self.state)
+            .debug(true)
             .plot_data(&self.rectangles_layer, AXIS_ID_X, AXIS_ID_Y)
             .plot_data(&self.circles_layer, AXIS_ID_X, AXIS_ID_Y)
             .plot_data(&self.triangles_layer, AXIS_ID_X, AXIS_ID_Y)

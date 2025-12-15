@@ -9,6 +9,9 @@ use lyon_tessellation::{
 pub struct MeshBuffer {
     buffer: Option<mesh::Indexed<SolidVertex2D>>,
     vertex_limit: usize,
+
+    total_vertices: usize,
+    total_indices: usize,
 }
 
 impl MeshBuffer {
@@ -16,6 +19,9 @@ impl MeshBuffer {
         Self {
             buffer: None,
             vertex_limit,
+
+            total_vertices: 0,
+            total_indices: 0,
         }
     }
 
@@ -25,6 +31,25 @@ impl MeshBuffer {
         };
 
         0
+    }
+
+    pub const fn total_vertices(&self) -> usize {
+        // Include what's currently in the buffer + what has already been rendered
+        let current = if let Some(b) = &self.buffer {
+            b.vertices.len()
+        } else {
+            0
+        };
+        self.total_vertices + current
+    }
+
+    pub const fn total_indices(&self) -> usize {
+        let current = if let Some(b) = &self.buffer {
+            b.indices.len()
+        } else {
+            0
+        };
+        self.total_indices + current
     }
 
     pub const fn limit(&self) -> usize {
@@ -51,6 +76,10 @@ impl MeshBuffer {
             if buffer.indices.is_empty() {
                 return;
             }
+
+            // Capture stats
+            self.total_vertices += buffer.vertices.len();
+            self.total_indices += buffer.indices.len();
 
             renderer.draw_mesh(mesh::Mesh::Solid {
                 buffers: buffer,

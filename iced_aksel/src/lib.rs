@@ -82,6 +82,7 @@ use iced_core::{
     layout::{self, Limits, Node},
     mouse::{self, ScrollDelta},
     renderer::{Quad, Style},
+    text::{LineHeight, Shaping, Wrapping},
     touch,
     widget::{Tree, tree},
 };
@@ -232,6 +233,8 @@ pub struct Chart<
     on_axis_drag: Option<AxisDragHandler<AxisId, Message>>,
     on_axis_hover: Option<AxisHoverHandler<AxisId, Message>>,
     on_axis_scroll: Option<AxisScrollHandler<AxisId, Message>>,
+
+    debug: bool,
 }
 
 impl<'a, AxisId, Domain, Message, Theme, Renderer>
@@ -273,7 +276,15 @@ where
             on_axis_drag: None,
             on_axis_hover: None,
             on_axis_scroll: None,
+
+            debug: false,
         }
+    }
+
+    /// Enables the debug overlay, showing vertex and index counts.
+    pub fn debug(mut self, debug: bool) -> Self {
+        self.debug = debug;
+        self
     }
 
     /// Adds a data layer to the chart using the specified axes.
@@ -1059,6 +1070,43 @@ where
                 &transform,
             );
             layer.items.draw(&mut plot, theme);
+        }
+
+        // --- NEW DEBUG OVERLAY CODE ---
+        if self.debug {
+            renderer.start_layer(bounds);
+            // Get total counts from the buffer (includes all flushed layers)
+            let v_count = mesh_buffer.total_vertices();
+            let i_count = mesh_buffer.total_indices();
+
+            // Color Coding: Green (Good), Yellow (Heavy), Red (Critical)
+            let color = if v_count < 50_000 {
+                Color::from_rgb(0.0, 0.7, 0.0) // Dark Green
+            } else if v_count < 200_000 {
+                Color::from_rgb(0.9, 0.7, 0.0) // Orange/Yellow
+            } else {
+                Color::from_rgb(0.9, 0.0, 0.0) // Red
+            };
+
+            let text = format!("Vertices: {} | Indices: {}", v_count, i_count);
+
+            let position = [bounds.x + 10.0, bounds.y + 10.0];
+
+            let text = iced_core::Text {
+                content: text,
+                bounds: Size::new(500., 500.),
+                size: 32.into(),
+                line_height: LineHeight::default(),
+                font: renderer.default_font(),
+                align_x: iced_core::text::Alignment::Left,
+                align_y: iced_core::alignment::Vertical::Top,
+                shaping: Shaping::Basic,
+                wrapping: Wrapping::None,
+            };
+
+            // Draw Text
+            renderer.fill_text(text, position.into(), color, bounds);
+            renderer.end_layer();
         }
     }
 }
