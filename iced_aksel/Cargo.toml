@@ -15,13 +15,14 @@ exclude.workspace = true
 aksel.workspace = true
 derive_more.workspace = true
 derivative.workspace = true
-iced_core.workspace = true 
-iced_graphics.workspace = true 
+iced_core.workspace = true
+iced_graphics.workspace = true
 iced_renderer.workspace = true
 indexmap.workspace = true
 lyon_tessellation.workspace = true
 lyon_path.workspace = true
 lyon.workspace = true
+earcutr.workspace = true
 
 [dev-dependencies]
 rand.workspace = true

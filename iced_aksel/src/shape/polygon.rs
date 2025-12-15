@@ -132,11 +132,40 @@ impl<D: Float> Polygon<D> {
                     self.add_triangle_fan(buffer, &screen_points, color);
                 }
             } else {
-                // ROBUST PATH: Lyon Tessellator
-                // Insetting concave polygons safely is mathematically hard (Straight Skeleton).
-                // We skip the bleed fix inset for concave shapes to avoid artifacts (swallowtails),
-                // relying on the stroke to cover the edge.
-                tess.fill_polygon(buffer, screen_points.iter().cloned(), color);
+                // 1. Flatten Data for Earcut
+                // Earcut expects a flat Vec<f64>: [x0, y0, x1, y1, ...]
+                let mut flat_coords = Vec::with_capacity(screen_points.len() * 2);
+                for p in &screen_points {
+                    flat_coords.push(p.x as f64);
+                    flat_coords.push(p.y as f64);
+                }
+
+                // 2. Run Earcut
+                // Signature: earcut(data, hole_indices, dimensions)
+                // We assume no holes for simple polygons (pass &[]).
+                let indices = earcutr::earcut(&flat_coords, &[], 2).unwrap();
+
+                // 3. Push to Buffer
+                // Earcut returns a Vec<usize> of indices. We map them to our vertices.
+
+                // Add vertices first
+                let start_offset = buffer.vertices_count() as u32;
+                let c = pack(color);
+
+                // Optimization: buffer.add() expects a slice of Vertices.
+                // We can create that slice easily.
+                let vertices: Vec<SolidVertex2D> = screen_points
+                    .iter()
+                    .map(|p| SolidVertex2D {
+                        position: p.to_array(),
+                        color: c,
+                    })
+                    .collect();
+
+                // Convert indices to u32
+                let mesh_indices: Vec<u32> = indices.iter().map(|&i| i as u32).collect();
+
+                buffer.add(&mesh_indices, &vertices);
             }
         }
 
