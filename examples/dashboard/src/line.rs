@@ -4,11 +4,17 @@ use iced::{
     time::Instant,
 };
 use iced_aksel::{
-    Axis, Chart, Measure, PlotPoint, State, Stroke,
+    Axis,
+    Chart,
+    Measure,
+    PlotPoint,
+    State,
+    Stroke,
     axis::{self, TickLine, TickResult},
     plot::{Plot, PlotData},
     scale::Linear,
-    shape::{Label, Polygon, Polyline, Rectangle},
+    // Added Zone to imports
+    shape::{Label, Polygon, Polyline, Rectangle, Zone},
 };
 use std::collections::HashMap;
 
@@ -590,7 +596,8 @@ impl PlotData<f64> for LineChart {
                 }
                 let mut color = s.color;
                 color.a = self.current_fill_alpha;
-                plot.add_shape(Polygon::new(fill_poly).fill(color));
+                // Changed from Polygon to Zone for area filling
+                plot.add_shape(Zone::new(fill_poly).fill(color));
             }
 
             plot.add_shape(Polyline {
@@ -605,8 +612,14 @@ impl PlotData<f64> for LineChart {
 
             if s.show_markers {
                 for point in &points {
-                    let marker_size = Measure::Screen(s.width.mul_add(2.0, 2.0));
-                    plot.add_shape(Rectangle::new(*point, marker_size, marker_size).fill(s.color));
+                    // Changed from Rectangle to Polygon (Diamond) for markers
+                    // radius ~ width + 2.0 (comparable to old box size)
+                    let marker_radius = Measure::Screen(s.width + 2.0);
+                    plot.add_shape(
+                        Polygon::new(*point, marker_radius, 4)
+                            .rotation(45.0) // Rotate to form diamond
+                            .fill(s.color),
+                    );
                 }
             }
 
@@ -630,6 +643,8 @@ impl PlotData<f64> for LineChart {
 
                 for (i, series) in self.series.iter().enumerate() {
                     let y_pos = (i as f64).mul_add(-step_y, start_y);
+
+                    // Legend marker: Small square using Rectangle
                     plot.add_shape(
                         Rectangle::new(
                             PlotPoint::new(start_x, y_pos),
