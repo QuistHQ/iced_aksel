@@ -13,34 +13,6 @@ use lyon::math::{Point, Vector};
 ///
 /// Supports infinite extension on the first/last segments, optional arrowheads,
 /// and proper miter joins via Lyon tessellation.
-///
-/// # Example
-///
-/// ```rust
-/// use iced_aksel::{PlotPoint, Measure, shape::Polyline, Stroke};
-/// use iced::Color;
-///
-/// // Simple path connecting points
-/// let path = Polyline::new(
-///     vec![
-///         PlotPoint::new(0.0, 0.0),
-///         PlotPoint::new(10.0, 15.0),
-///         PlotPoint::new(20.0, 10.0),
-///         PlotPoint::new(30.0, 20.0),
-///     ],
-///     Stroke::new(Color::from_rgb(0.0, 0.0, 1.0), Measure::Screen(3.0))
-/// );
-///
-/// // Polyline with arrow at the end
-/// let arrow_path = Polyline::new(
-///     vec![
-///         PlotPoint::new(5.0, 5.0),
-///         PlotPoint::new(15.0, 10.0),
-///         PlotPoint::new(25.0, 8.0),
-///     ],
-///     Stroke::new(Color::from_rgb(1.0, 0.0, 0.0), Measure::Screen(2.0))
-/// ).arrow_end(true);
-/// ```
 #[derive(Debug, Clone)]
 pub struct Polyline<D> {
     pub points: Vec<PlotPoint<D>>,
@@ -65,7 +37,6 @@ impl<D: Float> Polyline<D> {
     //  Constructors
     // =========================================================================
 
-    /// Creates a new Polyline from a list of points.
     pub const fn new(points: Vec<PlotPoint<D>>, stroke: Stroke<D>) -> Self {
         Self {
             points,
@@ -121,33 +92,57 @@ impl<D: Float> Polyline<D> {
             return;
         }
 
-        // 1. Resolve to Screen Coordinates
-        // Optimization: Pre-allocate vector
-        let mut screen_points: Vec<Point> = self
-            .points
-            .iter()
-            .map(|p| Point::new(transform.x_to_screen(&p.x), transform.y_to_screen(&p.y)))
-            .collect();
-
-        // Cull if degenerate (all points identical?)
-        // Simple check on bounding box could go here, but Lyon handles it.
-
-        // 2. Resolve Stroke Thickness
-        let width = match self.stroke.thickness {
-            Measure::Screen(w) => w,
-            Measure::Plot(w) => {
-                let p0 = transform.x_to_screen(&D::zero());
-                let p1 = transform.x_to_screen(&w);
-                (p1 - p0).abs()
-            }
-        };
-
+        // 1. Resolve Stroke Thickness
+        let width = self.resolve_thickness(transform);
         if width < 0.1 {
             return;
         }
 
+        // 2. Branch: Fast vs Complex
+        if self.is_simple_line() {
+            self.tessellate_fast(transform, buffer, tess, width);
+        } else {
+            self.tessellate_complex(transform, buffer, tess, width);
+        }
+    }
+
+    // --- Path A: The Fast Path (Zero Allocation) ---
+    // Used for standard data series (99% of cases).
+    // Streams points directly from the plot data to the tessellator.
+    fn tessellate_fast(
+        &self,
+        transform: &Transform<D, f32, f32>,
+        buffer: &mut MeshBuffer,
+        tess: &mut Tessellators,
+        width: f32,
+    ) {
+        // Creates the iterator, does NOT collect into Vec
+        let iterator = self.project_points(transform);
+
+        tess.stroke_polyline(
+            buffer,
+            iterator,
+            &self.stroke,
+            width,
+            false, // Open path
+        );
+    }
+
+    // --- Path B: The Complex Path (Modifies Geometry) ---
+    // Used for arrows and infinite extensions.
+    // Must allocate a Vec because we need random access to modify start/end points.
+    fn tessellate_complex(
+        self,
+        transform: &Transform<D, f32, f32>,
+        buffer: &mut MeshBuffer,
+        tess: &mut Tessellators,
+        width: f32,
+    ) {
+        // 1. Allocate and Collect (Necessary for modification)
+        let mut screen_points: Vec<Point> = self.project_points(transform).collect();
+
+        // 2. Prepare Clipping for Extensions
         let bounds = transform.screen_bounds();
-        // Margin for clipping to ensure arrows/caps don't disappear
         let clip_margin = width * self.arrow_size.max(2.0);
         let clip_rect = (
             bounds.x - clip_margin,
@@ -156,80 +151,101 @@ impl<D: Float> Polyline<D> {
             bounds.y + bounds.height + clip_margin,
         );
 
-        // 3. Handle Arrowhead Retraction & Extension
-        // We modify the FIRST and LAST points of the vector.
-        let first_idx = 0;
         let last_idx = screen_points.len() - 1;
+        let p0 = screen_points[0];
+        let pn = screen_points[last_idx];
 
-        // --- Start Segment Logic ---
-        let p0 = screen_points[first_idx];
-        let p1 = screen_points[first_idx + 1];
-        let start_dir = (p1 - p0).normalize();
-
-        let arrow_len = width * self.arrow_size;
-
+        // 3. Modify Start (Extension or Arrow Retraction)
         if self.extend_start {
-            // Extend backwards to screen edge
+            let p1 = screen_points[1];
             if let Some((t0, _)) = clip_line(p0, p1, clip_rect) {
-                // t0 is the entry point (likely negative if extending backwards)
-                // P_new = P0 + t0 * (P1 - P0)
-                let delta = p1 - p0;
-                // Only extend if t0 < 0 (i.e., the edge is "behind" P0)
                 if t0 < 0.0 {
-                    screen_points[first_idx] = p0 + delta * t0;
+                    screen_points[0] = p0 + (p1 - p0) * t0;
                 }
             }
         } else if self.arrow_start {
-            // Retract forwards to make room for arrow base
-            screen_points[first_idx] = p0 + start_dir * arrow_len;
+            let p1 = screen_points[1];
+            let dir = (p1 - p0).normalize();
+            screen_points[0] = p0 + dir * (width * self.arrow_size);
         }
 
-        // --- End Segment Logic ---
-        let pn = screen_points[last_idx];
-        let pn_minus_1 = screen_points[last_idx - 1];
-        let end_dir = (pn - pn_minus_1).normalize();
-
+        // 4. Modify End (Extension or Arrow Retraction)
         if self.extend_end {
-            // Extend forwards to screen edge
+            let pn_minus_1 = screen_points[last_idx - 1];
             if let Some((_, t1)) = clip_line(pn_minus_1, pn, clip_rect) {
-                // t1 is the exit point
-                let delta = pn - pn_minus_1;
-                // Only extend if t1 > 1.0 (i.e., the edge is "ahead" of Pn)
                 if t1 > 1.0 {
-                    screen_points[last_idx] = pn_minus_1 + delta * t1;
+                    screen_points[last_idx] = pn_minus_1 + (pn - pn_minus_1) * t1;
                 }
             }
         } else if self.arrow_end {
-            // Retract backwards
-            screen_points[last_idx] = pn - end_dir * arrow_len;
+            let pn_minus_1 = screen_points[last_idx - 1];
+            let dir = (pn - pn_minus_1).normalize();
+            screen_points[last_idx] = pn - dir * (width * self.arrow_size);
         }
 
-        // 4. Render Body (Lyon)
-        // We use Lyon for the body to ensure proper joins between segments.
+        // 5. Render the Body
         tess.stroke_polyline(
             buffer,
-            screen_points, // Pass ownership of the vector
+            screen_points, // Pass the modified Vec
             &self.stroke,
             width,
-            false, // Open path
+            false,
         );
 
-        // 5. Render Arrowheads (Manual)
-        // Draw at ORIGINAL locations (p0, pn) not the retracted/extended ones.
-        // Unless extended (infinity -> no arrow).
-
+        // 6. Render Arrowheads (Manual Manual)
+        // We draw these at the *original* p0/pn coordinates
         if self.arrow_start && !self.extend_start {
-            // Pointing backwards from p0. Direction is -start_dir.
-            self.add_arrowhead(buffer, p0, -start_dir, width, self.stroke.fill);
+            let p1 = self.project_single(transform, 1); // Helper to get just one point
+            let dir = (p1 - p0).normalize();
+            self.add_arrowhead(buffer, p0, -dir, width, self.stroke.fill);
         }
 
         if self.arrow_end && !self.extend_end {
-            // Pointing forwards at pn. Direction is end_dir.
-            self.add_arrowhead(buffer, pn, end_dir, width, self.stroke.fill);
+            let pn_minus_1 = self.project_single(transform, self.points.len() - 2);
+            let dir = (pn - pn_minus_1).normalize();
+            self.add_arrowhead(buffer, pn, dir, width, self.stroke.fill);
         }
     }
 
-    // --- Helpers ---
+    // =========================================================================
+    //  Helpers
+    // =========================================================================
+
+    /// Returns true if we can use the optimized zero-allocation path.
+    #[inline(always)]
+    fn is_simple_line(&self) -> bool {
+        !self.arrow_start && !self.arrow_end && !self.extend_start && !self.extend_end
+    }
+
+    /// Resolves the stroke width in screen pixels.
+    fn resolve_thickness(&self, transform: &Transform<D, f32, f32>) -> f32 {
+        match self.stroke.thickness {
+            Measure::Screen(w) => w,
+            Measure::Plot(w) => {
+                let p0 = transform.x_to_screen(&D::zero());
+                let p1 = transform.x_to_screen(&w);
+                (p1 - p0).abs()
+            }
+        }
+    }
+
+    /// THE KEY OPTIMIZATION:
+    /// Creates a lazy iterator that projects points from Plot Space to Screen Space.
+    /// This avoids allocating a `Vec<Point>` unless absolutely necessary.
+    fn project_points<'a>(
+        &'a self,
+        transform: &'a Transform<D, f32, f32>,
+    ) -> impl Iterator<Item = Point> + 'a {
+        self.points
+            .iter()
+            .map(move |p| Point::new(transform.x_to_screen(&p.x), transform.y_to_screen(&p.y)))
+    }
+
+    /// Helper to get a specific projected point without creating a full iterator.
+    fn project_single(&self, transform: &Transform<D, f32, f32>, index: usize) -> Point {
+        let p = &self.points[index];
+        Point::new(transform.x_to_screen(&p.x), transform.y_to_screen(&p.y))
+    }
 
     fn add_arrowhead(
         &self,
@@ -240,7 +256,6 @@ impl<D: Float> Polyline<D> {
         color: Color,
     ) {
         let c = pack(color);
-
         let arrow_len = width * self.arrow_size;
         let arrow_width = width * self.arrow_size * 0.8;
 
@@ -249,6 +264,7 @@ impl<D: Float> Polyline<D> {
         let wing1 = base_center + normal;
         let wing2 = base_center - normal;
 
+        // Simple Triangle
         buffer.add(
             &[0, 1, 2],
             &[
@@ -269,7 +285,9 @@ impl<D: Float> Polyline<D> {
     }
 }
 
-// --- Math Utilities (Reused) ---
+// =========================================================================
+//  Math Utilities
+// =========================================================================
 
 fn clip_line(p1: Point, p2: Point, clip_rect: (f32, f32, f32, f32)) -> Option<(f32, f32)> {
     let (xmin, ymin, xmax, ymax) = clip_rect;
