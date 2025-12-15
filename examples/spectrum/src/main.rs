@@ -98,7 +98,6 @@ impl AnalyzerApp {
 
     fn update(&mut self, message: Message) {
         match message {
-            // Ticks for checking FPS and rebuilding the curve on the audio-data
             Message::Tick(now) => {
                 if let Some(last) = self.last_frame_time {
                     let dt = now.duration_since(last).as_secs_f32();
@@ -143,7 +142,6 @@ impl AnalyzerApp {
             curve.push(PlotPoint::new(freq, db));
         }
 
-        // Replace curve
         self.spectrum_layer.curve = curve;
     }
 
@@ -214,7 +212,7 @@ impl PlotData<f64> for SpectrumLayer {
         fill_points.push(PlotPoint::new(MAX_FREQ, MIN_DB));
 
         plot.add_shape(
-            shape::Polygon::new(fill_points).fill(palette.primary.base.color.scale_alpha(0.4)),
+            shape::Zone::new(fill_points).fill(palette.primary.base.color.scale_alpha(0.4)),
         );
 
         let glow_color = if theme.mode() == Mode::Light {

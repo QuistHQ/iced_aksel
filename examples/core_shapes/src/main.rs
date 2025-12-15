@@ -6,7 +6,7 @@ use iced_aksel::{
     Axis, Chart, PlotPoint, State, Stroke, axis,
     plot::{Plot, PlotData},
     scale::Linear,
-    shape::{Arc, Circle, Label, Line, Polygon, Polyline, Rectangle, Triangle},
+    shape::{Arc, Circle, Label, Line, Polygon, Polyline, Rectangle, Triangle, Zone},
 };
 
 type AxisId = &'static str;
@@ -33,7 +33,7 @@ impl ShapeGallery {
         let mut state = State::new();
 
         // 1. Setup Canvas
-        // Y-range adjusted to -60 to fit the Label Align row comfortably
+        // Y-range adjusted to -85 to fit the extra Polygon row
         state.set_axis(
             Self::X,
             Axis::new(Linear::new(-15.0, 135.0), axis::Position::Bottom).invisible(),
@@ -41,7 +41,7 @@ impl ShapeGallery {
 
         state.set_axis(
             Self::Y,
-            Axis::new(Linear::new(-60.0, 190.0), axis::Position::Left).invisible(),
+            Axis::new(Linear::new(-85.0, 190.0), axis::Position::Left).invisible(),
         );
 
         (Self { state }, iced::Task::none())
@@ -166,7 +166,6 @@ impl PlotData<f64> for ShapeGallery {
 
         // =========================================================
         //  ROW 3: ARCS (Y = 110)
-        //  Showcasing inner_radius
         // =========================================================
         let y = 110.0;
         draw_row_label(plot, y, "Arc");
@@ -178,7 +177,7 @@ impl PlotData<f64> for ShapeGallery {
                 0.0,
                 4.0,
             )
-            .inner_radius(iced_aksel::Measure::Plot(3.0)) // Inner radius in Plot units
+            .inner_radius(iced_aksel::Measure::Plot(3.0))
             .fill(palette.primary),
         );
 
@@ -203,7 +202,7 @@ impl PlotData<f64> for ShapeGallery {
                 0.0,
                 4.0,
             )
-            .inner_radius(iced_aksel::Measure::Screen(6.0)) // Inner radius in Screen pixels
+            .inner_radius(iced_aksel::Measure::Screen(6.0))
             .fill(palette.success),
         );
 
@@ -262,24 +261,24 @@ impl PlotData<f64> for ShapeGallery {
         );
 
         // =========================================================
-        //  ROW 5: POLYGONS (Y = 60)
+        //  ROW 5: ZONES (Y = 60)
         // =========================================================
         let y = 60.0;
-        draw_row_label(plot, y, "Polygon");
+        draw_row_label(plot, y, "Zone");
 
-        let poly_pts = |cx: f64| {
+        // Concave Arrowhead shape to demonstrate arbitrary geometry
+        let arrow_pts = |cx: f64| {
             vec![
-                PlotPoint::new(cx, y + 5.0),
-                PlotPoint::new(cx + 4.0, y + 2.0),
-                PlotPoint::new(cx + 2.0, y - 5.0),
-                PlotPoint::new(cx - 2.0, y - 5.0),
-                PlotPoint::new(cx - 4.0, y + 2.0),
+                PlotPoint::new(cx, y + 5.0),       // Top tip
+                PlotPoint::new(cx + 5.0, y - 5.0), // Bottom Right
+                PlotPoint::new(cx, y - 2.0),       // Inner Notch (Concave)
+                PlotPoint::new(cx - 5.0, y - 5.0), // Bottom Left
             ]
         };
 
-        plot.add_shape(Polygon::new(poly_pts(25.0)).fill(palette.primary));
+        plot.add_shape(Zone::new(arrow_pts(25.0)).fill(palette.primary));
 
-        plot.add_shape(Polygon::new(poly_pts(50.0)).stroke(Stroke::new(
+        plot.add_shape(Zone::new(arrow_pts(50.0)).stroke(Stroke::new(
             palette.primary,
             iced_aksel::Measure::Screen(2.0),
         )));
@@ -296,9 +295,58 @@ impl PlotData<f64> for ShapeGallery {
         );
 
         // =========================================================
-        //  ROW 6: LINES (Y = 35)
+        //  ROW 6: POLYGONS (Y = 35)
         // =========================================================
         let y = 35.0;
+        draw_row_label(plot, y, "Polygon");
+
+        plot.add_shape(
+            Polygon::new(
+                PlotPoint::new(25.0, y),
+                iced_aksel::Measure::Plot(6.0),
+                5, // Pentagon
+            )
+            .fill(palette.primary),
+        );
+
+        plot.add_shape(
+            Polygon::new(
+                PlotPoint::new(50.0, y),
+                iced_aksel::Measure::Plot(6.0),
+                6, // Hexagon
+            )
+            .stroke(Stroke::new(
+                palette.primary,
+                iced_aksel::Measure::Screen(2.0),
+            )),
+        );
+
+        plot.add_shape(
+            Polygon::new(
+                PlotPoint::new(75.0, y),
+                iced_aksel::Measure::Screen(12.0),
+                8, // Octagon
+            )
+            .fill(palette.success),
+        );
+
+        plot.add_shape(
+            Polygon::new(
+                PlotPoint::new(100.0, y),
+                iced_aksel::Measure::Screen(12.0),
+                4, // Diamond (Rotated Square)
+            )
+            .rotation(45.0)
+            .stroke(Stroke::new(
+                palette.success,
+                iced_aksel::Measure::Screen(2.0),
+            )),
+        );
+
+        // =========================================================
+        //  ROW 7: LINES (Y = 10)
+        // =========================================================
+        let y = 10.0;
         draw_row_label(plot, y, "Line");
 
         plot.add_shape(Line::new(
@@ -325,9 +373,9 @@ impl PlotData<f64> for ShapeGallery {
         );
 
         // =========================================================
-        //  ROW 7: POLYLINE
+        //  ROW 8: POLYLINE (Y = -15)
         // =========================================================
-        let y = 10.0;
+        let y = -15.0;
         draw_row_label(plot, y, "Polyline");
 
         let zigzag = |cx: f64| {
@@ -349,7 +397,6 @@ impl PlotData<f64> for ShapeGallery {
             Stroke::new(palette.primary, iced_aksel::Measure::Screen(2.0)),
         ));
 
-        // Fixed Px variants
         plot.add_shape(Polyline::new(
             zigzag(75.0),
             Stroke::new(palette.success, iced_aksel::Measure::Plot(1.0)),
@@ -364,9 +411,8 @@ impl PlotData<f64> for ShapeGallery {
         //  SEPARATOR
         // =========================================================
 
-        let sep_y = -5.0;
+        let sep_y = -30.0;
 
-        // Replaced LineSegment with Line
         plot.add_shape(Line::new(
             PlotPoint::new(-10.0, sep_y),
             PlotPoint::new(130.0, sep_y),
@@ -387,9 +433,9 @@ impl PlotData<f64> for ShapeGallery {
         );
 
         // =========================================================
-        //  ROW 8: LABEL STYLE (Y = -20)
+        //  ROW 9: LABEL STYLE (Y = -45)
         // =========================================================
-        let y = -20.0;
+        let y = -45.0;
         draw_row_label(plot, y, "Label Style");
 
         // 1. Standard
@@ -441,12 +487,11 @@ impl PlotData<f64> for ShapeGallery {
         );
 
         // =========================================================
-        //  ROW 9: LABEL ALIGNMENT (Y = -45)
+        //  ROW 10: LABEL ALIGNMENT (Y = -70)
         // =========================================================
-        let y = -45.0;
+        let y = -70.0;
         draw_row_label(plot, y, "Label Align");
 
-        // Helper to draw an anchor point
         let draw_anchor = |plot: &mut Plot<f64>, pt: PlotPoint| {
             plot.add_shape(
                 Rectangle::new(
@@ -454,7 +499,7 @@ impl PlotData<f64> for ShapeGallery {
                     iced_aksel::Measure::Screen(4.0),
                     iced_aksel::Measure::Screen(4.0),
                 )
-                .fill(Color::from_rgb(1.0, 0.2, 0.2)), // Red anchor
+                .fill(Color::from_rgb(1.0, 0.2, 0.2)),
             );
         };
 
