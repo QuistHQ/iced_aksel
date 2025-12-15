@@ -1,7 +1,4 @@
-use iced::{
-    Color, Element, Theme,
-    alignment::{Horizontal, Vertical},
-};
+use iced::{Color, Element, Theme};
 use iced_aksel::{
     Axis,
     Chart,
