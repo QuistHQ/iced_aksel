@@ -1,6 +1,98 @@
-use lyon::math::{Point, point};
-use lyon::path::PathEvent;
+use iced_graphics::{
+    color::{self},
+    mesh::{Indexed, SolidVertex2D},
+};
+use lyon_path::PathEvent;
+use lyon_tessellation::{
+    FillGeometryBuilder, FillTessellator, FillVertex, FillVertexConstructor, GeometryBuilder,
+    GeometryBuilderError, StrokeGeometryBuilder, StrokeTessellator, StrokeVertex,
+    StrokeVertexConstructor, VertexId,
+    math::{Point, point},
+};
 
+/// A wrapper for Lyon's tessellators.
+#[derive(Default)]
+pub struct ComplexTessellator {
+    pub fill: FillTessellator,
+    pub stroke: StrokeTessellator,
+}
+
+#[derive(Copy, Clone)]
+pub struct SolidVertexConstructor {
+    pub color: color::Packed,
+}
+
+impl StrokeVertexConstructor<SolidVertex2D> for SolidVertexConstructor {
+    fn new_vertex(&mut self, vertex: StrokeVertex) -> SolidVertex2D {
+        SolidVertex2D {
+            position: vertex.position().to_array(),
+            color: self.color,
+        }
+    }
+}
+
+impl FillVertexConstructor<SolidVertex2D> for SolidVertexConstructor {
+    fn new_vertex(&mut self, vertex: FillVertex) -> SolidVertex2D {
+        SolidVertex2D {
+            position: vertex.position().to_array(),
+            color: self.color,
+        }
+    }
+}
+
+/// Adapts an Iced Mesh to accept Lyon geometry events.
+/// This decouples the Buffer from the specific tessellation library.
+pub struct LyonAdapter<'a, C> {
+    mesh: &'a mut Indexed<SolidVertex2D>,
+    constructor: C,
+}
+
+impl<'a, C> LyonAdapter<'a, C> {
+    pub fn new(mesh: &'a mut Indexed<SolidVertex2D>, constructor: C) -> Self {
+        Self { mesh, constructor }
+    }
+}
+
+impl<'a, C> GeometryBuilder for LyonAdapter<'a, C> {
+    fn begin_geometry(&mut self) {}
+
+    fn add_triangle(&mut self, a: VertexId, b: VertexId, c: VertexId) {
+        self.mesh.indices.push(a.0);
+        self.mesh.indices.push(b.0);
+        self.mesh.indices.push(c.0);
+    }
+
+    fn abort_geometry(&mut self) {}
+}
+
+impl<'a, C> StrokeGeometryBuilder for LyonAdapter<'a, C>
+where
+    C: StrokeVertexConstructor<SolidVertex2D>,
+{
+    fn add_stroke_vertex(
+        &mut self,
+        vertex: StrokeVertex,
+    ) -> Result<VertexId, GeometryBuilderError> {
+        let v = self.constructor.new_vertex(vertex);
+        let id = self.mesh.vertices.len();
+        self.mesh.vertices.push(v);
+        Ok(VertexId(id as u32))
+    }
+}
+
+impl<'a, C> FillGeometryBuilder for LyonAdapter<'a, C>
+where
+    C: FillVertexConstructor<SolidVertex2D>,
+{
+    fn add_fill_vertex(&mut self, vertex: FillVertex) -> Result<VertexId, GeometryBuilderError> {
+        let v = self.constructor.new_vertex(vertex);
+        let id = self.mesh.vertices.len();
+        self.mesh.vertices.push(v);
+        Ok(VertexId(id as u32))
+    }
+}
+
+/// Iterator for generating dashed lines.
 pub struct DashedPolyline<'a, I>
 where
     I: Iterator<Item = Point>,
@@ -14,8 +106,6 @@ where
     dash_remaining: f32,
     is_gap: bool,
 
-    // We need a small buffer because one step can generate:
-    // Begin -> Line -> End (3 events)
     pending_line: Option<PathEvent>,
     pending_end: Option<PathEvent>,
     finishing_segment: bool,
@@ -52,39 +142,12 @@ where
     type Item = PathEvent;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // 1. Flush Pending Events (Ordered: Line then End)
         if let Some(ev) = self.pending_line.take() {
             return Some(ev);
         }
         if let Some(ev) = self.pending_end.take() {
             return Some(ev);
         }
-
-        // 2. Handle End-of-Stream
-        //
-        // TODO: Dennis - Ved ikke om det er dig der har lavet det her,
-        // men bare til fremtiden, kan det være mere clean og forståeligt (Se under kommentaren)
-        //
-        // if self.current_pos.is_none() {
-        //     if self.finishing_segment {
-        //         self.finishing_segment = false;
-        //         return Some(PathEvent::End {
-        //             first: point(0.0, 0.0),
-        //             last: point(0.0, 0.0),
-        //             close: false,
-        //         });
-        //     }
-        //     return None;
-        // }
-        //
-        // let start = self.current_pos.unwrap();
-        //
-        // if self.next_pos.is_none() {
-        //     self.current_pos = None;
-        //     return self.next();
-        // }
-        //
-        // let end = self.next_pos.unwrap();
 
         let Some(start) = self.current_pos else {
             if self.finishing_segment {
@@ -103,7 +166,6 @@ where
             return self.next();
         };
 
-        // 3. Vector Math
         let delta = end - start;
         let dist = delta.length();
 
@@ -113,7 +175,6 @@ where
             return self.next();
         }
 
-        // 4. Calculate Step
         let take = dist.min(self.dash_remaining);
 
         let end_of_step = if take >= dist {
@@ -122,19 +183,14 @@ where
             start + delta * (take / dist)
         };
 
-        // 5. Generate Primary Event (Begin or Line)
         let event = if self.is_gap {
             None
         } else if self.finishing_segment {
-            // We are already drawing, so the next event is the Line itself
             Some(PathEvent::Line {
                 from: start,
                 to: end_of_step,
             })
         } else {
-            // We are starting a dash.
-            // Immediate event: Begin.
-            // Buffered event: Line.
             self.pending_line = Some(PathEvent::Line {
                 from: start,
                 to: end_of_step,
@@ -143,11 +199,9 @@ where
             Some(PathEvent::Begin { at: start })
         };
 
-        // 6. Advance State
         self.dash_remaining -= take;
         self.current_pos = Some(end_of_step);
 
-        // 7. Handle Pattern Completion (Dash <-> Gap)
         if self.dash_remaining <= 1e-5 {
             let was_dash = !self.is_gap;
 
@@ -156,8 +210,6 @@ where
             self.dash_remaining = self.pattern[self.pattern_idx];
 
             if was_dash {
-                // We finished a dash. We must emit End.
-                // We buffer it in `pending_end` so we don't overwrite `pending_line`.
                 self.pending_end = Some(PathEvent::End {
                     first: point(0.0, 0.0),
                     last: point(0.0, 0.0),
@@ -167,13 +219,11 @@ where
             }
         }
 
-        // 8. Handle Geometric Segment Completion
         if take >= dist {
             self.current_pos = self.next_pos;
             self.next_pos = self.input.next();
         }
 
-        // 9. Recurse (handle gap skipping or buffer flushing)
         if event.is_none() {
             return self.next();
         }

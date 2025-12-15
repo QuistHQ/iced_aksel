@@ -1,6 +1,6 @@
-mod dashed;
-mod meshbuffer;
+mod buffer;
 mod tessellation;
 
-pub use meshbuffer::MeshBuffer;
-pub use tessellation::Tessellators;
+pub use buffer::MeshBuffer;
+pub use tessellation::Tessellator;
+pub use tessellation::Tessellator as Tessellators; // Alias for backward compatibility

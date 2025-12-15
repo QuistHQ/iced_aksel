@@ -1,31 +1,17 @@
 use crate::{
     Measure, Shape, Stroke,
     plot::{self},
-    render::{MeshBuffer, Tessellators},
-    stroke::StrokeStyle,
+    render::{MeshBuffer, Tessellator},
 };
-
 use aksel::{Float, PlotPoint, Transform};
-use iced_core::Color;
-use iced_graphics::{color::pack, mesh::SolidVertex2D};
-use lyon::math::Point;
+use iced_core::{Color, Point};
 
-/// A regular polygon defined by a center, radius, and number of vertices.
-///
-/// Use this for markers, symbols, and geometric icons (e.g., Hexagons, Triangles).
-/// This shape is optimized for performance and is always convex.
-///
-/// # Example
-/// ```rust
-/// Polygon::new(center, Measure::Screen(10.0), 6) // Hexagon
-///     .fill(Color::RED)
-/// ```
 #[derive(Debug, Clone)]
 pub struct Polygon<D> {
     center: PlotPoint<D>,
     radius: Measure<D>,
     vertices: u16,
-    rotation: f32, // Degrees
+    rotation: f32,
     fill: Option<Color>,
     stroke: Option<Stroke<D>>,
 }
@@ -49,17 +35,14 @@ impl<D: Float> Polygon<D> {
             stroke: None,
         }
     }
-
     pub const fn rotation(mut self, degrees: f32) -> Self {
         self.rotation = degrees;
         self
     }
-
     pub const fn fill(mut self, color: Color) -> Self {
         self.fill = Some(color);
         self
     }
-
     pub const fn stroke(mut self, stroke: Stroke<D>) -> Self {
         self.stroke = Some(stroke);
         self
@@ -69,13 +52,12 @@ impl<D: Float> Polygon<D> {
         self,
         transform: &Transform<D, f32, f32>,
         buffer: &mut MeshBuffer,
-        tess: &mut Tessellators,
+        tess: &mut Tessellator,
     ) {
         if self.vertices < 3 {
             return;
         }
 
-        // 1. Resolve Center & Radius
         let center = Point::new(
             transform.x_to_screen(&self.center.x),
             transform.y_to_screen(&self.center.y),
@@ -94,8 +76,7 @@ impl<D: Float> Polygon<D> {
             return;
         }
 
-        // 2. Resolve Stroke
-        let maybe_stroke = self.stroke.as_ref().map(|s| {
+        let stroke_info = self.stroke.as_ref().map(|s| {
             let width = match s.thickness {
                 Measure::Screen(w) => w,
                 Measure::Plot(w) => {
@@ -104,102 +85,17 @@ impl<D: Float> Polygon<D> {
                     (p1 - p0).abs()
                 }
             };
-            (width, s)
+            (s, width)
         });
 
-        // 3. Generate Outer Ring
-        let outer_points = self.generate_ring(center, radius_px);
-
-        // 4. Render Fill
-        if let Some(color) = self.fill {
-            if maybe_stroke.is_some() {
-                // Inset slightly to prevent bleed
-                let inset_points = self.generate_ring(center, radius_px - 0.5);
-                self.add_fan(buffer, &inset_points, color);
-            } else {
-                self.add_fan(buffer, &outer_points, color);
-            }
-        }
-
-        // 5. Render Stroke
-        if let Some((width, stroke)) = maybe_stroke {
-            match stroke.style {
-                StrokeStyle::Solid => {
-                    // Fast Ring Stitching for Solid strokes
-                    let inner_radius = (radius_px - width).max(0.0);
-                    let inner_points = self.generate_ring(center, inner_radius);
-                    self.add_ring(buffer, &outer_points, &inner_points, stroke.fill);
-                }
-                _ => {
-                    // Fallback to Lyon for dashes
-                    tess.stroke_polyline(buffer, outer_points, stroke, width, true);
-                }
-            }
-        }
-    }
-
-    /// Generates vertices for a regular polygon.
-    fn generate_ring(&self, center: Point, radius: f32) -> Vec<Point> {
-        let mut points = Vec::with_capacity(self.vertices as usize);
-        let angle_step = 360.0 / self.vertices as f32;
-        let start_angle = self.rotation - 90.0; // Start at top (12 o'clock)
-
-        for i in 0..self.vertices {
-            let theta = (start_angle + i as f32 * angle_step).to_radians();
-            let (sin, cos) = theta.sin_cos();
-            points.push(Point::new(center.x + radius * cos, center.y + radius * sin));
-        }
-        points
-    }
-
-    fn add_fan(&self, buffer: &mut MeshBuffer, points: &[Point], color: Color) {
-        let c = pack(color);
-        let mut vertices = Vec::with_capacity(points.len());
-        let mut indices = Vec::with_capacity((points.len() - 2) * 3);
-
-        for p in points {
-            vertices.push(SolidVertex2D {
-                position: p.to_array(),
-                color: c,
-            });
-        }
-
-        for i in 1..(points.len() - 1) {
-            indices.push(0);
-            indices.push(i as u32);
-            indices.push((i + 1) as u32);
-        }
-        buffer.add(&indices, &vertices);
-    }
-
-    fn add_ring(&self, buffer: &mut MeshBuffer, outer: &[Point], inner: &[Point], color: Color) {
-        let c = pack(color);
-        let n = outer.len();
-        let mut vertices = Vec::with_capacity(n * 2);
-        let mut indices = Vec::with_capacity(n * 6);
-
-        for p in outer {
-            vertices.push(SolidVertex2D {
-                position: p.to_array(),
-                color: c,
-            });
-        }
-        for p in inner {
-            vertices.push(SolidVertex2D {
-                position: p.to_array(),
-                color: c,
-            });
-        }
-
-        for i in 0..n {
-            let next = (i + 1) % n;
-            let o_curr = i as u32;
-            let o_next = next as u32;
-            let i_curr = (i + n) as u32;
-            let i_next = (next + n) as u32;
-
-            indices.extend_from_slice(&[o_curr, o_next, i_curr, o_next, i_next, i_curr]);
-        }
-        buffer.add(&indices, &vertices);
+        tess.draw_polygon(
+            buffer,
+            center,
+            radius_px,
+            self.vertices,
+            self.rotation,
+            self.fill,
+            stroke_info,
+        );
     }
 }
