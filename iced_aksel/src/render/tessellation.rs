@@ -111,7 +111,7 @@ impl Tessellator {
         cx: f32,
         cy: f32,
         rx: f32,
-        ry: f32, // CHANGED: radius -> rx, ry
+        ry: f32, 
         fill: Option<Color>,
         stroke: Option<(&Stroke<D>, f32)>,
     ) {
