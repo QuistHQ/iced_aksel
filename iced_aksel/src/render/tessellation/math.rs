@@ -81,37 +81,53 @@ pub fn generate_ring(center: Point, radius: f32, vertices: u16, rotation: f32) -
 /// Computes a new vertex inset (moved inwards) from a corner of a polygon.
 ///
 /// Used for shrinking a polygon to create a stroke border.
+/// **Includes Miter Limiting to prevent sharp angles from exploding.**
 ///
 /// * `prev`, `curr`, `next`: The three points defining the corner at `curr`.
 /// * `distance`: How far to move inwards.
 pub fn compute_inset_vertex(prev: Point, curr: Point, next: Point, distance: f32) -> Point {
-    // Vectors for the two edges
+    // 1. Calculate normalized direction vectors for the two edges
+    // (Point - Point = Vector)
     let v1 = normalize(curr - prev);
     let v2 = normalize(next - curr);
 
-    // Perpendicular vectors (normals) pointing inwards
-    // Rotate 90 degrees CCW: (x, y) -> (-y, x)
+    // 2. Calculate the perpendicular normal for the first edge (90 deg rotation)
     let n1 = Vector::new(-v1.y, v1.x);
 
-    // Safety check for parallel lines
+    // 3. Calculate the sine of the angle between the two vectors.
+    // If this is close to 0, the lines are parallel or the angle is 180.
     let corner_sin = (v1.x * v2.y - v1.y * v2.x).abs();
+
+    // SAFETY CHECK 1: Parallel lines (Angle ~ 0 or 180)
+    // Just shift perpendicularly, don't try to compute a corner.
     if corner_sin < 0.001 {
-        // Parallel lines, just shift perpendicular
         return curr + n1 * distance;
     }
 
-    // Standard miter offset formula
+    // 4. Calculate the "Miter" vector (the direction of the corner bisection)
     let combined = v1 - v2;
     let len_sq = combined.x * combined.x + combined.y * combined.y;
     let len = len_sq.sqrt();
 
+    // SAFETY CHECK 2: Degenerate geometry (points on top of each other)
     if len < 1e-4 {
         return curr + n1 * distance;
     }
 
-    let miter = combined * (2.0 * distance / (len * corner_sin));
+    // 5. Calculate Miter Length
+    // Standard formula: length = distance / sin(theta/2)
+    // Derived here via vector algebra
+    let miter_len = 2.0 * distance / (len * corner_sin);
 
-    // Determine sign based on convexity (cross product) to ensure we go "in"
+    // 6. THE FIX: Miter Clamping
+    // If the required offset is more than 5x the stroke width, we clamp it.
+    // This prevents the "explosion" where the vertex shoots off to infinity.
+    let miter_limit = distance * 5.0;
+    let clamped_len = miter_len.min(miter_limit);
+
+    let miter = combined * clamped_len;
+
+    // 7. Apply offset based on winding order (Convexity check)
     let cross = v1.x * v2.y - v1.y * v2.x;
     if cross < 0.0 {
         curr - miter
@@ -186,4 +202,33 @@ pub fn clip_line_liang_barsky(
     }
 
     if t0 <= t1 { Some((t0, t1)) } else { None }
+}
+
+/// Calculates the Cubic Bézier control points for a Catmull-Rom spline segment.
+///
+/// Given four points (p0, p1, p2, p3), this calculates the curve segment between p1 and p2.
+///
+/// * `tension`: Controls the "tightness" of the curve.
+///   * `0.0` = Catmull-Rom (Standard smooth).
+///   * `1.0` = Linear (Straight lines).
+///
+/// Returns `(ControlPoint1, ControlPoint2)`.
+pub fn catmull_rom_to_bezier(
+    p0: Point,
+    p1: Point,
+    p2: Point,
+    p3: Point,
+    tension: f32,
+) -> (Point, Point) {
+    let alpha = 0.5 * (1.0 - tension);
+
+    // Tangent vectors
+    let tangent1 = (p2 - p0) * alpha;
+    let tangent2 = (p3 - p1) * alpha;
+
+    // Convert tangents to Bézier control points
+    let c1 = p1 + tangent1 * (1.0 / 3.0);
+    let c2 = p2 - tangent2 * (1.0 / 3.0);
+
+    (c1, c2)
 }

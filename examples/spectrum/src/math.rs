@@ -1,5 +1,7 @@
 use std::f32::consts::PI;
 
+use iced::Point;
+
 use crate::{MAX_DB, MAX_FREQ, MIN_DB, MIN_FREQ, SMOOTHING_BAND_SHAPE};
 
 pub fn fractional_width(freq: f64) -> f64 {

@@ -615,6 +615,124 @@ impl Tessellator {
     }
 
     // =========================================================================
+    //  Curves
+    // =========================================================================
+
+    /// Draws a quadratic or cubic Bézier curve.
+    ///
+    /// * `control_2`: If `None`, draws a Quadratic curve. If `Some`, draws a Cubic curve.
+    pub fn draw_bezier<D>(
+        &mut self,
+        buffer: &mut MeshBuffer,
+        start: Point,
+        control_1: Point,
+        control_2: Option<Point>,
+        end: Point,
+        stroke: &Stroke<D>,
+        width: f32,
+    ) {
+        if width < 0.1 {
+            return;
+        }
+
+        let mut builder = Path::builder();
+
+        // Convert iced Points to Lyon Points
+        let start_lyon = lyon_tessellation::math::Point::new(start.x, start.y);
+        let c1_lyon = lyon_tessellation::math::Point::new(control_1.x, control_1.y);
+        let end_lyon = lyon_tessellation::math::Point::new(end.x, end.y);
+
+        builder.begin(start_lyon);
+
+        if let Some(c2) = control_2 {
+            // Cubic Bézier
+            let c2_lyon = lyon_tessellation::math::Point::new(c2.x, c2.y);
+            builder.cubic_bezier_to(c1_lyon, c2_lyon, end_lyon);
+        } else {
+            // Quadratic Bézier
+            builder.quadratic_bezier_to(c1_lyon, end_lyon);
+        }
+
+        builder.end(false); // Open path
+
+        // Calculate dynamic tolerance based on quality setting
+        // Higher quality = lower tolerance (more segments)
+        let tolerance = 0.1 / self.quality.max(0.1);
+
+        self.stroke_path(buffer, builder.build().iter(), stroke, width, tolerance);
+    }
+
+    /// Draws a smooth curve passing through all given points (Spline).
+    ///
+    /// Uses Catmull-Rom interpolation.
+    /// * `points`: The data points the line must pass through.
+    /// * `tension`: `0.0` for smooth curves, `1.0` for straight lines.
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_spline<I, D>(
+        &mut self,
+        buffer: &mut MeshBuffer,
+        points: I,
+        stroke: &Stroke<D>,
+        width: f32,
+        tension: f32,
+    ) where
+        I: IntoIterator<Item = Point>,
+    {
+        if width < 0.1 {
+            return;
+        }
+
+        let pts: Vec<Point> = points.into_iter().collect();
+        if pts.len() < 2 {
+            return;
+        }
+
+        let mut builder = Path::builder();
+        let first = pts[0];
+
+        // Start the path at the first point
+        builder.begin(lyon_tessellation::math::Point::new(first.x, first.y));
+
+        for i in 0..pts.len() - 1 {
+            // Define the 4 points window: p0, p1, p2, p3
+            // We are drawing the curve from p1 to p2.
+            let p1 = pts[i];
+            let p2 = pts[i + 1];
+
+            // Handle start boundary: simpler to mirror p1 around p0, or just repeat p0
+            let p0 = if i == 0 {
+                // Virtual point before start: Extend the line backwards
+                p1 - (p2 - p1)
+            } else {
+                pts[i - 1]
+            };
+
+            // Handle end boundary
+            let p3 = if i + 2 < pts.len() {
+                pts[i + 2]
+            } else {
+                // Virtual point after end: Extend the line forwards
+                p2 + (p2 - p1)
+            };
+
+            // Calculate Control Points
+            let (c1, c2) = catmull_rom_to_bezier(p0, p1, p2, p3, tension);
+
+            // Add Cubic Bezier segment to path
+            builder.cubic_bezier_to(
+                lyon_tessellation::math::Point::new(c1.x, c1.y),
+                lyon_tessellation::math::Point::new(c2.x, c2.y),
+                lyon_tessellation::math::Point::new(p2.x, p2.y),
+            );
+        }
+
+        builder.end(false); // Open path
+
+        let tolerance = 0.1 / self.quality.max(0.1);
+        self.stroke_path(buffer, builder.build().iter(), stroke, width, tolerance);
+    }
+
+    // =========================================================================
     //  Arc
     // =========================================================================
 
