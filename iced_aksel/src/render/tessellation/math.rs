@@ -15,11 +15,9 @@ pub fn clip_line_liang_barsky(
     let q = [p1.x - xmin, xmax - p1.x, p1.y - ymin, ymax - p1.y];
 
     for i in 0..4 {
-        if p[i].abs() < 1e-6 {
-            if q[i] < 0.0 {
+        if p[i].abs() < 1e-6 && q[i] < 0.0 {
                 return None;
-            }
-        } else {
+        }
             let t = q[i] / p[i];
             if p[i] < 0.0 {
                 if t > t1 {
@@ -28,15 +26,15 @@ pub fn clip_line_liang_barsky(
                 if t > t0 {
                     t0 = t;
                 }
-            } else {
-                if t < t0 {
-                    return None;
-                }
-                if t < t1 {
-                    t1 = t;
-                }
+                
+                continue
+            } 
+            if t < t0 {
+                return None;
             }
-        }
+            if t < t1 {
+                t1 = t;
+            }
     }
 
     if t0 <= t1 { Some((t0, t1)) } else { None }
