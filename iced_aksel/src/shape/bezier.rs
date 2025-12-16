@@ -1,10 +1,10 @@
 use crate::{
-    Measure, Shape, Stroke,
+    Shape, Stroke,
     plot::{self},
     render::{MeshBuffer, Tessellator},
 };
 use aksel::{Float, PlotPoint, Transform};
-use iced_core::{Color, Point};
+use iced_core::Point;
 
 /// A primitive representing a smooth Bézier curve.
 ///

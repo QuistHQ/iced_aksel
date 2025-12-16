@@ -39,6 +39,7 @@ impl Default for Tessellator {
     }
 }
 
+#[allow(dead_code)]
 impl Tessellator {
     /// Creates a new, default tessellator.
     pub fn new() -> Self {
@@ -409,11 +410,10 @@ impl Tessellator {
 
     /// Draws a straight line segment.
     ///
-    /// # Advanced Features
-    /// * **Clipping:** This method performs Liang-Barsky clipping against the provided `clip_bounds` to
-    ///   prevent drawing lines far outside the visible area, which saves GPU resources.
-    /// * **Extensions:** Can calculate infinite extensions (e.g., for trend lines) within the clip bounds.
-    /// * **Decorations:** Supports arrowheads at either end.
+    /// # Strategy
+    /// * **Finite Lines:** Passed directly to the tessellator. We rely on the GPU scissoring/clipping for performance.
+    /// * **Infinite Extensions:** We mathematically project the line to the screen edges (`clip_bounds`)
+    ///   to convert "Infinite" into "Finite but spanning the whole screen".
     #[allow(clippy::too_many_arguments)]
     pub fn draw_line<D>(
         &mut self,
@@ -431,90 +431,80 @@ impl Tessellator {
         }
 
         let direction_vector = raw_end - raw_start;
-        // Ignore zero-length lines
+        // Avoid NaN math on degenerate lines
         if (direction_vector.x * direction_vector.x + direction_vector.y * direction_vector.y)
-            < 0.001
+            < 1e-12
         {
             return;
         }
 
-        let direction = normalize(direction_vector);
-        let arrow_length = width * arrows.2;
+        let mut draw_start = raw_start;
+        let mut draw_end = raw_end;
+        let is_infinite = extensions.0 || extensions.1;
 
-        let mut line_start = raw_start;
-        let mut line_end = raw_end;
+        // 1. Resolve Infinite Geometry
+        // If infinite, we MUST clamp to the clip_bounds, otherwise coordinates explode.
+        if is_infinite {
+            // Expand clip bounds by line width so we don't see the "cut" at the edge
+            let margin = width.max(1.0);
+            let clip_rect = (
+                clip_bounds.x - margin,
+                clip_bounds.y - margin,
+                clip_bounds.x + clip_bounds.width + margin,
+                clip_bounds.y + clip_bounds.height + margin,
+            );
 
-        // Retract line start/end if arrows are present so the arrow tip lands exactly on the point
-        if arrows.0 && !extensions.0 {
-            line_start = raw_start + direction * arrow_length;
-        }
-        if arrows.1 && !extensions.1 {
-            line_end = raw_end - direction * arrow_length;
-        }
-
-        // Validity check: Did the arrows consume the entire line?
-        let check_vector = line_end - line_start;
-        let valid = (check_vector.x * direction.x + check_vector.y * direction.y) > 0.0;
-
-        // Expand clip bounds slightly to avoid artifacts at the edges
-        let margin = width * arrows.2.max(1.0);
-        let clip_rect = (
-            clip_bounds.x - margin,
-            clip_bounds.y - margin,
-            clip_bounds.x + clip_bounds.width + margin,
-            clip_bounds.y + clip_bounds.height + margin,
-        );
-
-        let p1 = if extensions.0 { raw_start } else { line_start };
-        let p2 = if extensions.1 { raw_end } else { line_end };
-
-        let mut draw_start = line_start;
-        let mut draw_end = line_end;
-        let mut visible = true;
-
-        // Perform Liang-Barsky clipping to find the visible segment of the line
-        if let Some((t0, t1)) = clip_line_liang_barsky(p1, p2, clip_rect) {
-            let delta = p2 - p1;
-            draw_start = if extensions.0 {
-                p1 + delta * t0
-            } else if t0 > 0.0 {
-                p1 + delta * t0
-            } else {
-                p1
-            };
-            draw_end = if extensions.1 {
-                p1 + delta * t1
-            } else if t1 < 1.0 {
-                p1 + delta * t1
-            } else {
-                p2
-            };
-        } else {
-            visible = false;
-        }
-
-        if visible && valid {
-            match stroke.style {
-                StrokeStyle::Solid => {
-                    self.manual
-                        .draw_line_segment(buffer, draw_start, draw_end, width, stroke.fill);
+            if let Some((edge_start, edge_end)) = clip_infinite_line(raw_start, raw_end, clip_rect)
+            {
+                if extensions.0 {
+                    draw_start = edge_start;
                 }
-                _ => {
-                    let points = vec![
-                        lyon_tessellation::math::Point::new(draw_start.x, draw_start.y),
-                        lyon_tessellation::math::Point::new(draw_end.x, draw_end.y),
-                    ];
-                    self.stroke_polyline(buffer, points, stroke, width, false);
+                if extensions.1 {
+                    draw_end = edge_end;
                 }
+            } else {
+                // Infinite line is off-screen
+                return;
             }
         }
 
-        // Draw arrowheads
-        if arrows.0 && !extensions.0 {
+        // 2. Resolve Arrow Retraction
+        // We shrink the draw segment so the arrow tip doesn't overlap the line.
+        let direction = normalize(direction_vector);
+        let arrow_len = width * arrows.2;
+        let has_start_arrow = arrows.0 && !extensions.0;
+        let has_end_arrow = arrows.1 && !extensions.1;
+
+        if has_start_arrow {
+            draw_start = draw_start + direction * arrow_len;
+        }
+        if has_end_arrow {
+            draw_end = draw_end - direction * arrow_len;
+        }
+
+        // 3. Draw Line Body
+        match stroke.style {
+            StrokeStyle::Solid => {
+                // Performance: Use manual tessellation for solid lines (Fastest)
+                self.manual
+                    .draw_line_segment(buffer, draw_start, draw_end, width, stroke.fill);
+            }
+            _ => {
+                // Fallback: Use Lyon for complex dashes/dots
+                let points = vec![
+                    lyon_tessellation::math::Point::new(draw_start.x, draw_start.y),
+                    lyon_tessellation::math::Point::new(draw_end.x, draw_end.y),
+                ];
+                self.stroke_polyline(buffer, points, stroke, width, false);
+            }
+        }
+
+        // 4. Draw Arrowheads
+        if has_start_arrow {
             self.manual
                 .draw_arrowhead(buffer, raw_start, -direction, width, arrows.2, stroke.fill);
         }
-        if arrows.1 && !extensions.1 {
+        if has_end_arrow {
             self.manual
                 .draw_arrowhead(buffer, raw_end, direction, width, arrows.2, stroke.fill);
         }
@@ -541,74 +531,73 @@ impl Tessellator {
             return;
         }
 
-        // Fast Path: No special decorations or extensions, just stroke it
-        if !extensions.0 && !extensions.1 && !arrows.0 && !arrows.1 {
-            let lyon_points = points
-                .into_iter()
-                .map(|p| lyon_tessellation::math::Point::new(p.x, p.y));
-            self.stroke_polyline(buffer, lyon_points, stroke, width, false);
-            return;
-        }
-
         let mut point_list: Vec<Point> = points.into_iter().collect();
         if point_list.len() < 2 {
             return;
         }
 
-        let margin = width * arrows.2.max(2.0);
-        let clip_rect = (
-            clip_bounds.x - margin,
-            clip_bounds.y - margin,
-            clip_bounds.x + clip_bounds.width + margin,
-            clip_bounds.y + clip_bounds.height + margin,
-        );
-
         let last_idx = point_list.len() - 1;
         let p0 = point_list[0];
         let pn = point_list[last_idx];
 
-        // Handle Start Extension / Arrow retraction
-        if extensions.0 {
-            let p1 = point_list[1];
-            if let Some((t0, _)) = clip_line_liang_barsky(p0, p1, clip_rect) {
-                if t0 < 0.0 {
-                    point_list[0] = p0 + (p1 - p0) * t0;
+        // 1. Handle Infinite Extensions
+        // We only clip if we are extending to infinity.
+        if extensions.0 || extensions.1 {
+            let margin = width.max(1.0);
+            let clip_rect = (
+                clip_bounds.x - margin,
+                clip_bounds.y - margin,
+                clip_bounds.x + clip_bounds.width + margin,
+                clip_bounds.y + clip_bounds.height + margin,
+            );
+
+            if extensions.0 {
+                let p1 = point_list[1];
+                if let Some((edge_start, _)) = clip_infinite_line(p0, p1, clip_rect) {
+                    point_list[0] = edge_start;
                 }
             }
-        } else if arrows.0 {
-            let p1 = point_list[1];
-            let direction = normalize(p1 - p0);
-            point_list[0] = p0 + direction * (width * arrows.2);
-        }
-
-        // Handle End Extension / Arrow retraction
-        if extensions.1 {
-            let point_before_last = point_list[last_idx - 1];
-            if let Some((_, t1)) = clip_line_liang_barsky(point_before_last, pn, clip_rect) {
-                if t1 > 1.0 {
-                    point_list[last_idx] = point_before_last + (pn - point_before_last) * t1;
+            if extensions.1 {
+                let p_prev = point_list[last_idx - 1];
+                if let Some((_, edge_end)) = clip_infinite_line(p_prev, pn, clip_rect) {
+                    point_list[last_idx] = edge_end;
                 }
             }
-        } else if arrows.1 {
-            let point_before_last = point_list[last_idx - 1];
-            let direction = normalize(pn - point_before_last);
-            point_list[last_idx] = pn - direction * (width * arrows.2);
         }
 
+        // 2. Handle Arrow Retraction
+        if arrows.0 && !extensions.0 {
+            let p1 = point_list[1];
+            let dir = normalize(p1 - p0);
+            point_list[0] = p0 + dir * (width * arrows.2);
+        }
+        if arrows.1 && !extensions.1 {
+            let p_prev = point_list[last_idx - 1];
+            let dir = normalize(pn - p_prev);
+            point_list[last_idx] = pn - dir * (width * arrows.2);
+        }
+
+        // 3. Draw Path
+        // Polyline stroking involves complex joints (miters) between segments.
+        // We ALWAYS use Lyon here because doing miter joints manually is extremely complex
+        // and error-prone (as seen with the triangle artifacts).
         let lyon_points = point_list
             .iter()
             .map(|p| lyon_tessellation::math::Point::new(p.x, p.y));
         self.stroke_polyline(buffer, lyon_points, stroke, width, false);
 
-        // Draw Arrowheads
+        // 4. Draw Arrowheads
         if arrows.0 && !extensions.0 {
-            let direction = normalize(point_list[1] - p0);
+            let p1 = point_list[1];
+            // Use direction from the original start point (p0) to p1
+            // Even if p0 was retracted in the list, the visual direction is the same.
+            let direction = normalize(p1 - p0);
             self.manual
                 .draw_arrowhead(buffer, p0, -direction, width, arrows.2, stroke.fill);
         }
         if arrows.1 && !extensions.1 {
-            let point_before_last = point_list[last_idx - 1];
-            let direction = normalize(pn - point_before_last);
+            let p_prev = point_list[last_idx - 1];
+            let direction = normalize(pn - p_prev);
             self.manual
                 .draw_arrowhead(buffer, pn, direction, width, arrows.2, stroke.fill);
         }

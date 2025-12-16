@@ -1,5 +1,5 @@
 use crate::{
-    Measure, Shape, Stroke,
+    Shape, Stroke,
     plot::{self},
     render::{MeshBuffer, Tessellator},
 };

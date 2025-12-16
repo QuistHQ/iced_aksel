@@ -154,56 +154,6 @@ pub fn compute_inset_polygon(points: &[Point], distance: f32) -> Vec<Point> {
     new_points
 }
 
-/// Clipping Algorithm: Liang-Barsky.
-///
-/// Calculates the intersection of a line segment `p1`->`p2` with a rectangle `rect`.
-/// Returns `Some((t0, t1))` where `t` are scalar values along the line segment (0.0 to 1.0).
-pub fn clip_line_liang_barsky(
-    p1: Point,
-    p2: Point,
-    rect: (f32, f32, f32, f32), // x_min, y_min, x_max, y_max
-) -> Option<(f32, f32)> {
-    let (x_min, y_min, x_max, y_max) = rect;
-    let dx = p2.x - p1.x;
-    let dy = p2.y - p1.y;
-
-    // p array: directional components
-    // q array: distance to boundaries
-    let p = [-dx, dx, -dy, dy];
-    let q = [p1.x - x_min, x_max - p1.x, p1.y - y_min, y_max - p1.y];
-
-    let mut t0 = 0.0;
-    let mut t1 = 1.0;
-
-    for i in 0..4 {
-        if p[i] == 0.0 {
-            // Parallel line outside?
-            if q[i] < 0.0 {
-                return None;
-            }
-        } else {
-            let t = q[i] / p[i];
-            if p[i] < 0.0 {
-                if t > t1 {
-                    return None;
-                }
-                if t > t0 {
-                    t0 = t;
-                }
-            } else {
-                if t < t0 {
-                    return None;
-                }
-                if t < t1 {
-                    t1 = t;
-                }
-            }
-        }
-    }
-
-    if t0 <= t1 { Some((t0, t1)) } else { None }
-}
-
 /// Calculates the Cubic Bézier control points for a Catmull-Rom spline segment.
 ///
 /// Given four points (p0, p1, p2, p3), this calculates the curve segment between p1 and p2.
@@ -231,4 +181,72 @@ pub fn catmull_rom_to_bezier(
     let c2 = p2 - tangent2 * (1.0 / 3.0);
 
     (c1, c2)
+}
+
+/// Calculates the entry and exit points of an infinite line passing through `p1` and `p2`
+/// against a rectangle `rect`.
+///
+/// Returns `Some((entry_point, exit_point))` if the line intersects the rectangle.
+/// The points are ordered relative to the direction `p1 -> p2`.
+pub fn clip_infinite_line(
+    p1: Point,
+    p2: Point,
+    rect: (f32, f32, f32, f32), // x_min, y_min, x_max, y_max
+) -> Option<(Point, Point)> {
+    let (x_min, y_min, x_max, y_max) = rect;
+    let dx = p2.x - p1.x;
+    let dy = p2.y - p1.y;
+
+    // Parallel checks
+    if dx.abs() < 1e-6 {
+        // Vertical line
+        if p1.x < x_min || p1.x > x_max {
+            return None;
+        }
+        return Some((Point::new(p1.x, y_min), Point::new(p1.x, y_max)));
+    }
+    if dy.abs() < 1e-6 {
+        // Horizontal line
+        if p1.y < y_min || p1.y > y_max {
+            return None;
+        }
+        return Some((Point::new(x_min, p1.y), Point::new(x_max, p1.y)));
+    }
+
+    // Calculate intersections with all 4 infinite boundaries
+    // t = (boundary - origin) / direction
+    let t_x_min = (x_min - p1.x) / dx;
+    let t_x_max = (x_max - p1.x) / dx;
+    let t_y_min = (y_min - p1.y) / dy;
+    let t_y_max = (y_max - p1.y) / dy;
+
+    // Sort t-values to find entry/exit for the segment within the box
+    // For an infinite line, the visible segment is defined by the "middle two" intersection t-values
+    // that actually lie on the rectangle boundary.
+
+    // Easier approach: Liang-Barsky simplified for infinite lines
+    // We want the interval [t_enter, t_exit] that overlaps with (-inf, +inf)
+    let (tx_entry, tx_exit) = if dx > 0.0 {
+        (t_x_min, t_x_max)
+    } else {
+        (t_x_max, t_x_min)
+    };
+    let (ty_entry, ty_exit) = if dy > 0.0 {
+        (t_y_min, t_y_max)
+    } else {
+        (t_y_max, t_y_min)
+    };
+
+    let t_entry = tx_entry.max(ty_entry);
+    let t_exit = tx_exit.min(ty_exit);
+
+    if t_entry > t_exit {
+        return None; // Line misses the rectangle
+    }
+
+    // Convert t back to points
+    let p_entry = Point::new(p1.x + dx * t_entry, p1.y + dy * t_entry);
+    let p_exit = Point::new(p1.x + dx * t_exit, p1.y + dy * t_exit);
+
+    Some((p_entry, p_exit))
 }
