@@ -658,7 +658,7 @@ impl StressTestApp {
 
             self.circles_layer
                 .geometry
-                .push(Ellipse::new(PlotPoint::new(x, y), radius));
+                .push(Ellipse::new(PlotPoint::new(x, y), radius, radius));
             self.circles_layer
                 .colors
                 .push(random_color(&mut rng, self.opacity));

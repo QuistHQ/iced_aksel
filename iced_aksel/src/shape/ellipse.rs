@@ -6,29 +6,39 @@ use crate::{
 use aksel::{Float, PlotPoint, Transform};
 use iced_core::Color;
 
-/// A primitive representing a circle or ellipse.
+/// A primitive representing an ellipse or circle.
 ///
-/// Can be defined as a perfect circle (one radius) or an ellipse (separate X/Y radii).
+/// This shape is defined by a center point and two radii (X and Y).
+/// It allows for creating perfect circles (where radii are equal) or stretched ellipses.
 ///
 /// # Usage
+///
+/// ## 1. Perfect Circle
 /// ```rust
-/// use iced_aksel::shape::Circle;
+/// use iced_aksel::shape::Ellipse;
 /// use iced_aksel::Measure;
 /// use aksel::PlotPoint;
 /// use iced_core::Color;
 ///
-/// // Standard Circle
-/// let circle = Circle::new(
+/// let circle = Ellipse::circle(
 ///     PlotPoint::new(0.0, 0.0),
-///     Measure::Screen(5.0)
-/// ).fill(Color::RED);
+///     Measure::Screen(10.0)
+/// )
+/// .fill(Color::RED);
+/// ```
 ///
-/// // Ellipse (Wide and Short)
-/// let ellipse = Circle::ellipse(
+/// ## 2. Stretched Ellipse
+/// ```rust
+/// use iced_aksel::shape::Ellipse;
+/// use iced_aksel::Measure;
+/// use aksel::PlotPoint;
+///
+/// let oval = Ellipse::new(
 ///     PlotPoint::new(0.0, 0.0),
-///     Measure::Screen(10.0), // Radius X
-///     Measure::Screen(5.0)   // Radius Y
-/// ).fill(Color::BLUE);
+///     Measure::Screen(20.0), // Radius X
+///     Measure::Screen(10.0)  // Radius Y
+/// )
+/// .stroke(iced_aksel::Stroke::default());
 /// ```
 #[derive(Debug, Clone)]
 pub struct Ellipse<D> {
@@ -48,27 +58,27 @@ impl<D: Float, R: plot::Renderer> Shape<D, R> for Ellipse<D> {
 }
 
 impl<D: Float> Ellipse<D> {
-    /// Creates a new perfect `Circle` defined by a center and a single radius.
+    /// Creates a new `Ellipse` defined by a center and separate X and Y radii.
     ///
     /// Note: The shape is invisible by default. You must call `.fill()` or `.stroke()` to render it.
-    pub const fn new(center: PlotPoint<D>, radius: Measure<D>) -> Self {
+    pub const fn new(center: PlotPoint<D>, radius_x: Measure<D>, radius_y: Measure<D>) -> Self {
         Self {
             center,
-            radius_x: radius,
-            radius_y: radius,
+            radius_x,
+            radius_y,
             fill: None,
             stroke: None,
         }
     }
 
-    /// Creates a new `Ellipse` defined by a center and separate X and Y radii.
+    /// Creates a perfect `Circle` (an Ellipse where radius X equals radius Y).
     ///
     /// Note: The shape is invisible by default. You must call `.fill()` or `.stroke()` to render it.
-    pub const fn ellipse(center: PlotPoint<D>, radius_x: Measure<D>, radius_y: Measure<D>) -> Self {
+    pub const fn circle(center: PlotPoint<D>, radius: Measure<D>) -> Self {
         Self {
             center,
-            radius_x,
-            radius_y,
+            radius_x: radius,
+            radius_y: radius,
             fill: None,
             stroke: None,
         }
@@ -97,43 +107,42 @@ impl<D: Float> Ellipse<D> {
         let cx = transform.x_to_screen(&self.center.x);
         let cy = transform.y_to_screen(&self.center.y);
 
-        let rx_px = self.resolve_measure(transform, self.radius_x, true);
-        let ry_px = self.resolve_measure(transform, self.radius_y, false);
+        let rx_px = resolve_measure(transform, self.radius_x, true);
+        let ry_px = resolve_measure(transform, self.radius_y, false);
 
         let stroke_info = self.stroke.as_ref().map(|s| {
+            // For stroke thickness, we use the X-axis scale as the reference
+            // to ensure consistency, avoiding complex anisotropic stroke logic.
             let width = match s.thickness {
                 Measure::Screen(w) => w,
-                // For stroke thickness on ellipses, we default to isotropic averaging or X-axis
-                // to avoid complexity. Using X-axis scale for simplicity.
-                Measure::Plot(w) => self.resolve_measure(transform, Measure::Plot(w), true),
+                Measure::Plot(w) => resolve_measure(transform, Measure::Plot(w), true),
             };
             (s, width)
         });
 
         tess.draw_circle(buffer, cx, cy, rx_px, ry_px, self.fill, stroke_info);
     }
+}
 
-    fn resolve_measure(
-        &self,
-        transform: &Transform<D, f32, f32>,
-        measure: Measure<D>,
-        is_x: bool,
-    ) -> f32 {
-        match measure {
-            Measure::Screen(px) => px,
-            Measure::Plot(units) => {
-                let zero = if is_x {
-                    transform.x_to_screen(&D::zero())
-                } else {
-                    transform.y_to_screen(&D::zero())
-                };
-                let val = if is_x {
-                    transform.x_to_screen(&units)
-                } else {
-                    transform.y_to_screen(&units)
-                };
-                (val - zero).abs()
-            }
+fn resolve_measure<D: Float>(
+    transform: &Transform<D, f32, f32>,
+    measure: Measure<D>,
+    is_x: bool,
+) -> f32 {
+    match measure {
+        Measure::Screen(px) => px,
+        Measure::Plot(units) => {
+            let zero = if is_x {
+                transform.x_to_screen(&D::zero())
+            } else {
+                transform.y_to_screen(&D::zero())
+            };
+            let val = if is_x {
+                transform.x_to_screen(&units)
+            } else {
+                transform.y_to_screen(&units)
+            };
+            (val - zero).abs()
         }
     }
 }

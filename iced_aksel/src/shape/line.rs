@@ -132,11 +132,7 @@ impl<D: Float> Line<D> {
 
         let width = match stroke.thickness {
             Measure::Screen(w) => w,
-            Measure::Plot(w) => {
-                let p0 = transform.x_to_screen(&D::zero());
-                let p1 = transform.x_to_screen(&w);
-                (p1 - p0).abs()
-            }
+            Measure::Plot(w) => resolve_measure(transform, Measure::Plot(w), true),
         };
 
         let b = transform.screen_bounds();
@@ -157,5 +153,28 @@ impl<D: Float> Line<D> {
             (self.extend_start, self.extend_end),
             (self.arrow_start, self.arrow_end, self.arrow_size),
         );
+    }
+}
+
+fn resolve_measure<D: Float>(
+    transform: &Transform<D, f32, f32>,
+    measure: Measure<D>,
+    is_x: bool,
+) -> f32 {
+    match measure {
+        Measure::Screen(px) => px,
+        Measure::Plot(units) => {
+            let zero = if is_x {
+                transform.x_to_screen(&D::zero())
+            } else {
+                transform.y_to_screen(&D::zero())
+            };
+            let val = if is_x {
+                transform.x_to_screen(&units)
+            } else {
+                transform.y_to_screen(&units)
+            };
+            (val - zero).abs()
+        }
     }
 }

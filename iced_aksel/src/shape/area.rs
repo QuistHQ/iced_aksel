@@ -80,15 +80,34 @@ impl<D: Float> Area<D> {
         let stroke_info = self.stroke.as_ref().map(|s| {
             let width = match s.thickness {
                 Measure::Screen(w) => w,
-                Measure::Plot(w) => {
-                    let p0 = transform.x_to_screen(&D::zero());
-                    let p1 = transform.x_to_screen(&w);
-                    (p1 - p0).abs()
-                }
+                Measure::Plot(w) => resolve_measure(transform, Measure::Plot(w), true),
             };
             (s, width)
         });
 
         tess.draw_zone(buffer, &screen_points, self.fill, stroke_info);
+    }
+}
+
+fn resolve_measure<D: Float>(
+    transform: &Transform<D, f32, f32>,
+    measure: Measure<D>,
+    is_x: bool,
+) -> f32 {
+    match measure {
+        Measure::Screen(px) => px,
+        Measure::Plot(units) => {
+            let zero = if is_x {
+                transform.x_to_screen(&D::zero())
+            } else {
+                transform.y_to_screen(&D::zero())
+            };
+            let val = if is_x {
+                transform.x_to_screen(&units)
+            } else {
+                transform.y_to_screen(&units)
+            };
+            (val - zero).abs()
+        }
     }
 }

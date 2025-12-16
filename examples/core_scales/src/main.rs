@@ -213,7 +213,12 @@ impl PlotData<f64> for ExponentialData {
         // Draw dots at 1, 10, 100, 1000...
         for point in &self.markers {
             plot.add_shape(
-                Ellipse::new(*point, iced_aksel::Measure::Screen(5.0)).fill(theme.palette().danger),
+                Ellipse::new(
+                    *point,
+                    iced_aksel::Measure::Screen(5.0),
+                    iced_aksel::Measure::Screen(5.0),
+                )
+                .fill(theme.palette().danger),
             );
         }
     }
@@ -249,7 +254,7 @@ fn y_axis_tick_renderer(ctx: TickContext<f64>) -> TickResult {
     result.label(label)
 }
 
-// -----------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 // Styles
 // -----------------------------------------------------------------------------
 

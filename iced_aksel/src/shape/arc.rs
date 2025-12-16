@@ -96,11 +96,11 @@ impl<D: Float> Arc<D> {
         let cx = transform.x_to_screen(&self.center.x);
         let cy = transform.y_to_screen(&self.center.y);
 
-        let outer_r = self.resolve_isotropic(transform, self.radius);
-        let inner_r = self.resolve_isotropic(transform, self.inner_radius);
+        let outer_r = resolve_isotropic(transform, self.radius);
+        let inner_r = resolve_isotropic(transform, self.inner_radius);
 
         let stroke_info = self.stroke.as_ref().and_then(|stroke| {
-            let width = self.resolve_isotropic(transform, stroke.thickness);
+            let width = resolve_isotropic(transform, stroke.thickness);
             if width < 0.1 {
                 None
             } else {
@@ -120,17 +120,38 @@ impl<D: Float> Arc<D> {
             stroke_info,
         );
     }
+}
 
-    fn resolve_isotropic(&self, transform: &Transform<D, f32, f32>, measure: Measure<D>) -> f32 {
-        match measure {
-            Measure::Screen(px) => px,
-            Measure::Plot(units) => {
-                let px_x =
-                    (transform.x_to_screen(&units) - transform.x_to_screen(&D::zero())).abs();
-                let px_y =
-                    (transform.y_to_screen(&units) - transform.y_to_screen(&D::zero())).abs();
-                px_x.min(px_y)
-            }
+fn resolve_isotropic<D: Float>(transform: &Transform<D, f32, f32>, measure: Measure<D>) -> f32 {
+    match measure {
+        Measure::Screen(px) => px,
+        Measure::Plot(units) => {
+            let px_x = resolve_measure(transform, Measure::Plot(units), true);
+            let px_y = resolve_measure(transform, Measure::Plot(units), false);
+            px_x.min(px_y)
+        }
+    }
+}
+
+fn resolve_measure<D: Float>(
+    transform: &Transform<D, f32, f32>,
+    measure: Measure<D>,
+    is_x: bool,
+) -> f32 {
+    match measure {
+        Measure::Screen(px) => px,
+        Measure::Plot(units) => {
+            let zero = if is_x {
+                transform.x_to_screen(&D::zero())
+            } else {
+                transform.y_to_screen(&D::zero())
+            };
+            let val = if is_x {
+                transform.x_to_screen(&units)
+            } else {
+                transform.y_to_screen(&units)
+            };
+            (val - zero).abs()
         }
     }
 }

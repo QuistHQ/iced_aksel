@@ -1,12 +1,13 @@
 use iced::{
-    Color, Theme,
     alignment::{Horizontal, Vertical},
+    Color, Theme,
 };
 use iced_aksel::{
-    Axis, Chart, PlotPoint, State, Stroke, axis,
+    axis,
     plot::{Plot, PlotData},
     scale::Linear,
     shape::{Arc, Area, Ellipse, Label, Line, Polygon, Polyline, Rectangle, Triangle},
+    Axis, Chart, PlotPoint, State, Stroke,
 };
 
 type AxisId = &'static str;
@@ -143,25 +144,45 @@ impl PlotData<f64> for ShapeGallery {
         draw_row_label(plot, y, "Circle");
 
         plot.add_shape(
-            Ellipse::new(PlotPoint::new(25.0, y), iced_aksel::Measure::Plot(6.0))
-                .fill(palette.primary),
+            Ellipse::new(
+                PlotPoint::new(25.0, y),
+                iced_aksel::Measure::Plot(6.0),
+                iced_aksel::Measure::Plot(6.0),
+            )
+            .fill(palette.primary),
         );
 
         plot.add_shape(
-            Ellipse::new(PlotPoint::new(50.0, y), iced_aksel::Measure::Plot(6.0)).stroke(
-                Stroke::new(palette.primary, iced_aksel::Measure::Screen(2.0)),
-            ),
+            Ellipse::new(
+                PlotPoint::new(50.0, y),
+                iced_aksel::Measure::Plot(6.0),
+                iced_aksel::Measure::Plot(6.0),
+            )
+            .stroke(Stroke::new(
+                palette.primary,
+                iced_aksel::Measure::Screen(2.0),
+            )),
         );
 
         plot.add_shape(
-            Ellipse::new(PlotPoint::new(75.0, y), iced_aksel::Measure::Screen(12.0))
-                .fill(palette.success),
+            Ellipse::new(
+                PlotPoint::new(75.0, y),
+                iced_aksel::Measure::Screen(12.0),
+                iced_aksel::Measure::Screen(12.0),
+            )
+            .fill(palette.success),
         );
 
         plot.add_shape(
-            Ellipse::new(PlotPoint::new(100.0, y), iced_aksel::Measure::Screen(12.0)).stroke(
-                Stroke::new(palette.success, iced_aksel::Measure::Screen(2.0)),
-            ),
+            Ellipse::new(
+                PlotPoint::new(100.0, y),
+                iced_aksel::Measure::Screen(12.0),
+                iced_aksel::Measure::Screen(12.0),
+            )
+            .stroke(Stroke::new(
+                palette.success,
+                iced_aksel::Measure::Screen(2.0),
+            )),
         );
 
         // =========================================================

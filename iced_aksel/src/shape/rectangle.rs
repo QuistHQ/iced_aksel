@@ -129,8 +129,8 @@ impl<D: Float> Rectangle<D> {
                 let cx = transform.x_to_screen(&center.x);
                 let cy = transform.y_to_screen(&center.y);
 
-                let w_px = self.resolve_measure(transform, width, true);
-                let h_px = self.resolve_measure(transform, height, false);
+                let w_px = resolve_measure(transform, width, true);
+                let h_px = resolve_measure(transform, height, false);
 
                 let half_w = w_px / 2.0;
                 let half_h = h_px / 2.0;
@@ -143,8 +143,8 @@ impl<D: Float> Rectangle<D> {
             let (width_x, width_y) = match s.thickness {
                 Measure::Screen(w) => (w, w),
                 Measure::Plot(w) => {
-                    let w_px_x = self.resolve_measure(transform, Measure::Plot(w), true);
-                    let w_px_y = self.resolve_measure(transform, Measure::Plot(w), false);
+                    let w_px_x = resolve_measure(transform, Measure::Plot(w), true);
+                    let w_px_y = resolve_measure(transform, Measure::Plot(w), false);
                     (w_px_x, w_px_y)
                 }
             };
@@ -153,28 +153,28 @@ impl<D: Float> Rectangle<D> {
 
         tess.draw_rectangle(buffer, x_min, y_min, x_max, y_max, self.fill, stroke_info);
     }
+}
 
-    fn resolve_measure(
-        &self,
-        transform: &Transform<D, f32, f32>,
-        measure: Measure<D>,
-        is_x: bool,
-    ) -> f32 {
-        match measure {
-            Measure::Screen(px) => px,
-            Measure::Plot(units) => {
-                let zero = if is_x {
-                    transform.x_to_screen(&D::zero())
-                } else {
-                    transform.y_to_screen(&D::zero())
-                };
-                let val = if is_x {
-                    transform.x_to_screen(&units)
-                } else {
-                    transform.y_to_screen(&units)
-                };
-                (val - zero).abs()
-            }
+/// Helper to resolve a Measure to screen pixels.
+fn resolve_measure<D: Float>(
+    transform: &Transform<D, f32, f32>,
+    measure: Measure<D>,
+    is_x: bool,
+) -> f32 {
+    match measure {
+        Measure::Screen(px) => px,
+        Measure::Plot(units) => {
+            let zero = if is_x {
+                transform.x_to_screen(&D::zero())
+            } else {
+                transform.y_to_screen(&D::zero())
+            };
+            let val = if is_x {
+                transform.x_to_screen(&units)
+            } else {
+                transform.y_to_screen(&units)
+            };
+            (val - zero).abs()
         }
     }
 }
