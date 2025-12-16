@@ -12,18 +12,20 @@ use iced_core::{Color, Point, Vector};
 /// This component contains highly optimized, allocation-free algorithms for generating
 /// vertices for standard geometric primitives. Unlike generic tessellators, it uses
 /// domain-specific knowledge (e.g., "a circle is just a triangle fan") to write
-/// vertices directly to the [`MeshBuffer`](crate::render::MeshBuffer).
+/// vertices directly to the [`MeshBuffer`].
 ///
 /// # Layman's Terms
 /// This acts as a **direct writer**. It skips general-purpose geometry math and instead uses
 /// specific, optimized formulas. For example, it knows that a rectangle is always made of
-/// exactly two triangles, so it calculates and writes those six points directly to memory
-/// without running a complex shape analysis algorithm first.
+/// exactly two triangles, so it calculates and writes those six points directly to memory.
 #[derive(Default)]
 pub struct ManualTessellator;
 
 impl ManualTessellator {
-    // Basic
+    // =========================================================================
+    //  Basic Primitives (Rectangles & Circles)
+    // =========================================================================
+
     #[inline]
     pub fn draw_fill_rect(
         &mut self,
@@ -36,6 +38,7 @@ impl ManualTessellator {
     ) {
         basic::draw_fill_rect(buffer, x_min, y_min, x_max, y_max, color);
     }
+
     #[inline]
     #[allow(clippy::too_many_arguments)]
     pub fn draw_stroke_rect(
@@ -45,69 +48,106 @@ impl ManualTessellator {
         y_min: f32,
         x_max: f32,
         y_max: f32,
-        th_x: f32,
-        th_y: f32,
+        thickness_x: f32,
+        thickness_y: f32,
         color: Color,
     ) {
-        basic::draw_stroke_rect(buffer, x_min, y_min, x_max, y_max, th_x, th_y, color);
+        basic::draw_stroke_rect(
+            buffer,
+            x_min,
+            y_min,
+            x_max,
+            y_max,
+            thickness_x,
+            thickness_y,
+            color,
+        );
     }
+
     #[inline]
+    #[allow(clippy::too_many_arguments)]
     pub fn draw_fill_circle(
         &mut self,
         buffer: &mut MeshBuffer,
-        cx: f32,
-        cy: f32,
-        rx: f32,
-        ry: f32,
+        center_x: f32,
+        center_y: f32,
+        radius_x: f32,
+        radius_y: f32,
         color: Color,
         segments: usize,
     ) {
-        basic::draw_fill_circle(buffer, cx, cy, rx, ry, color, segments);
+        basic::draw_fill_circle(
+            buffer, center_x, center_y, radius_x, radius_y, color, segments,
+        );
     }
+
     #[inline]
+    #[allow(clippy::too_many_arguments)]
     pub fn draw_stroke_circle(
         &mut self,
         buffer: &mut MeshBuffer,
-        cx: f32,
-        cy: f32,
-        rx_inner: f32,
-        ry_inner: f32,
-        rx_outer: f32,
-        ry_outer: f32,
+        center_x: f32,
+        center_y: f32,
+        radius_x_inner: f32,
+        radius_y_inner: f32,
+        radius_x_outer: f32,
+        radius_y_outer: f32,
         color: Color,
         segments: usize,
     ) {
         basic::draw_stroke_circle(
-            buffer, cx, cy, rx_inner, ry_inner, rx_outer, ry_outer, color, segments,
+            buffer,
+            center_x,
+            center_y,
+            radius_x_inner,
+            radius_y_inner,
+            radius_x_outer,
+            radius_y_outer,
+            color,
+            segments,
         );
     }
 
-    // Linear
+    // =========================================================================
+    //  Linear Primitives (Lines & Arrows)
+    // =========================================================================
+
     #[inline]
     pub fn draw_line_segment(
         &mut self,
         buffer: &mut MeshBuffer,
-        p1: Point,
-        p2: Point,
-        w: f32,
+        start: Point,
+        end: Point,
+        width: f32,
         color: Color,
     ) {
-        linear::draw_line_segment(buffer, p1, p2, w, color);
+        linear::draw_line_segment(buffer, start, end, width, color);
     }
+
     #[inline]
     pub fn draw_arrowhead(
         &mut self,
         buffer: &mut MeshBuffer,
         tip: Point,
-        dir: Vector,
-        w: f32,
-        size: f32,
+        direction: Vector, // CHANGED: Point -> Vector
+        line_width: f32,
+        arrow_size_multiplier: f32,
         color: Color,
     ) {
-        linear::draw_arrowhead(buffer, tip, dir, w, size, color);
+        linear::draw_arrowhead(
+            buffer,
+            tip,
+            direction,
+            line_width,
+            arrow_size_multiplier,
+            color,
+        );
     }
 
-    // Polygon
+    // =========================================================================
+    //  Polygons (Triangles, Fans, Rings)
+    // =========================================================================
+
     #[inline]
     pub fn draw_fill_triangle(
         &mut self,
@@ -119,6 +159,7 @@ impl ManualTessellator {
     ) {
         polygon::draw_fill_triangle(buffer, p1, p2, p3, color);
     }
+
     #[inline]
     pub fn draw_stroke_triangle(
         &mut self,
@@ -129,40 +170,58 @@ impl ManualTessellator {
     ) {
         polygon::draw_stroke_triangle(buffer, outer, inner, color);
     }
+
     #[inline]
     pub fn draw_fan(&mut self, buffer: &mut MeshBuffer, points: &[Point], color: Color) {
         polygon::draw_fan(buffer, points, color);
     }
+
     #[inline]
     pub fn draw_ring(
         &mut self,
         buffer: &mut MeshBuffer,
-        outer: &[Point],
-        inner: &[Point],
+        outer_points: &[Point],
+        inner_points: &[Point],
         color: Color,
     ) {
-        polygon::draw_ring(buffer, outer, inner, color);
+        polygon::draw_ring(buffer, outer_points, inner_points, color);
     }
 
-    // Radial
+    // =========================================================================
+    //  Radial Primitives (Arcs & Sectors)
+    // =========================================================================
+
     #[inline]
     #[allow(clippy::too_many_arguments)]
     pub fn draw_arc_strip(
         &mut self,
         buffer: &mut MeshBuffer,
-        cx: f32,
-        cy: f32,
-        r_in: f32,
-        r_out: f32,
-        start: f32,
-        end: f32,
+        center_x: f32,
+        center_y: f32,
+        radius_inner: f32,
+        radius_outer: f32,
+        start_angle: f32,
+        end_angle: f32,
         color: Color,
         segments: usize,
     ) {
-        radial::draw_arc_strip(buffer, cx, cy, r_in, r_out, start, end, color, segments);
+        radial::draw_arc_strip(
+            buffer,
+            center_x,
+            center_y,
+            radius_inner,
+            radius_outer,
+            start_angle,
+            end_angle,
+            color,
+            segments,
+        );
     }
 
-    // Mesh
+    // =========================================================================
+    //  Raw Mesh
+    // =========================================================================
+
     #[inline]
     pub fn draw_mesh(
         &mut self,
@@ -171,6 +230,6 @@ impl ManualTessellator {
         indices: &[u32],
         color: Color,
     ) {
-        mesh::draw_mesh(buffer, vertices, indices, color);
+        mesh::draw_raw_mesh(buffer, vertices, indices, color);
     }
 }

@@ -1,7 +1,14 @@
+//! Basic geometric primitives (Rectangles and Ellipses).
+//!
+//! This module handles shapes that can be trivially defined by a bounding box or center/radius.
+
 use crate::render::MeshBuffer;
 use iced_core::Color;
 use iced_graphics::{color::pack, mesh::SolidVertex2D};
 
+/// Writes a filled axis-aligned rectangle.
+///
+/// Uses 4 vertices and 2 triangles (Quad).
 #[inline]
 pub fn draw_fill_rect(
     buffer: &mut MeshBuffer,
@@ -11,36 +18,41 @@ pub fn draw_fill_rect(
     y_max: f32,
     color: Color,
 ) {
-    let c = pack(color);
+    let packed_color = pack(color);
     let mesh = buffer.get_mesh_mut();
-    let start = mesh.vertices.len() as u32;
+    let start_index = mesh.vertices.len() as u32;
 
     mesh.vertices.extend_from_slice(&[
         SolidVertex2D {
             position: [x_min, y_min],
-            color: c,
-        },
+            color: packed_color,
+        }, // Top-Left
         SolidVertex2D {
             position: [x_max, y_min],
-            color: c,
-        },
+            color: packed_color,
+        }, // Top-Right
         SolidVertex2D {
             position: [x_max, y_max],
-            color: c,
-        },
+            color: packed_color,
+        }, // Bottom-Right
         SolidVertex2D {
             position: [x_min, y_max],
-            color: c,
-        },
+            color: packed_color,
+        }, // Bottom-Left
     ]);
 
+    // Standard Quad Indices (0-1-2, 0-2-3)
     #[rustfmt::skip]
     mesh.indices.extend_from_slice(&[
-        start, start + 1, start + 2,
-        start, start + 2, start + 3,
+        start_index, start_index + 1, start_index + 2,
+        start_index, start_index + 2, start_index + 3,
     ]);
 }
 
+/// Writes a hollow rectangle (border).
+///
+/// Constructed as a "picture frame" using 8 vertices and 8 triangles to form the thick border.
+/// This prevents overdraw artifacts that occur if we were to just draw 4 overlapping line segments.
 #[inline]
 #[allow(clippy::too_many_arguments)]
 pub fn draw_stroke_rect(
@@ -49,143 +61,174 @@ pub fn draw_stroke_rect(
     y_min: f32,
     x_max: f32,
     y_max: f32,
-    th_x: f32,
-    th_y: f32,
+    thickness_x: f32,
+    thickness_y: f32,
     color: Color,
 ) {
-    let c = pack(color);
+    let packed_color = pack(color);
     let mesh = buffer.get_mesh_mut();
-    let start = mesh.vertices.len() as u32;
+    let start_index = mesh.vertices.len() as u32;
 
-    let ix_min = x_min + th_x;
-    let ix_max = x_max - th_x;
-    let iy_min = y_min + th_y;
-    let iy_max = y_max - th_y;
+    // Inner rectangle coordinates
+    let inner_x_min = x_min + thickness_x;
+    let inner_x_max = x_max - thickness_x;
+    let inner_y_min = y_min + thickness_y;
+    let inner_y_max = y_max - thickness_y;
 
     mesh.vertices.extend_from_slice(&[
+        // Outer Loop (0-3)
         SolidVertex2D {
             position: [x_min, y_min],
-            color: c,
+            color: packed_color,
         },
         SolidVertex2D {
             position: [x_max, y_min],
-            color: c,
+            color: packed_color,
         },
         SolidVertex2D {
             position: [x_max, y_max],
-            color: c,
+            color: packed_color,
         },
         SolidVertex2D {
             position: [x_min, y_max],
-            color: c,
+            color: packed_color,
+        },
+        // Inner Loop (4-7)
+        SolidVertex2D {
+            position: [inner_x_min, inner_y_min],
+            color: packed_color,
         },
         SolidVertex2D {
-            position: [ix_min, iy_min],
-            color: c,
+            position: [inner_x_max, inner_y_min],
+            color: packed_color,
         },
         SolidVertex2D {
-            position: [ix_max, iy_min],
-            color: c,
+            position: [inner_x_max, inner_y_max],
+            color: packed_color,
         },
         SolidVertex2D {
-            position: [ix_max, iy_max],
-            color: c,
-        },
-        SolidVertex2D {
-            position: [ix_min, iy_max],
-            color: c,
+            position: [inner_x_min, inner_y_max],
+            color: packed_color,
         },
     ]);
 
+    // Connect outer loop to inner loop using a triangle strip approach
     #[rustfmt::skip]
     mesh.indices.extend_from_slice(&[
-        start, start + 1, start + 4,   start + 1, start + 4, start + 5,
-        start + 1, start + 2, start + 5,   start + 2, start + 5, start + 6,
-        start + 2, start + 3, start + 6,   start + 3, start + 6, start + 7,
-        start + 3, start, start + 7,   start, start + 7, start + 4,
+        start_index, start_index + 1, start_index + 4,   start_index + 1, start_index + 4, start_index + 5, // Top Edge
+        start_index + 1, start_index + 2, start_index + 5,   start_index + 2, start_index + 5, start_index + 6, // Right Edge
+        start_index + 2, start_index + 3, start_index + 6,   start_index + 3, start_index + 6, start_index + 7, // Bottom Edge
+        start_index + 3, start_index, start_index + 7,   start_index, start_index + 7, start_index + 4, // Left Edge
     ]);
 }
 
+/// Writes a filled circle or ellipse using a Triangle Fan.
+///
+/// A center vertex is created, and surrounding vertices are generated via trigonometry.
 #[inline]
 pub fn draw_fill_circle(
     buffer: &mut MeshBuffer,
-    cx: f32,
-    cy: f32,
-    rx: f32, // CHANGED: radius -> rx
-    ry: f32, // CHANGED: Added ry
+    center_x: f32,
+    center_y: f32,
+    radius_x: f32,
+    radius_y: f32,
     color: Color,
     segments: usize,
 ) {
-    let c = pack(color);
+    let packed_color = pack(color);
     let mesh = buffer.get_mesh_mut();
-    let start = mesh.vertices.len() as u32;
-    let step = std::f32::consts::TAU / segments as f32;
+    let start_index = mesh.vertices.len() as u32;
+    let step_angle = std::f32::consts::TAU / segments as f32;
 
+    // Center Vertex (Hub of the fan)
     mesh.vertices.push(SolidVertex2D {
-        position: [cx, cy],
-        color: c,
+        position: [center_x, center_y],
+        color: packed_color,
     });
 
+    // Rim Vertices
     for i in 0..segments {
-        let theta = i as f32 * step;
+        let theta = i as f32 * step_angle;
         let (sin, cos) = theta.sin_cos();
-        // Anisotropic scaling: multiply cos by rx, sin by ry
         mesh.vertices.push(SolidVertex2D {
-            position: [cos.mul_add(rx, cx), sin.mul_add(ry, cy)],
-            color: c,
+            position: [
+                cos.mul_add(radius_x, center_x),
+                sin.mul_add(radius_y, center_y),
+            ],
+            color: packed_color,
         });
     }
 
+    // Connect indices (Hub -> Current -> Next)
     for i in 0..segments {
         let current = (i + 1) as u32;
         let next = if i == segments - 1 { 1 } else { current + 1 };
         mesh.indices
-            .extend_from_slice(&[start, start + current, start + next]);
+            .extend_from_slice(&[start_index, start_index + current, start_index + next]);
     }
 }
 
+/// Writes a hollow circle or ellipse (ring) using a Triangle Strip.
+///
+/// Creates an inner ring and an outer ring of vertices and laces them together.
 #[inline]
 #[allow(clippy::too_many_arguments)]
 pub fn draw_stroke_circle(
     buffer: &mut MeshBuffer,
-    cx: f32,
-    cy: f32,
-    rx_inner: f32,
-    ry_inner: f32,
-    rx_outer: f32,
-    ry_outer: f32,
+    center_x: f32,
+    center_y: f32,
+    radius_x_inner: f32,
+    radius_y_inner: f32,
+    radius_x_outer: f32,
+    radius_y_outer: f32,
     color: Color,
     segments: usize,
 ) {
-    let c = pack(color);
+    let packed_color = pack(color);
     let mesh = buffer.get_mesh_mut();
-    let start = mesh.vertices.len() as u32;
-    let step = std::f32::consts::TAU / segments as f32;
+    let start_index = mesh.vertices.len() as u32;
+    let step_angle = std::f32::consts::TAU / segments as f32;
 
     for i in 0..segments {
-        let theta = i as f32 * step;
+        let theta = i as f32 * step_angle;
         let (sin, cos) = theta.sin_cos();
 
+        // Inner Vertex
         mesh.vertices.push(SolidVertex2D {
-            position: [cos.mul_add(rx_inner, cx), sin.mul_add(ry_inner, cy)],
-            color: c,
+            position: [
+                cos.mul_add(radius_x_inner, center_x),
+                sin.mul_add(radius_y_inner, center_y),
+            ],
+            color: packed_color,
         });
+
+        // Outer Vertex
         mesh.vertices.push(SolidVertex2D {
-            position: [cos.mul_add(rx_outer, cx), sin.mul_add(ry_outer, cy)],
-            color: c,
+            position: [
+                cos.mul_add(radius_x_outer, center_x),
+                sin.mul_add(radius_y_outer, center_y),
+            ],
+            color: packed_color,
         });
     }
 
+    // Connect the strip
     for i in 0..segments {
         let i = i as u32;
         let next_i = (i + 1) % segments as u32;
-        let inner_curr = start + i * 2;
-        let outer_curr = start + i * 2 + 1;
-        let inner_next = start + next_i * 2;
-        let outer_next = start + next_i * 2 + 1;
+
+        let inner_current = start_index + i * 2;
+        let outer_current = start_index + i * 2 + 1;
+        let inner_next = start_index + next_i * 2;
+        let outer_next = start_index + next_i * 2 + 1;
 
         mesh.indices.extend_from_slice(&[
-            inner_curr, outer_curr, outer_next, inner_curr, outer_next, inner_next,
+            inner_current,
+            outer_current,
+            outer_next, // Triangle 1
+            inner_current,
+            outer_next,
+            inner_next, // Triangle 2
         ]);
     }
 }
