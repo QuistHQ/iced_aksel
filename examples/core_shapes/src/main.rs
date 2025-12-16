@@ -6,7 +6,7 @@ use iced_aksel::{
     Axis, Chart, PlotPoint, State, Stroke, axis,
     plot::{Plot, PlotData},
     scale::Linear,
-    shape::{Arc, Circle, Label, Line, Polygon, Polyline, Rectangle, Triangle, Zone},
+    shape::{Arc, Area, Circle, Label, Line, Polygon, Polyline, Rectangle, Triangle},
 };
 
 type AxisId = &'static str;
@@ -276,9 +276,9 @@ impl PlotData<f64> for ShapeGallery {
             ]
         };
 
-        plot.add_shape(Zone::new(arrow_pts(25.0)).fill(palette.primary));
+        plot.add_shape(Area::new(arrow_pts(25.0)).fill(palette.primary));
 
-        plot.add_shape(Zone::new(arrow_pts(50.0)).stroke(Stroke::new(
+        plot.add_shape(Area::new(arrow_pts(50.0)).stroke(Stroke::new(
             palette.primary,
             iced_aksel::Measure::Screen(2.0),
         )));

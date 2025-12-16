@@ -14,7 +14,7 @@ use iced_aksel::{
     plot::{Plot, PlotData},
     scale::Linear,
     // Added Zone to imports
-    shape::{Label, Polygon, Polyline, Rectangle, Zone},
+    shape::{Area, Label, Polygon, Polyline, Rectangle},
 };
 use std::collections::HashMap;
 
@@ -597,7 +597,7 @@ impl PlotData<f64> for LineChart {
                 let mut color = s.color;
                 color.a = self.current_fill_alpha;
                 // Changed from Polygon to Zone for area filling
-                plot.add_shape(Zone::new(fill_poly).fill(color));
+                plot.add_shape(Area::new(fill_poly).fill(color));
             }
 
             plot.add_shape(Polyline {

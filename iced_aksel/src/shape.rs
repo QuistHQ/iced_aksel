@@ -43,6 +43,7 @@ use super::plot;
 use aksel::Float;
 
 mod arc;
+mod area;
 mod circle;
 mod label;
 mod line;
@@ -50,9 +51,9 @@ mod polygon;
 mod polyline;
 mod rectangle;
 mod triangle;
-mod zone;
 
 pub use arc::Arc;
+pub use area::Area;
 pub use circle::Circle;
 pub use label::Label;
 pub use line::Line;
@@ -60,7 +61,6 @@ pub use polygon::Polygon;
 pub use polyline::Polyline;
 pub use rectangle::Rectangle;
 pub use triangle::Triangle;
-pub use zone::Zone;
 
 /// Trait for shapes that can be rendered on a plot.
 ///

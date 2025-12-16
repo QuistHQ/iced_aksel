@@ -7,13 +7,13 @@ use aksel::{Float, PlotPoint, Transform};
 use iced_core::{Color, Point};
 
 #[derive(Debug, Clone)]
-pub struct Zone<D> {
+pub struct Area<D> {
     points: Vec<PlotPoint<D>>,
     fill: Option<Color>,
     stroke: Option<Stroke<D>>,
 }
 
-impl<D: Float, R: plot::Renderer> Shape<D, R> for Zone<D> {
+impl<D: Float, R: plot::Renderer> Shape<D, R> for Area<D> {
     fn render(self, ctx: &mut plot::Context<'_, D, R>) {
         ctx.render_mesh(move |transform, buffer, tess| {
             self.tessellate(transform, buffer, tess);
@@ -21,7 +21,7 @@ impl<D: Float, R: plot::Renderer> Shape<D, R> for Zone<D> {
     }
 }
 
-impl<D: Float> Zone<D> {
+impl<D: Float> Area<D> {
     pub const fn new(points: Vec<PlotPoint<D>>) -> Self {
         Self {
             points,

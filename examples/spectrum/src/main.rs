@@ -212,7 +212,7 @@ impl PlotData<f64> for SpectrumLayer {
         fill_points.push(PlotPoint::new(MAX_FREQ, MIN_DB));
 
         plot.add_shape(
-            shape::Zone::new(fill_points).fill(palette.primary.base.color.scale_alpha(0.4)),
+            shape::Area::new(fill_points).fill(palette.primary.base.color.scale_alpha(0.4)),
         );
 
         let glow_color = if theme.mode() == Mode::Light {
