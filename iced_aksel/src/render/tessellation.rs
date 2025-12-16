@@ -60,7 +60,8 @@ impl Tessellator {
     ) {
         let width = x_max - x_min;
         let height = y_max - y_min;
-        let is_consumed = stroke.is_some_and(|(_, th_x, th_y)| th_x >= width / 2 || th_y >= height / 2);
+        let is_consumed =
+            stroke.is_some_and(|(_, th_x, th_y)| th_x >= width / 2. || th_y >= height / 2.);
 
         if is_consumed {
             if let Some((s, _, _)) = stroke {
