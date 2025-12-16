@@ -11,8 +11,10 @@ use lyon_tessellation::{
 };
 
 /// A wrapper for Lyon's tessellators.
+///
 #[derive(Default)]
 pub struct ComplexTessellator {
+    #[allow(dead_code)]
     pub fill: FillTessellator,
     pub stroke: StrokeTessellator,
 }
