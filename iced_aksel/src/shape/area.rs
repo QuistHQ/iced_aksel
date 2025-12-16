@@ -16,9 +16,10 @@ use iced_core::{Color, Point};
 /// use aksel::PlotPoint;
 /// use iced_core::Color;
 ///
-/// let poly = Area::new(vec![
+/// let area = Area::new(vec![
 ///     PlotPoint::new(0.0, 0.0),
 ///     PlotPoint::new(1.0, 1.0)
+///     PlotPoint::new(2.0, 2.0)
 /// ])
 /// .fill(Color::from_rgb(0.0, 0.0, 1.0));
 /// ```
