@@ -574,7 +574,7 @@ impl StressTestApp {
     fn get_view_bounds(&self) -> ((f64, f64), (f64, f64)) {
         let (x_min, x_max) = self
             .state
-            .axis(&AXIS_ID_X)
+            .axis_opt(&AXIS_ID_X)
             .map(|axis| {
                 let (min, max) = axis.domain();
                 if min <= max {
@@ -587,7 +587,7 @@ impl StressTestApp {
 
         let (y_min, y_max) = self
             .state
-            .axis(&AXIS_ID_Y)
+            .axis_opt(&AXIS_ID_Y)
             .map(|axis| {
                 let (min, max) = axis.domain();
                 if min <= max {

@@ -6,8 +6,6 @@ use indexmap::{IndexMap, map::IterMut};
 
 use crate::Axis;
 
-#[derive(Default, Derivative)]
-#[derivative(Debug)]
 /// Manages the configuration and runtime state of chart axes.
 ///
 /// `State` acts as the central registry for all active axes. It provides methods to
@@ -31,6 +29,8 @@ use crate::Axis;
 /// // 2. Pass the state to the Chart during rendering
 /// let chart: Chart<&str, f64, Message> = Chart::new(&chart_state);
 /// ```
+#[derive(Default, Derivative)]
+#[derivative(Debug)]
 pub struct State<AxisId: Hash + Eq, Domain> {
     axes: IndexMap<AxisId, Axis<Domain>>,
 }
@@ -62,7 +62,7 @@ where
     }
 
     /// Returns a reference to all axes in the state.
-    pub const fn get_axes(&self) -> &IndexMap<AxisId, Axis<D>> {
+    pub const fn axes(&self) -> &IndexMap<AxisId, Axis<D>> {
         &self.axes
     }
 
@@ -119,8 +119,15 @@ where
     ///     let (min, max) = x_axis.domain();
     /// }
     /// ```
-    pub fn axis(&self, id: &AxisId) -> Option<&Axis<D>> {
+    pub fn axis_opt(&self, id: &AxisId) -> Option<&Axis<D>> {
         self.axes.get(id)
+    }
+
+    /// Returns a reference to an axis by ID.
+    ///
+    /// Panics if the axis doesn't exist.
+    pub fn axis(&self, id: &AxisId) -> &Axis<D> {
+        self.axes.get(id).unwrap()
     }
 
     /// Returns a mutable reference to an axis by ID.
@@ -135,8 +142,15 @@ where
     ///     x_axis.pan(0.1);
     /// }
     /// ```
-    pub fn axis_mut(&mut self, id: &AxisId) -> Option<&mut Axis<D>> {
+    pub fn axis_mut_opt(&mut self, id: &AxisId) -> Option<&mut Axis<D>> {
         self.axes.get_mut(id)
+    }
+
+    /// Returns a mutable reference to an axis by ID.
+    ///
+    /// Panics if the axis doesn't exist.
+    pub fn axis_mut(&mut self, id: &AxisId) -> &mut Axis<D> {
+        self.axes.get_mut(id).unwrap()
     }
 
     /// Returns an iterator over all axes mutably.

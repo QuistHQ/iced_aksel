@@ -226,7 +226,7 @@ impl ExampleApp {
         let x_domain = self
             .candlestick_chart
             .state
-            .axis(&X_AXIS_ID)
+            .axis_opt(&X_AXIS_ID)
             .map(|axis| axis.domain())
             .unwrap_or((&0.0, &100.0));
 

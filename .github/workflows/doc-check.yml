@@ -1,0 +1,38 @@
+name: Doc-Check
+
+on:
+  workflow_run:
+    workflows: ["Check"]
+    branches: [main]
+    types:
+      - completed
+
+env:
+  CARGO_TERM_COLOR: always
+  SDL_VIDEODRIVER: "dummy"
+  SDL_AUDIODRIVER: "disk"
+  RUSTFLAGS: -D missing_docs -D warnings
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Install Alsa lib
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev
+
+      - name: Build docs
+        run: cargo doc --workspace --no-deps
+
+      - name: Test docs
+        run: cargo test --doc

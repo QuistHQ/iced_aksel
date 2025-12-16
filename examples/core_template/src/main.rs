@@ -90,7 +90,7 @@ impl SimpleExample {
                 // Get current zoom level
                 let current_span = self
                     .chart_state
-                    .axis(&Self::X_ID)
+                    .axis_opt(&Self::X_ID)
                     .map(|ax| {
                         let (min, max) = ax.domain();
                         max - min
@@ -103,18 +103,18 @@ impl SimpleExample {
 
                 if should_clamp {
                     // Snap to exact world bounds
-                    if let Some(axis) = self.chart_state.axis_mut(&Self::X_ID) {
+                    if let Some(axis) = self.chart_state.axis_mut_opt(&Self::X_ID) {
                         axis.set_domain(-Self::WORLD_SIZE, Self::WORLD_SIZE);
                     }
-                    if let Some(axis) = self.chart_state.axis_mut(&Self::Y_ID) {
+                    if let Some(axis) = self.chart_state.axis_mut_opt(&Self::Y_ID) {
                         axis.set_domain(-Self::WORLD_SIZE, Self::WORLD_SIZE);
                     }
                 } else {
                     // Standard Zoom
-                    if let Some(axis) = self.chart_state.axis_mut(&Self::X_ID) {
+                    if let Some(axis) = self.chart_state.axis_mut_opt(&Self::X_ID) {
                         axis.zoom(factor as f32, Some(cursor_norm.x));
                     }
-                    if let Some(axis) = self.chart_state.axis_mut(&Self::Y_ID) {
+                    if let Some(axis) = self.chart_state.axis_mut_opt(&Self::Y_ID) {
                         axis.zoom(factor as f32, Some(cursor_norm.y));
                     }
                 }

@@ -154,10 +154,10 @@ impl Interactions {
                 let zoom_y = self.modifiers.command() || self.modifiers.shift();
 
                 // 3. Apply Zoom
-                if zoom_x && let Some(axis) = self.state.axis_mut(&Self::AXIS_X) {
+                if zoom_x && let Some(axis) = self.state.axis_mut_opt(&Self::AXIS_X) {
                     axis.zoom(factor, Some(cursor_norm.x));
                 }
-                if zoom_y && let Some(axis) = self.state.axis_mut(&Self::AXIS_Y) {
+                if zoom_y && let Some(axis) = self.state.axis_mut_opt(&Self::AXIS_Y) {
                     axis.zoom(factor, Some(cursor_norm.y));
                 }
             }
@@ -169,8 +169,8 @@ impl Interactions {
             }
             Message::Hovered(cursor_norm) => {
                 // Calculate real data values from normalized cursor position
-                let x_axis = self.state.axis(&Self::AXIS_X);
-                let y_axis = self.state.axis(&Self::AXIS_Y);
+                let x_axis = self.state.axis_opt(&Self::AXIS_X);
+                let y_axis = self.state.axis_opt(&Self::AXIS_Y);
 
                 if let (Some(x_ax), Some(y_ax)) = (x_axis, y_axis) {
                     let x = x_ax.denormalize_opt(cursor_norm.x);

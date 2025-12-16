@@ -310,7 +310,7 @@ impl LineChart {
 
         self.current_x_domain = (next_x0, next_x1);
 
-        if let Some(axis) = self.state.axis_mut(&Self::X.to_string()) {
+        if let Some(axis) = self.state.axis_mut_opt(&Self::X.to_string()) {
             axis.set_domain(self.current_x_domain.0, self.current_x_domain.1);
         }
 
@@ -319,7 +319,7 @@ impl LineChart {
             current.0 += (target.0 - current.0) * alpha;
             current.1 += (target.1 - current.1) * alpha;
 
-            if let Some(axis) = self.state.axis_mut(&id) {
+            if let Some(axis) = self.state.axis_mut_opt(&id) {
                 axis.set_domain(current.0, current.1);
             }
         }
@@ -358,11 +358,11 @@ impl LineChart {
         self.current_x_domain = tx;
         self.current_y_domains = tys;
 
-        if let Some(axis) = self.state.axis_mut(&Self::X.to_string()) {
+        if let Some(axis) = self.state.axis_mut_opt(&Self::X.to_string()) {
             axis.set_domain(tx.0, tx.1);
         }
         for (id, d) in &self.current_y_domains {
-            if let Some(axis) = self.state.axis_mut(id) {
+            if let Some(axis) = self.state.axis_mut_opt(id) {
                 axis.set_domain(d.0, d.1);
             }
         }
@@ -500,7 +500,7 @@ impl LineChart {
 
     fn update_x_axis_labels(&mut self) {
         let labels = self.labels.clone();
-        let x_axis = self.state.axis_mut(&Self::X.to_string()).unwrap();
+        let x_axis = self.state.axis_mut(&Self::X.to_string());
 
         x_axis.set_tick_renderer(move |ctx| {
             let mut result = TickResult::new();
@@ -555,7 +555,7 @@ impl PlotData<f64> for LineChart {
     fn draw(&self, plot: &mut Plot<f64>, theme: &Theme) {
         let chart_floor = self
             .state
-            .axis(&Self::Y.to_string())
+            .axis_opt(&Self::Y.to_string())
             .map_or(0.0, |axis| *axis.domain().0);
 
         let mut baseline: Vec<f64> = Vec::new();
@@ -629,8 +629,8 @@ impl PlotData<f64> for LineChart {
         if self.show_legend {
             let palette = theme.palette();
             if let (Some(x_axis), Some(y_axis)) = (
-                self.state.axis(&Self::X.to_string()),
-                self.state.axis(&Self::Y.to_string()),
+                self.state.axis_opt(&Self::X.to_string()),
+                self.state.axis_opt(&Self::Y.to_string()),
             ) {
                 let (x_min, x_max) = x_axis.domain();
                 let (y_min, y_max) = y_axis.domain();

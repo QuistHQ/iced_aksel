@@ -10,9 +10,10 @@ env:
   CARGO_TERM_COLOR: always
   SDL_VIDEODRIVER: "dummy"
   SDL_AUDIODRIVER: "disk"
+  RUSTFLAGS: -D missing_docs -D warnings
 
 jobs:
-  build:
+  check:
     runs-on: ubuntu-latest
 
     steps:
@@ -24,8 +25,6 @@ jobs:
         with:
           cache-on-failure: true
 
-      - uses: extractions/setup-just@v3
-
       - name: Install Alsa lib
         run: |
           sudo apt-get update
@@ -34,14 +33,15 @@ jobs:
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
 
-      - name: Lint
-        run: cargo fmt -- --check --color always
-
-      - name: Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
-
       - name: Build
-        run: cargo build
+        run: |
+          cargo check
+          cargo build
 
-      - name: Run tests
+      - name: Lint
+        run: |
+          cargo fmt -- --check --color always
+          cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Test
         run: cargo nextest run --hide-progress-bar --failure-output final --no-tests warn
