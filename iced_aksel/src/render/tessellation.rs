@@ -10,7 +10,22 @@ use lyon_path::{LineCap, LineJoin, Path, PathEvent, iterator::FromPolyline, trai
 use lyon_tessellation::{FillOptions, StrokeOptions};
 use math::*;
 
-/// The unified tessellator facade.
+/// The central driver for the rendering engine.
+///
+/// The `Tessellator` acts as the "Brain" of the graphics pipeline. It orchestrates the
+/// tessellation process by deciding which strategy to use for a given shape:
+///
+/// * **Fast Path (Manual):** Direct vertex generation for simple primitives (Rects, Circles, Lines).
+/// * **Robust Path (Complex):** Lyon-based tessellation for dashed lines, complex paths, and boolean operations.
+///
+/// It also manages the global [`quality`](Self::quality) setting, automatically calculating the
+/// Level of Detail (LOD) for curves and arcs to balance performance with visual fidelity.
+///
+/// # Layman's Terms
+/// This component serves as the **decision maker**. It takes a high-level request like "draw a circle"
+/// and translates it into low-level instructions. It handles the "smart" work—like determining that
+/// a circle needs fewer edges when zoomed out—before handing off the actual work of writing
+/// coordinates to the underlying tessellators.
 pub struct Tessellator {
     pub complex: ComplexTessellator,
     pub manual: manual::ManualTessellator,

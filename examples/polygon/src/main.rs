@@ -10,7 +10,7 @@ use iced_aksel::{
     Stroke,
     axis::Position,
     scale::Linear,
-    shape::{Label, Polygon, Zone}, // Import both
+    shape::{Area, Label, Polygon}, // Import both
 };
 
 const X_AXIS: &str = "x";
@@ -95,7 +95,7 @@ impl PlotData<f64> for PolygonGallery {
         ];
 
         plot.add_shape(
-            Zone::new(trapezoid)
+            Area::new(trapezoid)
                 .fill(Color::from_rgba(0.2, 0.4, 0.8, 0.5))
                 .stroke(Stroke::new(palette.primary, Measure::Screen(2.0))),
         );
@@ -109,6 +109,6 @@ impl PlotData<f64> for PolygonGallery {
             PlotPoint::new(80.0, 20.0),
         ];
 
-        plot.add_shape(Zone::new(loop_shape).fill(Color::from_rgba(0.2, 0.8, 0.2, 0.5)));
+        plot.add_shape(Area::new(loop_shape).fill(Color::from_rgba(0.2, 0.8, 0.2, 0.5)));
     }
 }

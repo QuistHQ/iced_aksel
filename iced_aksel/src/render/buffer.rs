@@ -1,6 +1,16 @@
 use iced_core::{Rectangle, Transformation};
 use iced_graphics::mesh::{self, SolidVertex2D};
 
+/// A simplified container for GPU vertex and index data.
+///
+/// The `MeshBuffer` acts as a bridge between the high-level tessellation logic and
+/// the low-level `iced_graphics` mesh primitives.
+///
+/// # Layman's Terms
+/// This is the **data collector**. It holds the final list of vertices (points in space) and
+/// indices (the order to connect them) that the GPU will actually draw. It acts as a universal
+/// adapter, accepting geometry data from different parts of the engine and bundling it all
+/// into one efficiently packed format ready for the graphics card.
 #[derive(Default)]
 pub struct MeshBuffer {
     buffer: Option<mesh::Indexed<SolidVertex2D>>,

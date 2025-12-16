@@ -20,7 +20,7 @@ use iced_aksel::{
     axis::Position,
     plot::{self, DragDelta},
     scale::Linear,
-    shape::{Arc, Circle, Label, Line, Polygon, Polyline, Rectangle, Triangle, Zone},
+    shape::{Arc, Area, Circle, Label, Line, Polygon, Polyline, Rectangle, Triangle},
     stroke::StrokeStyle,
 };
 use rand::Rng;
@@ -326,7 +326,7 @@ impl PlotData<f64> for StressArcs {
 }
 
 struct StressPolygons {
-    zones: Vec<Zone<f64>>,       // For concave/arbitrary shapes
+    zones: Vec<Area<f64>>,       // For concave/arbitrary shapes
     polygons: Vec<Polygon<f64>>, // For regular convex markers
     colors: Vec<Color>,
     show_fill: bool,
@@ -845,7 +845,7 @@ impl StressTestApp {
                     points.push(PlotPoint::new(px, py));
                 }
 
-                self.polygons_layer.zones.push(Zone::new(points));
+                self.polygons_layer.zones.push(Area::new(points));
             } else {
                 // Polygon path (Regular Marker)
                 let radius = match self.size_mode {

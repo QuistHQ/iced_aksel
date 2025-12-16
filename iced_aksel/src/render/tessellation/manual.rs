@@ -7,9 +7,18 @@ pub mod radial;
 use crate::render::MeshBuffer;
 use iced_core::{Color, Point, Vector};
 
-/// The "Fast Path" tessellator.
+/// The "Fast Path" rendering engine.
 ///
-/// This struct aggregates the pure functions from sub-modules.
+/// This component contains highly optimized, allocation-free algorithms for generating
+/// vertices for standard geometric primitives. Unlike generic tessellators, it uses
+/// domain-specific knowledge (e.g., "a circle is just a triangle fan") to write
+/// vertices directly to the [`MeshBuffer`](crate::render::MeshBuffer).
+///
+/// # Layman's Terms
+/// This acts as a **direct writer**. It skips general-purpose geometry math and instead uses
+/// specific, optimized formulas. For example, it knows that a rectangle is always made of
+/// exactly two triangles, so it calculates and writes those six points directly to memory
+/// without running a complex shape analysis algorithm first.
 #[derive(Default)]
 pub struct ManualTessellator;
 
