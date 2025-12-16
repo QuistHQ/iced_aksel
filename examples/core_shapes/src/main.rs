@@ -269,10 +269,10 @@ impl PlotData<f64> for ShapeGallery {
         );
 
         // =========================================================
-        //  ROW 5: ZONES (Y = 60)
+        //  ROW 5: AREAS (Y = 60)
         // =========================================================
         let y = 60.0;
-        draw_row_label(plot, y, "Zone");
+        draw_row_label(plot, y, "Area");
 
         // Concave Arrowhead shape to demonstrate arbitrary geometry
         let arrow_pts = |cx: f64| {
