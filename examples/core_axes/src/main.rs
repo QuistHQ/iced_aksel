@@ -394,9 +394,9 @@ impl DataLayer {
 
 impl PlotData<f64> for DataLayer {
     fn draw(&self, plot: &mut Plot<f64>, theme: &Theme) {
-        plot.add_shape(Polyline::new(
-            self.points.clone(),
-            Stroke::new(theme.palette().primary, Measure::Screen(2.0)),
-        ));
+        plot.add_shape(
+            Polyline::new(self.points.clone())
+                .stroke(Stroke::new(theme.palette().primary, Measure::Screen(2.0))),
+        );
     }
 }

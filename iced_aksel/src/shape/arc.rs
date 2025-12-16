@@ -6,6 +6,23 @@ use crate::{
 use aksel::{Float, PlotPoint, Transform};
 use iced_core::Color;
 
+/// A primitive representing a sector of a circle or a ring.
+///
+/// # Usage
+/// ```rust
+/// use iced_aksel::shape::Arc;
+/// use iced_aksel::Measure;
+/// use aksel::PlotPoint;
+/// use iced_core::Color;
+///
+/// let sector = Arc::new(
+///     PlotPoint::new(0.0, 0.0),
+///     Measure::Screen(50.0),
+///     0.0, // Radians
+///     1.5  // Radians
+/// )
+/// .fill(Color::from_rgb(1.0, 0.0, 0.0));
+/// ```
 #[derive(Debug, Clone)]
 pub struct Arc<D> {
     pub center: PlotPoint<D>,
@@ -26,6 +43,13 @@ impl<D: Float, R: plot::Renderer> Shape<D, R> for Arc<D> {
 }
 
 impl<D: Float> Arc<D> {
+    /// Creates a new `Arc`.
+    ///
+    /// * `radius`: The outer radius of the arc.
+    /// * `start_angle`: Starting angle in **Radians**.
+    /// * `end_angle`: Ending angle in **Radians**.
+    ///
+    /// Note: The shape is invisible by default. You must call `.fill()` or `.stroke()` to render it.
     pub const fn new(
         center: PlotPoint<D>,
         radius: Measure<D>,
@@ -43,17 +67,20 @@ impl<D: Float> Arc<D> {
         }
     }
 
+    /// Sets the inner radius of the arc, creating a donut sector.
     pub const fn inner_radius(mut self, radius: Measure<D>) -> Self {
         self.inner_radius = radius;
         self
     }
 
+    /// Sets the fill color of the arc.
     #[inline]
     pub const fn fill(mut self, color: Color) -> Self {
         self.fill = Some(color);
         self
     }
 
+    /// Sets the stroke style (border) of the arc.
     #[inline]
     pub const fn stroke(mut self, stroke: Stroke<D>) -> Self {
         self.stroke = Some(stroke);
@@ -69,11 +96,11 @@ impl<D: Float> Arc<D> {
         let cx = transform.x_to_screen(&self.center.x);
         let cy = transform.y_to_screen(&self.center.y);
 
-        let outer_r = self.resolve_length(transform, self.radius);
-        let inner_r = self.resolve_length(transform, self.inner_radius);
+        let outer_r = self.resolve_isotropic(transform, self.radius);
+        let inner_r = self.resolve_isotropic(transform, self.inner_radius);
 
         let stroke_info = self.stroke.as_ref().and_then(|stroke| {
-            let width = self.resolve_length(transform, stroke.thickness);
+            let width = self.resolve_isotropic(transform, stroke.thickness);
             if width < 0.1 {
                 None
             } else {
@@ -94,19 +121,15 @@ impl<D: Float> Arc<D> {
         );
     }
 
-    fn resolve_length(&self, transform: &Transform<D, f32, f32>, len: Measure<D>) -> f32 {
-        match len {
+    fn resolve_isotropic(&self, transform: &Transform<D, f32, f32>, measure: Measure<D>) -> f32 {
+        match measure {
             Measure::Screen(px) => px,
             Measure::Plot(units) => {
-                let p0_x = transform.x_to_screen(&D::zero());
-                let p1_x = transform.x_to_screen(&units);
-                let size_x = (p1_x - p0_x).abs();
-
-                let p0_y = transform.y_to_screen(&D::zero());
-                let p1_y = transform.y_to_screen(&units);
-                let size_y = (p1_y - p0_y).abs();
-
-                size_x.min(size_y)
+                let px_x =
+                    (transform.x_to_screen(&units) - transform.x_to_screen(&D::zero())).abs();
+                let px_y =
+                    (transform.y_to_screen(&units) - transform.y_to_screen(&D::zero())).abs();
+                px_x.min(px_y)
             }
         }
     }

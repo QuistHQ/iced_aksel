@@ -111,7 +111,8 @@ pub fn draw_fill_circle(
     buffer: &mut MeshBuffer,
     cx: f32,
     cy: f32,
-    radius: f32,
+    rx: f32, // CHANGED: radius -> rx
+    ry: f32, // CHANGED: Added ry
     color: Color,
     segments: usize,
 ) {
@@ -128,8 +129,9 @@ pub fn draw_fill_circle(
     for i in 0..segments {
         let theta = i as f32 * step;
         let (sin, cos) = theta.sin_cos();
+        // Anisotropic scaling: multiply cos by rx, sin by ry
         mesh.vertices.push(SolidVertex2D {
-            position: [cos.mul_add(radius, cx), sin.mul_add(radius, cy)],
+            position: [cos.mul_add(rx, cx), sin.mul_add(ry, cy)],
             color: c,
         });
     }
@@ -143,12 +145,15 @@ pub fn draw_fill_circle(
 }
 
 #[inline]
+#[allow(clippy::too_many_arguments)]
 pub fn draw_stroke_circle(
     buffer: &mut MeshBuffer,
     cx: f32,
     cy: f32,
-    r_inner: f32,
-    r_outer: f32,
+    rx_inner: f32,
+    ry_inner: f32,
+    rx_outer: f32,
+    ry_outer: f32,
     color: Color,
     segments: usize,
 ) {
@@ -160,12 +165,13 @@ pub fn draw_stroke_circle(
     for i in 0..segments {
         let theta = i as f32 * step;
         let (sin, cos) = theta.sin_cos();
+
         mesh.vertices.push(SolidVertex2D {
-            position: [cos.mul_add(r_inner, cx), sin.mul_add(r_inner, cy)],
+            position: [cos.mul_add(rx_inner, cx), sin.mul_add(ry_inner, cy)],
             color: c,
         });
         mesh.vertices.push(SolidVertex2D {
-            position: [cos.mul_add(r_outer, cx), sin.mul_add(r_outer, cy)],
+            position: [cos.mul_add(rx_outer, cx), sin.mul_add(ry_outer, cy)],
             color: c,
         });
     }

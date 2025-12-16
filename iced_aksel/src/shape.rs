@@ -44,7 +44,7 @@ use aksel::Float;
 
 mod arc;
 mod area;
-mod circle;
+mod ellipse;
 mod label;
 mod line;
 mod polygon;
@@ -54,7 +54,7 @@ mod triangle;
 
 pub use arc::Arc;
 pub use area::Area;
-pub use circle::Circle;
+pub use ellipse::Ellipse;
 pub use label::Label;
 pub use line::Line;
 pub use polygon::Polygon;

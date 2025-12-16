@@ -1,15 +1,33 @@
 use crate::{
-    Float, Measure, PlotPoint, Shape, Stroke, Transform,
+    Float, Measure, Shape, Stroke, Transform,
     plot::{self},
     render::{MeshBuffer, Tessellator},
 };
+use aksel::PlotPoint;
 use iced_core::Point;
 
+/// A primitive representing a straight segment between two points.
+///
+/// Supports infinite extensions and arrowheads.
+///
+/// # Usage
+/// ```rust
+/// use iced_aksel::shape::Line;
+/// use iced_aksel::Stroke;
+/// use aksel::PlotPoint;
+///
+/// let trend = Line::new(
+///     PlotPoint::new(0.0, 0.0),
+///     PlotPoint::new(100.0, 100.0)
+/// )
+/// .stroke(Stroke::default()) // Essential!
+/// .infinite();
+/// ```
 #[derive(Debug, Clone)]
 pub struct Line<D> {
     pub p1: PlotPoint<D>,
     pub p2: PlotPoint<D>,
-    pub stroke: Stroke<D>,
+    pub stroke: Option<Stroke<D>>,
     pub extend_start: bool,
     pub extend_end: bool,
     pub arrow_start: bool,
@@ -26,11 +44,14 @@ impl<D: Float, R: plot::Renderer> Shape<D, R> for Line<D> {
 }
 
 impl<D: Float> Line<D> {
-    pub const fn new(p1: PlotPoint<D>, p2: PlotPoint<D>, stroke: Stroke<D>) -> Self {
+    /// Creates a new `Line` segment between two points.
+    ///
+    /// Note: The shape is invisible by default. You **must** call `.stroke()` to render it.
+    pub const fn new(p1: PlotPoint<D>, p2: PlotPoint<D>) -> Self {
         Self {
             p1,
             p2,
-            stroke,
+            stroke: None,
             extend_start: false,
             extend_end: false,
             arrow_start: false,
@@ -39,32 +60,51 @@ impl<D: Float> Line<D> {
         }
     }
 
+    /// Sets the stroke style for the line.
+    pub const fn stroke(mut self, stroke: Stroke<D>) -> Self {
+        self.stroke = Some(stroke);
+        self
+    }
+
+    /// Extends the line infinitely in the start direction.
     pub const fn extend_start(mut self, enable: bool) -> Self {
         self.extend_start = enable;
         self
     }
+
+    /// Extends the line infinitely in the end direction.
     pub const fn extend_end(mut self, enable: bool) -> Self {
         self.extend_end = enable;
         self
     }
+
+    /// Extends the line infinitely in both directions.
     pub const fn infinite(mut self) -> Self {
         self.extend_start = true;
         self.extend_end = true;
         self
     }
+
+    /// Adds an arrowhead at the start of the line.
     pub const fn arrow_start(mut self, enable: bool) -> Self {
         self.arrow_start = enable;
         self
     }
+
+    /// Adds an arrowhead at the end of the line.
     pub const fn arrow_end(mut self, enable: bool) -> Self {
         self.arrow_end = enable;
         self
     }
+
+    /// Adds arrowheads to both ends of the line.
     pub const fn arrows(mut self, enable: bool) -> Self {
         self.arrow_start = enable;
         self.arrow_end = enable;
         self
     }
+
+    /// Sets the size multiplier for arrowheads (default is 3.0x line width).
     pub const fn arrow_size(mut self, multiplier: f32) -> Self {
         self.arrow_size = multiplier;
         self
@@ -76,6 +116,11 @@ impl<D: Float> Line<D> {
         buffer: &mut MeshBuffer,
         tess: &mut Tessellator,
     ) {
+        let stroke = match self.stroke {
+            Some(s) => s,
+            None => return, // Invisible
+        };
+
         let raw_start = Point::new(
             transform.x_to_screen(&self.p1.x),
             transform.y_to_screen(&self.p1.y),
@@ -85,7 +130,7 @@ impl<D: Float> Line<D> {
             transform.y_to_screen(&self.p2.y),
         );
 
-        let width = match self.stroke.thickness {
+        let width = match stroke.thickness {
             Measure::Screen(w) => w,
             Measure::Plot(w) => {
                 let p0 = transform.x_to_screen(&D::zero());
@@ -94,7 +139,6 @@ impl<D: Float> Line<D> {
             }
         };
 
-        // Fix: Map ScreenRect to iced_core::Rectangle manually
         let b = transform.screen_bounds();
         let clip_bounds = iced_core::Rectangle {
             x: b.x,
@@ -107,7 +151,7 @@ impl<D: Float> Line<D> {
             buffer,
             raw_start,
             raw_end,
-            &self.stroke,
+            &stroke,
             width,
             clip_bounds,
             (self.extend_start, self.extend_end),

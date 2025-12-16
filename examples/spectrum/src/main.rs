@@ -222,10 +222,10 @@ impl PlotData<f64> for SpectrumLayer {
         };
 
         let glow_stroke = Stroke::new(glow_color, Measure::Screen(6.0));
-        plot.add_shape(shape::Polyline::new(self.curve.clone(), glow_stroke));
+        plot.add_shape(shape::Polyline::new(self.curve.clone()).stroke(glow_stroke));
 
         let line_stroke = Stroke::new(palette.background.base.text, Measure::Screen(2.2));
-        plot.add_shape(shape::Polyline::new(self.curve.clone(), line_stroke));
+        plot.add_shape(shape::Polyline::new(self.curve.clone()).stroke(line_stroke));
     }
 }
 

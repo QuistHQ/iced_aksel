@@ -6,10 +6,24 @@ use crate::{
 use aksel::{Float, PlotPoint, Transform};
 use iced_core::Point;
 
+/// A primitive representing a connected series of line segments.
+///
+/// Optimized for drawing data series and paths.
+///
+/// # Usage
+/// ```rust
+/// use iced_aksel::shape::Polyline;
+/// use iced_aksel::Stroke;
+/// use aksel::PlotPoint;
+///
+/// let data = vec![PlotPoint::new(0.0, 0.0), PlotPoint::new(1.0, 5.0)];
+/// let series = Polyline::new(data)
+///     .stroke(Stroke::default()); // Essential!
+/// ```
 #[derive(Debug, Clone)]
 pub struct Polyline<D> {
     pub points: Vec<PlotPoint<D>>,
-    pub stroke: Stroke<D>,
+    pub stroke: Option<Stroke<D>>,
     pub extend_start: bool,
     pub extend_end: bool,
     pub arrow_start: bool,
@@ -26,10 +40,13 @@ impl<D: Float, R: plot::Renderer> Shape<D, R> for Polyline<D> {
 }
 
 impl<D: Float> Polyline<D> {
-    pub const fn new(points: Vec<PlotPoint<D>>, stroke: Stroke<D>) -> Self {
+    /// Creates a new `Polyline` from a vector of points.
+    ///
+    /// Note: The shape is invisible by default. You **must** call `.stroke()` to render it.
+    pub const fn new(points: Vec<PlotPoint<D>>) -> Self {
         Self {
             points,
-            stroke,
+            stroke: None,
             extend_start: false,
             extend_end: false,
             arrow_start: false,
@@ -37,22 +54,38 @@ impl<D: Float> Polyline<D> {
             arrow_size: 3.0,
         }
     }
+
+    /// Sets the stroke style for the polyline.
+    pub const fn stroke(mut self, stroke: Stroke<D>) -> Self {
+        self.stroke = Some(stroke);
+        self
+    }
+
+    /// Extends the first segment of the polyline infinitely backwards.
     pub const fn extend_start(mut self, enable: bool) -> Self {
         self.extend_start = enable;
         self
     }
+
+    /// Extends the last segment of the polyline infinitely forwards.
     pub const fn extend_end(mut self, enable: bool) -> Self {
         self.extend_end = enable;
         self
     }
+
+    /// Adds an arrowhead at the start of the polyline.
     pub const fn arrow_start(mut self, enable: bool) -> Self {
         self.arrow_start = enable;
         self
     }
+
+    /// Adds an arrowhead at the end of the polyline.
     pub const fn arrow_end(mut self, enable: bool) -> Self {
         self.arrow_end = enable;
         self
     }
+
+    /// Sets the size multiplier for arrowheads.
     pub const fn arrow_size(mut self, size: f32) -> Self {
         self.arrow_size = size;
         self
@@ -68,7 +101,12 @@ impl<D: Float> Polyline<D> {
             return;
         }
 
-        let width = match self.stroke.thickness {
+        let stroke = match self.stroke {
+            Some(s) => s,
+            None => return, // Invisible
+        };
+
+        let width = match stroke.thickness {
             Measure::Screen(w) => w,
             Measure::Plot(w) => {
                 let p0 = transform.x_to_screen(&D::zero());
@@ -77,7 +115,6 @@ impl<D: Float> Polyline<D> {
             }
         };
 
-        // Fix: Map ScreenRect to iced_core::Rectangle manually
         let b = transform.screen_bounds();
         let clip_bounds = iced_core::Rectangle {
             x: b.x,
@@ -86,7 +123,6 @@ impl<D: Float> Polyline<D> {
             height: b.height,
         };
 
-        // Stream points lazily
         let points_iter = self
             .points
             .iter()
@@ -95,7 +131,7 @@ impl<D: Float> Polyline<D> {
         tess.draw_polyline(
             buffer,
             points_iter,
-            &self.stroke,
+            &stroke,
             width,
             clip_bounds,
             (self.extend_start, self.extend_end),

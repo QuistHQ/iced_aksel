@@ -6,6 +6,22 @@ use crate::{
 use aksel::{Float, PlotPoint, Transform};
 use iced_core::{Color, Point};
 
+/// A primitive representing an arbitrary filled area defined by a list of points.
+///
+/// Automatically handles convex and concave polygons.
+///
+/// # Usage
+/// ```rust
+/// use iced_aksel::shape::Area;
+/// use aksel::PlotPoint;
+/// use iced_core::Color;
+///
+/// let poly = Area::new(vec![
+///     PlotPoint::new(0.0, 0.0),
+///     PlotPoint::new(1.0, 1.0)
+/// ])
+/// .fill(Color::from_rgb(0.0, 0.0, 1.0));
+/// ```
 #[derive(Debug, Clone)]
 pub struct Area<D> {
     points: Vec<PlotPoint<D>>,
@@ -22,6 +38,9 @@ impl<D: Float, R: plot::Renderer> Shape<D, R> for Area<D> {
 }
 
 impl<D: Float> Area<D> {
+    /// Creates a new `Area` from a list of points.
+    ///
+    /// Note: The shape is invisible by default. You must call `.fill()` or `.stroke()` to render it.
     pub const fn new(points: Vec<PlotPoint<D>>) -> Self {
         Self {
             points,
@@ -30,11 +49,13 @@ impl<D: Float> Area<D> {
         }
     }
 
+    /// Sets the fill color of the area.
     pub const fn fill(mut self, color: Color) -> Self {
         self.fill = Some(color);
         self
     }
 
+    /// Sets the stroke style (border) of the area.
     pub const fn stroke(mut self, stroke: Stroke<D>) -> Self {
         self.stroke = Some(stroke);
         self

@@ -110,52 +110,59 @@ impl Tessellator {
         buffer: &mut MeshBuffer,
         cx: f32,
         cy: f32,
-        radius: f32,
+        rx: f32,
+        ry: f32, // CHANGED: radius -> rx, ry
         fill: Option<Color>,
         stroke: Option<(&Stroke<D>, f32)>,
     ) {
-        if radius < 0.5 {
+        let max_r = rx.max(ry);
+        if max_r < 0.5 {
             return;
         }
-        let segments = self.resolve_lod(radius);
+        let segments = self.resolve_lod(max_r);
 
         let is_consumed = if let Some((_, width)) = stroke {
-            width >= radius
+            width >= max_r
         } else {
             false
         };
         if is_consumed {
             if let Some((s, _)) = stroke {
                 self.manual
-                    .draw_fill_circle(buffer, cx, cy, radius, s.fill, segments);
+                    .draw_fill_circle(buffer, cx, cy, rx, ry, s.fill, segments);
             }
             return;
         }
 
         if let Some(color) = fill {
             let d = if stroke.is_some() { 0.5 } else { 0.0 };
-            let fill_r = (radius - d).max(0.0);
-            if fill_r > 0.1 {
+            let fill_rx = (rx - d).max(0.0);
+            let fill_ry = (ry - d).max(0.0);
+            if fill_rx > 0.1 && fill_ry > 0.1 {
                 self.manual
-                    .draw_fill_circle(buffer, cx, cy, fill_r, color, segments);
+                    .draw_fill_circle(buffer, cx, cy, fill_rx, fill_ry, color, segments);
             }
         }
 
         if let Some((s, width)) = stroke {
             match s.style {
                 StrokeStyle::Solid => {
-                    let r_inner = radius - width;
-                    self.manual
-                        .draw_stroke_circle(buffer, cx, cy, r_inner, radius, s.fill, segments);
+                    let rx_inner = rx - width;
+                    let ry_inner = ry - width;
+                    self.manual.draw_stroke_circle(
+                        buffer, cx, cy, rx_inner, ry_inner, rx, ry, s.fill, segments,
+                    );
                 }
                 _ => {
-                    let stroke_radius = radius - (width / 2.0);
-                    if stroke_radius > 0.1 {
+                    // Elliptical stroking with Lyon for dashed lines
+                    let stroke_rx = rx - (width / 2.0);
+                    let stroke_ry = ry - (width / 2.0);
+                    if stroke_rx > 0.1 && stroke_ry > 0.1 {
                         use lyon_tessellation::geom::Arc;
                         use lyon_tessellation::math::{Angle, Point, Vector};
                         let arc = Arc {
                             center: Point::new(cx, cy),
-                            radii: Vector::new(stroke_radius, stroke_radius),
+                            radii: Vector::new(stroke_rx, stroke_ry),
                             start_angle: Angle::radians(0.0),
                             sweep_angle: Angle::radians(std::f32::consts::TAU),
                             x_rotation: Angle::radians(0.0),

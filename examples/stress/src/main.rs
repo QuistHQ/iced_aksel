@@ -20,7 +20,7 @@ use iced_aksel::{
     axis::Position,
     plot::{self, DragDelta},
     scale::Linear,
-    shape::{Arc, Area, Circle, Label, Line, Polygon, Polyline, Rectangle, Triangle},
+    shape::{Arc, Area, Ellipse, Label, Line, Polygon, Polyline, Rectangle, Triangle},
     stroke::StrokeStyle,
 };
 use rand::Rng;
@@ -136,7 +136,7 @@ impl PlotData<f64> for StressRectangles {
 }
 
 struct StressCircles {
-    geometry: Vec<Circle<f64>>,
+    geometry: Vec<Ellipse<f64>>,
     colors: Vec<Color>,
     show_fill: bool,
     show_stroke: bool,
@@ -238,7 +238,7 @@ impl PlotData<f64> for StressLines {
                 LengthMode::Plot => Measure::Plot(self.stroke_width as f64),
             };
 
-            line.stroke = Stroke::with_style(color, thickness, self.stroke_style);
+            line.stroke = Some(Stroke::with_style(color, thickness, self.stroke_style));
             line.arrow_start = self.arrow_start;
             line.arrow_end = self.arrow_end;
             line.extend_start = self.extend_start;
@@ -276,7 +276,7 @@ impl PlotData<f64> for StressPolylines {
                 LengthMode::Plot => Measure::Plot(self.stroke_width as f64),
             };
 
-            poly.stroke = Stroke::with_style(color, thickness, self.stroke_style);
+            poly.stroke = Some(Stroke::with_style(color, thickness, self.stroke_style));
             poly.arrow_start = self.arrow_start;
             poly.arrow_end = self.arrow_end;
             poly.extend_start = self.extend_start;
@@ -628,7 +628,7 @@ impl StressTestApp {
 
             self.rectangles_layer
                 .geometry
-                .push(Rectangle::new(center, width, height));
+                .push(Rectangle::centered(center, width, height));
             self.rectangles_layer
                 .colors
                 .push(random_color(&mut rng, self.opacity));
@@ -658,7 +658,7 @@ impl StressTestApp {
 
             self.circles_layer
                 .geometry
-                .push(Circle::new(PlotPoint::new(x, y), radius));
+                .push(Ellipse::new(PlotPoint::new(x, y), radius));
             self.circles_layer
                 .colors
                 .push(random_color(&mut rng, self.opacity));
@@ -686,9 +686,11 @@ impl StressTestApp {
                 LengthMode::Plot => Measure::Plot(r_val),
             };
 
-            self.triangles_layer
-                .geometry
-                .push(Triangle::equilateral(PlotPoint::new(x, y), radius));
+            self.triangles_layer.geometry.push(Triangle::centered(
+                PlotPoint::new(x, y),
+                radius,
+                radius,
+            ));
             self.triangles_layer
                 .colors
                 .push(random_color(&mut rng, self.opacity));
@@ -714,11 +716,10 @@ impl StressTestApp {
             let x2 = angle.cos().mul_add(len, x1);
             let y2 = angle.sin().mul_add(len, y1);
 
-            self.lines_layer.geometry.push(Line::new(
-                PlotPoint::new(x1, y1),
-                PlotPoint::new(x2, y2),
-                Stroke::new(Color::BLACK, Measure::Screen(1.0)),
-            ));
+            self.lines_layer.geometry.push(
+                Line::new(PlotPoint::new(x1, y1), PlotPoint::new(x2, y2))
+                    .stroke(Stroke::new(Color::BLACK, Measure::Screen(1.0))),
+            );
             self.lines_layer
                 .colors
                 .push(random_color(&mut rng, self.opacity));
@@ -753,10 +754,9 @@ impl StressTestApp {
                 prev_y = next_y;
             }
 
-            self.polylines_layer.geometry.push(Polyline::new(
-                points,
-                Stroke::new(Color::BLACK, Measure::Screen(1.0)),
-            ));
+            self.polylines_layer.geometry.push(
+                Polyline::new(points).stroke(Stroke::new(Color::BLACK, Measure::Screen(1.0))),
+            );
             self.polylines_layer
                 .colors
                 .push(random_color(&mut rng, self.opacity));

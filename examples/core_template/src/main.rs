@@ -173,7 +173,7 @@ impl PlotData<f64> for StarField {
         let size = Measure::Screen(1.0);
 
         for obj in &self.objects {
-            plot.add_shape(Rectangle::new(obj.position, size, size).fill(obj.color));
+            plot.add_shape(Rectangle::centered(obj.position, size, size).fill(obj.color));
         }
     }
 }

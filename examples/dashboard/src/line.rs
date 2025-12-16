@@ -602,7 +602,7 @@ impl PlotData<f64> for LineChart {
 
             plot.add_shape(Polyline {
                 points: points.clone(),
-                stroke: Stroke::new(s.color, Measure::Screen(s.width)),
+                stroke: Some(Stroke::new(s.color, Measure::Screen(s.width))),
                 extend_start: false,
                 extend_end: false,
                 arrow_start: false,
@@ -644,7 +644,7 @@ impl PlotData<f64> for LineChart {
 
                     // Legend marker: Small square using Rectangle
                     plot.add_shape(
-                        Rectangle::new(
+                        Rectangle::centered(
                             PlotPoint::new(start_x, y_pos),
                             Measure::Screen(10.0),
                             Measure::Screen(10.0),

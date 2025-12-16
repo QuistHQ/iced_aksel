@@ -308,9 +308,9 @@ impl SignalData {
 
 impl PlotData<f64> for SignalData {
     fn draw(&self, plot: &mut Plot<f64>, theme: &Theme) {
-        plot.add_shape(Polyline::new(
-            self.points.clone(),
-            Stroke::new(theme.palette().primary, iced_aksel::Measure::Screen(1.5)),
-        ));
+        plot.add_shape(Polyline::new(self.points.clone()).stroke(Stroke::new(
+            theme.palette().primary,
+            iced_aksel::Measure::Screen(1.5),
+        )));
     }
 }

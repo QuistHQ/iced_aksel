@@ -267,12 +267,12 @@ impl PlotData<f64> for BarChart {
             let shape = match self.orientation {
                 Orientation::Horizontal => {
                     let center = PlotPoint::new(val / 2.0, index);
-                    Rectangle::new(center, Measure::Plot(val), Measure::Plot(self.bar_width))
+                    Rectangle::centered(center, Measure::Plot(val), Measure::Plot(self.bar_width))
                         .fill(bar_color)
                 }
                 Orientation::Vertical => {
                     let center = PlotPoint::new(index, val / 2.0);
-                    Rectangle::new(center, Measure::Plot(self.bar_width), Measure::Plot(val))
+                    Rectangle::centered(center, Measure::Plot(self.bar_width), Measure::Plot(val))
                         .fill(bar_color)
                 }
             };

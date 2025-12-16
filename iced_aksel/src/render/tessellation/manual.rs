@@ -57,11 +57,12 @@ impl ManualTessellator {
         buffer: &mut MeshBuffer,
         cx: f32,
         cy: f32,
-        r: f32,
+        rx: f32,
+        ry: f32,
         color: Color,
         segments: usize,
     ) {
-        basic::draw_fill_circle(buffer, cx, cy, r, color, segments);
+        basic::draw_fill_circle(buffer, cx, cy, rx, ry, color, segments);
     }
     #[inline]
     pub fn draw_stroke_circle(
@@ -69,12 +70,16 @@ impl ManualTessellator {
         buffer: &mut MeshBuffer,
         cx: f32,
         cy: f32,
-        r_in: f32,
-        r_out: f32,
+        rx_inner: f32,
+        ry_inner: f32,
+        rx_outer: f32,
+        ry_outer: f32,
         color: Color,
         segments: usize,
     ) {
-        basic::draw_stroke_circle(buffer, cx, cy, r_in, r_out, color, segments);
+        basic::draw_stroke_circle(
+            buffer, cx, cy, rx_inner, ry_inner, rx_outer, ry_outer, color, segments,
+        );
     }
 
     // Linear

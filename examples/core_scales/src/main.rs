@@ -8,7 +8,7 @@ use iced_aksel::{
     axis::{self, TickContext, TickResult},
     plot::{Plot, PlotData},
     scale::{Linear, Logarithmic},
-    shape::{Circle, Polyline},
+    shape::{Ellipse, Polyline},
 };
 
 // -----------------------------------------------------------------------------
@@ -205,15 +205,15 @@ impl ExponentialData {
 impl PlotData<f64> for ExponentialData {
     fn draw(&self, plot: &mut Plot<f64>, theme: &Theme) {
         // Draw the line
-        plot.add_shape(Polyline::new(
-            self.line.clone(),
-            Stroke::new(theme.palette().primary, iced_aksel::Measure::Screen(2.5)),
-        ));
+        plot.add_shape(Polyline::new(self.line.clone()).stroke(Stroke::new(
+            theme.palette().primary,
+            iced_aksel::Measure::Screen(2.5),
+        )));
 
         // Draw dots at 1, 10, 100, 1000...
         for point in &self.markers {
             plot.add_shape(
-                Circle::new(*point, iced_aksel::Measure::Screen(5.0)).fill(theme.palette().danger),
+                Ellipse::new(*point, iced_aksel::Measure::Screen(5.0)).fill(theme.palette().danger),
             );
         }
     }

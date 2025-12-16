@@ -6,6 +6,22 @@ use crate::{
 use aksel::{Float, PlotPoint, Transform};
 use iced_core::{Color, Point};
 
+/// A primitive representing a regular N-sided shape (Hexagon, Octagon, etc.).
+///
+/// # Usage
+/// ```rust
+/// use iced_aksel::shape::Polygon;
+/// use iced_aksel::Measure;
+/// use aksel::PlotPoint;
+/// use iced_core::Color;
+///
+/// let hex = Polygon::new(
+///     PlotPoint::new(20.0, 5.0),
+///     Measure::Screen(6.0),
+///     6
+/// )
+/// .fill(Color::from_rgb(0.0, 0.0, 1.0));
+/// ```
 #[derive(Debug, Clone)]
 pub struct Polygon<D> {
     center: PlotPoint<D>,
@@ -25,6 +41,9 @@ impl<D: Float, R: plot::Renderer> Shape<D, R> for Polygon<D> {
 }
 
 impl<D: Float> Polygon<D> {
+    /// Creates a new regular `Polygon` with a center, radius, and number of vertices.
+    ///
+    /// Note: The shape is invisible by default. You must call `.fill()` or `.stroke()` to render it.
     pub const fn new(center: PlotPoint<D>, radius: Measure<D>, vertices: u16) -> Self {
         Self {
             center,
@@ -35,14 +54,21 @@ impl<D: Float> Polygon<D> {
             stroke: None,
         }
     }
+
+    /// Sets the rotation of the polygon in **degrees**.
+    /// `0.0` means the first vertex is at the top (North/-90 degrees).
     pub const fn rotation(mut self, degrees: f32) -> Self {
         self.rotation = degrees;
         self
     }
+
+    /// Sets the fill color of the polygon.
     pub const fn fill(mut self, color: Color) -> Self {
         self.fill = Some(color);
         self
     }
+
+    /// Sets the stroke style (border) of the polygon.
     pub const fn stroke(mut self, stroke: Stroke<D>) -> Self {
         self.stroke = Some(stroke);
         self
@@ -63,14 +89,7 @@ impl<D: Float> Polygon<D> {
             transform.y_to_screen(&self.center.y),
         );
 
-        let radius_px = match self.radius {
-            Measure::Screen(px) => px,
-            Measure::Plot(u) => {
-                let p0 = transform.x_to_screen(&D::zero());
-                let p1 = transform.x_to_screen(&u);
-                (p1 - p0).abs()
-            }
-        };
+        let radius_px = self.resolve_isotropic(transform, self.radius);
 
         if radius_px < 0.5 {
             return;
@@ -79,11 +98,7 @@ impl<D: Float> Polygon<D> {
         let stroke_info = self.stroke.as_ref().map(|s| {
             let width = match s.thickness {
                 Measure::Screen(w) => w,
-                Measure::Plot(w) => {
-                    let p0 = transform.x_to_screen(&D::zero());
-                    let p1 = transform.x_to_screen(&w);
-                    (p1 - p0).abs()
-                }
+                Measure::Plot(w) => self.resolve_isotropic(transform, Measure::Plot(w)),
             };
             (s, width)
         });
@@ -97,5 +112,18 @@ impl<D: Float> Polygon<D> {
             self.fill,
             stroke_info,
         );
+    }
+
+    fn resolve_isotropic(&self, transform: &Transform<D, f32, f32>, measure: Measure<D>) -> f32 {
+        match measure {
+            Measure::Screen(px) => px,
+            Measure::Plot(units) => {
+                let px_x =
+                    (transform.x_to_screen(&units) - transform.x_to_screen(&D::zero())).abs();
+                let px_y =
+                    (transform.y_to_screen(&units) - transform.y_to_screen(&D::zero())).abs();
+                px_x.min(px_y)
+            }
+        }
     }
 }

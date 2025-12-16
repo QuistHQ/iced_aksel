@@ -6,12 +6,35 @@ use crate::{
 use aksel::{Float, PlotPoint, Transform};
 use iced_core::{Color, Point};
 
+/// A primitive representing a three-sided polygon.
+///
+/// Can be defined by arbitrary vertices or as a centered shape with specific width/height.
+///
+/// # Usage
+/// ```rust
+/// use iced_aksel::shape::Triangle;
+/// use iced_aksel::Measure;
+/// use aksel::PlotPoint;
+/// use iced_core::Color;
+///
+/// // A wide, short triangle (Directional Marker)
+/// let marker = Triangle::centered(
+///     PlotPoint::new(10.0, 10.0),
+///     Measure::Screen(20.0), // Width
+///     Measure::Screen(10.0)  // Height
+/// )
+/// .fill(Color::RED);
+/// ```
 #[derive(Debug, Clone)]
 enum Geometry<D> {
+    /// A triangle defined by three distinct points in plot space.
     Vertices([PlotPoint<D>; 3]),
-    Equilateral {
+    /// A triangle defined by a center and dimensions (Isosceles).
+    /// Vertices are calculated relative to the bounding box.
+    Centered {
         center: PlotPoint<D>,
-        radius: Measure<D>,
+        width: Measure<D>,
+        height: Measure<D>,
     },
 }
 
@@ -31,6 +54,9 @@ impl<D: Float, R: plot::Renderer> Shape<D, R> for Triangle<D> {
 }
 
 impl<D: Float> Triangle<D> {
+    /// Creates a new `Triangle` defined by three specific vertices.
+    ///
+    /// Note: The shape is invisible by default. You must call `.fill()` or `.stroke()` to render it.
     pub const fn new(p1: PlotPoint<D>, p2: PlotPoint<D>, p3: PlotPoint<D>) -> Self {
         Self {
             geometry: Geometry::Vertices([p1, p2, p3]),
@@ -39,20 +65,30 @@ impl<D: Float> Triangle<D> {
         }
     }
 
-    pub const fn equilateral(center: PlotPoint<D>, radius: Measure<D>) -> Self {
+    /// Creates a new `Triangle` centered at a point with a specific width and height.
+    /// The triangle points **Up** (North).
+    ///
+    /// Note: The shape is invisible by default. You must call `.fill()` or `.stroke()` to render it.
+    pub const fn centered(center: PlotPoint<D>, width: Measure<D>, height: Measure<D>) -> Self {
         Self {
-            geometry: Geometry::Equilateral { center, radius },
+            geometry: Geometry::Centered {
+                center,
+                width,
+                height,
+            },
             fill: None,
             stroke: None,
         }
     }
 
+    /// Sets the fill color.
     #[inline]
     pub const fn fill(mut self, color: Color) -> Self {
         self.fill = Some(color);
         self
     }
 
+    /// Sets the stroke style.
     #[inline]
     pub const fn stroke(mut self, stroke: Stroke<D>) -> Self {
         self.stroke = Some(stroke);
@@ -80,24 +116,25 @@ impl<D: Float> Triangle<D> {
                     transform.y_to_screen(&pts[2].y),
                 ),
             ),
-            Geometry::Equilateral { center, radius } => {
+            Geometry::Centered {
+                center,
+                width,
+                height,
+            } => {
                 let cx = transform.x_to_screen(&center.x);
                 let cy = transform.y_to_screen(&center.y);
-                let r_px = match radius {
-                    Measure::Screen(px) => px,
-                    Measure::Plot(units) => {
-                        let p0 = transform.x_to_screen(&D::zero());
-                        let p1 = transform.x_to_screen(&units);
-                        (p1 - p0).abs()
-                    }
-                };
-                let a1 = std::f32::consts::FRAC_PI_2;
-                let a2 = std::f32::consts::PI * 7.0 / 6.0;
-                let a3 = std::f32::consts::PI * 11.0 / 6.0;
+
+                let w_px = self.resolve_measure(transform, width, true);
+                let h_px = self.resolve_measure(transform, height, false);
+
+                let half_w = w_px / 2.0;
+                let half_h = h_px / 2.0;
+
+                // Points for an Upward facing triangle inside the bounding box
                 (
-                    Point::new(a1.cos().mul_add(r_px, cx), a1.sin().mul_add(-r_px, cy)),
-                    Point::new(a2.cos().mul_add(r_px, cx), a2.sin().mul_add(-r_px, cy)),
-                    Point::new(a3.cos().mul_add(r_px, cx), a3.sin().mul_add(-r_px, cy)),
+                    Point::new(cx, cy - half_h),          // Top Center
+                    Point::new(cx + half_w, cy + half_h), // Bottom Right
+                    Point::new(cx - half_w, cy + half_h), // Bottom Left
                 )
             }
         };
@@ -105,11 +142,8 @@ impl<D: Float> Triangle<D> {
         let stroke_info = self.stroke.as_ref().and_then(|stroke| {
             let width = match stroke.thickness {
                 Measure::Screen(w) => w,
-                Measure::Plot(w) => {
-                    let p0 = transform.x_to_screen(&D::zero());
-                    let p1 = transform.x_to_screen(&w);
-                    (p1 - p0).abs()
-                }
+                // Default to X-axis scale for stroke thickness
+                Measure::Plot(w) => self.resolve_measure(transform, Measure::Plot(w), true),
             };
             if width < 0.1 {
                 None
@@ -119,5 +153,29 @@ impl<D: Float> Triangle<D> {
         });
 
         tess.draw_triangle(buffer, p1, p2, p3, self.fill, stroke_info);
+    }
+
+    fn resolve_measure(
+        &self,
+        transform: &Transform<D, f32, f32>,
+        measure: Measure<D>,
+        is_x: bool,
+    ) -> f32 {
+        match measure {
+            Measure::Screen(px) => px,
+            Measure::Plot(units) => {
+                let zero = if is_x {
+                    transform.x_to_screen(&D::zero())
+                } else {
+                    transform.y_to_screen(&D::zero())
+                };
+                let val = if is_x {
+                    transform.x_to_screen(&units)
+                } else {
+                    transform.y_to_screen(&units)
+                };
+                (val - zero).abs()
+            }
+        }
     }
 }

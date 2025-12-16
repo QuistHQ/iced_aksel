@@ -405,7 +405,7 @@ impl PlotData<f64> for Gauge {
         if self.debug_mode {
             let limit = GAUGE_RADIUS + self.padding;
             plot.add_shape(
-                Rectangle::new(
+                Rectangle::centered(
                     PlotPoint::new(0.0, 0.0),
                     Measure::Plot(limit * 2.0),
                     Measure::Plot(limit * 2.0),
