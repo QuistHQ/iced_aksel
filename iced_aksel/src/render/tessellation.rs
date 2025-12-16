@@ -111,7 +111,7 @@ impl Tessellator {
         cx: f32,
         cy: f32,
         rx: f32,
-        ry: f32, 
+        ry: f32,
         fill: Option<Color>,
         stroke: Option<(&Stroke<D>, f32)>,
     ) {
@@ -747,31 +747,27 @@ impl Tessellator {
                 color: pack(stroke.fill),
             },
         );
-        match &stroke.style {
-            StrokeStyle::Solid => {
-                let _ = self.complex.stroke.tessellate(
-                    FromPolyline::new(close_path, points.into_iter()),
-                    &options,
-                    &mut writer,
-                );
-            }
+        let _ = match &stroke.style {
+            StrokeStyle::Solid => self.complex.stroke.tessellate(
+                FromPolyline::new(close_path, points.into_iter()),
+                &options,
+                &mut writer,
+            ),
             StrokeStyle::Dashed => {
                 let dashes = [resolved_width * 5., resolved_width * 2.];
                 let dashed = DashedPolyline::new(points.into_iter(), &dashes);
-                let _ = self
-                    .complex
+                self.complex
                     .stroke
-                    .tessellate(dashed, &options, &mut writer);
+                    .tessellate(dashed, &options, &mut writer)
             }
             StrokeStyle::Dotted => {
                 let dots = [resolved_width, resolved_width * 2.0];
                 let dashed = DashedPolyline::new(points.into_iter(), &dots);
-                let _ = self
-                    .complex
+                self.complex
                     .stroke
-                    .tessellate(dashed, &options, &mut writer);
+                    .tessellate(dashed, &options, &mut writer)
             }
-        }
+        };
     }
 
     pub fn stroke_path<Iter, D>(
