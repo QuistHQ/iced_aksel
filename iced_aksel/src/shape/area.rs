@@ -1,5 +1,5 @@
 use crate::{
-    Measure, Shape, Stroke,
+    Shape, Stroke,
     plot::{self},
     render::{MeshBuffer, Tessellator},
 };
@@ -78,36 +78,10 @@ impl<D: Float> Area<D> {
             .collect();
 
         let stroke_info = self.stroke.as_ref().map(|s| {
-            let width = match s.thickness {
-                Measure::Screen(w) => w,
-                Measure::Plot(w) => resolve_measure(transform, Measure::Plot(w), true),
-            };
-            (s, width)
+            let width_pixels = s.thickness.resolve_x(transform);
+            (s, width_pixels)
         });
 
         tess.draw_zone(buffer, &screen_points, self.fill, stroke_info);
-    }
-}
-
-fn resolve_measure<D: Float>(
-    transform: &Transform<D, f32, f32>,
-    measure: Measure<D>,
-    is_x: bool,
-) -> f32 {
-    match measure {
-        Measure::Screen(px) => px,
-        Measure::Plot(units) => {
-            let zero = if is_x {
-                transform.x_to_screen(&D::zero())
-            } else {
-                transform.y_to_screen(&D::zero())
-            };
-            let val = if is_x {
-                transform.x_to_screen(&units)
-            } else {
-                transform.y_to_screen(&units)
-            };
-            (val - zero).abs()
-        }
     }
 }

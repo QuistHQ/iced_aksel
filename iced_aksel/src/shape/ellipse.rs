@@ -104,45 +104,27 @@ impl<D: Float> Ellipse<D> {
         buffer: &mut MeshBuffer,
         tess: &mut Tessellator,
     ) {
-        let cx = transform.x_to_screen(&self.center.x);
-        let cy = transform.y_to_screen(&self.center.y);
+        let center_x = transform.x_to_screen(&self.center.x);
+        let center_y = transform.y_to_screen(&self.center.y);
 
-        let rx_px = resolve_measure(transform, self.radius_x, true);
-        let ry_px = resolve_measure(transform, self.radius_y, false);
+        let radius_x_pixels = self.radius_x.resolve_x(transform);
+        let radius_y_pixels = self.radius_y.resolve_y(transform);
 
         let stroke_info = self.stroke.as_ref().map(|s| {
-            // For stroke thickness, we use the X-axis scale as the reference
-            // to ensure consistency, avoiding complex anisotropic stroke logic.
-            let width = match s.thickness {
-                Measure::Screen(w) => w,
-                Measure::Plot(w) => resolve_measure(transform, Measure::Plot(w), true),
-            };
-            (s, width)
+            // For stroke thickness on ellipses, we use X-axis scaling as a convention
+            // to ensure a uniform stroke width, avoiding complex anisotropic stroking logic.
+            let width_pixels = s.thickness.resolve_x(transform);
+            (s, width_pixels)
         });
 
-        tess.draw_circle(buffer, cx, cy, rx_px, ry_px, self.fill, stroke_info);
-    }
-}
-
-fn resolve_measure<D: Float>(
-    transform: &Transform<D, f32, f32>,
-    measure: Measure<D>,
-    is_x: bool,
-) -> f32 {
-    match measure {
-        Measure::Screen(px) => px,
-        Measure::Plot(units) => {
-            let zero = if is_x {
-                transform.x_to_screen(&D::zero())
-            } else {
-                transform.y_to_screen(&D::zero())
-            };
-            let val = if is_x {
-                transform.x_to_screen(&units)
-            } else {
-                transform.y_to_screen(&units)
-            };
-            (val - zero).abs()
-        }
+        tess.draw_circle(
+            buffer,
+            center_x,
+            center_y,
+            radius_x_pixels,
+            radius_y_pixels,
+            self.fill,
+            stroke_info,
+        );
     }
 }

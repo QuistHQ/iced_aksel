@@ -1,5 +1,5 @@
 use crate::{
-    Float, Measure, Shape, Stroke, Transform,
+    Float, Shape, Stroke, Transform,
     plot::{self},
     render::{MeshBuffer, Tessellator},
 };
@@ -118,63 +118,39 @@ impl<D: Float> Line<D> {
     ) {
         let stroke = match self.stroke {
             Some(s) => s,
-            None => return, // Invisible
+            None => return, // Invisible if no stroke is defined
         };
 
-        let raw_start = Point::new(
+        let raw_start_point = Point::new(
             transform.x_to_screen(&self.p1.x),
             transform.y_to_screen(&self.p1.y),
         );
-        let raw_end = Point::new(
+
+        let raw_end_point = Point::new(
             transform.x_to_screen(&self.p2.x),
             transform.y_to_screen(&self.p2.y),
         );
 
-        let width = match stroke.thickness {
-            Measure::Screen(w) => w,
-            Measure::Plot(w) => resolve_measure(transform, Measure::Plot(w), true),
-        };
+        // We resolve stroke thickness using the X-axis for consistency.
+        let stroke_width_pixels = stroke.thickness.resolve_x(transform);
 
-        let b = transform.screen_bounds();
-        let clip_bounds = iced_core::Rectangle {
-            x: b.x,
-            y: b.y,
-            width: b.width,
-            height: b.height,
+        let screen_bounds = transform.screen_bounds();
+        let clipping_rect = iced_core::Rectangle {
+            x: screen_bounds.x,
+            y: screen_bounds.y,
+            width: screen_bounds.width,
+            height: screen_bounds.height,
         };
 
         tess.draw_line(
             buffer,
-            raw_start,
-            raw_end,
+            raw_start_point,
+            raw_end_point,
             &stroke,
-            width,
-            clip_bounds,
+            stroke_width_pixels,
+            clipping_rect,
             (self.extend_start, self.extend_end),
             (self.arrow_start, self.arrow_end, self.arrow_size),
         );
-    }
-}
-
-fn resolve_measure<D: Float>(
-    transform: &Transform<D, f32, f32>,
-    measure: Measure<D>,
-    is_x: bool,
-) -> f32 {
-    match measure {
-        Measure::Screen(px) => px,
-        Measure::Plot(units) => {
-            let zero = if is_x {
-                transform.x_to_screen(&D::zero())
-            } else {
-                transform.y_to_screen(&D::zero())
-            };
-            let val = if is_x {
-                transform.x_to_screen(&units)
-            } else {
-                transform.y_to_screen(&units)
-            };
-            (val - zero).abs()
-        }
     }
 }

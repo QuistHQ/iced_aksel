@@ -1,6 +1,6 @@
 use std::ops::{Add, Div, Mul, Sub};
 
-use aksel::Float;
+use aksel::{Float, Transform};
 
 /// Defines how a dimension should be interpreted by the chart.
 ///
@@ -46,6 +46,38 @@ pub enum Measure<D> {
     /// let bar_width = Measure::Plot(10.0_f64); // 10 data units
     /// ```
     Plot(D),
+}
+
+impl<D: Float> Measure<D> {
+    /// Resolves the measure to screen pixels along the **X axis**.
+    ///
+    /// * If `Screen`, returns the pixel value directly.
+    /// * If `Plot`, calculates the screen distance covered by the data units on the X axis.
+    pub fn resolve_x(&self, transform: &Transform<D, f32, f32>) -> f32 {
+        match self {
+            Measure::Screen(px) => *px,
+            Measure::Plot(units) => {
+                let p0 = transform.x_to_screen(&D::zero());
+                let p1 = transform.x_to_screen(units);
+                (p1 - p0).abs()
+            }
+        }
+    }
+
+    /// Resolves the measure to screen pixels along the **Y axis**.
+    ///
+    /// * If `Screen`, returns the pixel value directly.
+    /// * If `Plot`, calculates the screen distance covered by the data units on the Y axis.
+    pub fn resolve_y(&self, transform: &Transform<D, f32, f32>) -> f32 {
+        match self {
+            Measure::Screen(px) => *px,
+            Measure::Plot(units) => {
+                let p0 = transform.y_to_screen(&D::zero());
+                let p1 = transform.y_to_screen(units);
+                (p1 - p0).abs()
+            }
+        }
+    }
 }
 
 // 1. Implement Multiplication: Length * Number

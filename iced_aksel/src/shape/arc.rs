@@ -93,65 +93,44 @@ impl<D: Float> Arc<D> {
         buffer: &mut MeshBuffer,
         tess: &mut Tessellator,
     ) {
-        let cx = transform.x_to_screen(&self.center.x);
-        let cy = transform.y_to_screen(&self.center.y);
+        let center_x = transform.x_to_screen(&self.center.x);
+        let center_y = transform.y_to_screen(&self.center.y);
 
-        let outer_r = resolve_isotropic(transform, self.radius);
-        let inner_r = resolve_isotropic(transform, self.inner_radius);
+        // Calculate isotropic radii by taking the minimum scale of X and Y dimensions
+        let outer_radius_pixels = {
+            let x = self.radius.resolve_x(transform);
+            let y = self.radius.resolve_y(transform);
+            x.min(y)
+        };
+
+        let inner_radius_pixels = {
+            let x = self.inner_radius.resolve_x(transform);
+            let y = self.inner_radius.resolve_y(transform);
+            x.min(y)
+        };
 
         let stroke_info = self.stroke.as_ref().and_then(|stroke| {
-            let width = resolve_isotropic(transform, stroke.thickness);
-            if width < 0.1 {
+            let width_x = stroke.thickness.resolve_x(transform);
+            let width_y = stroke.thickness.resolve_y(transform);
+            let width_pixels = width_x.min(width_y);
+
+            if width_pixels < 0.1 {
                 None
             } else {
-                Some((stroke, width))
+                Some((stroke, width_pixels))
             }
         });
 
         tess.draw_arc(
             buffer,
-            cx,
-            cy,
-            inner_r,
-            outer_r,
+            center_x,
+            center_y,
+            inner_radius_pixels,
+            outer_radius_pixels,
             self.start_angle,
             self.end_angle,
             self.fill,
             stroke_info,
         );
-    }
-}
-
-fn resolve_isotropic<D: Float>(transform: &Transform<D, f32, f32>, measure: Measure<D>) -> f32 {
-    match measure {
-        Measure::Screen(px) => px,
-        Measure::Plot(units) => {
-            let px_x = resolve_measure(transform, Measure::Plot(units), true);
-            let px_y = resolve_measure(transform, Measure::Plot(units), false);
-            px_x.min(px_y)
-        }
-    }
-}
-
-fn resolve_measure<D: Float>(
-    transform: &Transform<D, f32, f32>,
-    measure: Measure<D>,
-    is_x: bool,
-) -> f32 {
-    match measure {
-        Measure::Screen(px) => px,
-        Measure::Plot(units) => {
-            let zero = if is_x {
-                transform.x_to_screen(&D::zero())
-            } else {
-                transform.y_to_screen(&D::zero())
-            };
-            let val = if is_x {
-                transform.x_to_screen(&units)
-            } else {
-                transform.y_to_screen(&units)
-            };
-            (val - zero).abs()
-        }
     }
 }

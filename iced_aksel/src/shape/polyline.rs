@@ -1,5 +1,5 @@
 use crate::{
-    Measure, Shape, Stroke,
+    Shape, Stroke,
     plot::{self},
     render::{MeshBuffer, Tessellator},
 };
@@ -106,55 +106,30 @@ impl<D: Float> Polyline<D> {
             None => return, // Invisible
         };
 
-        let width = match stroke.thickness {
-            Measure::Screen(w) => w,
-            Measure::Plot(w) => resolve_measure(transform, Measure::Plot(w), true),
+        // Resolve stroke thickness against X axis
+        let width_pixels = stroke.thickness.resolve_x(transform);
+
+        let screen_bounds = transform.screen_bounds();
+        let clipping_rect = iced_core::Rectangle {
+            x: screen_bounds.x,
+            y: screen_bounds.y,
+            width: screen_bounds.width,
+            height: screen_bounds.height,
         };
 
-        let b = transform.screen_bounds();
-        let clip_bounds = iced_core::Rectangle {
-            x: b.x,
-            y: b.y,
-            width: b.width,
-            height: b.height,
-        };
-
-        let points_iter = self
+        let screen_points_iterator = self
             .points
             .iter()
             .map(|p| Point::new(transform.x_to_screen(&p.x), transform.y_to_screen(&p.y)));
 
         tess.draw_polyline(
             buffer,
-            points_iter,
+            screen_points_iterator,
             &stroke,
-            width,
-            clip_bounds,
+            width_pixels,
+            clipping_rect,
             (self.extend_start, self.extend_end),
             (self.arrow_start, self.arrow_end, self.arrow_size),
         );
-    }
-}
-
-fn resolve_measure<D: Float>(
-    transform: &Transform<D, f32, f32>,
-    measure: Measure<D>,
-    is_x: bool,
-) -> f32 {
-    match measure {
-        Measure::Screen(px) => px,
-        Measure::Plot(units) => {
-            let zero = if is_x {
-                transform.x_to_screen(&D::zero())
-            } else {
-                transform.y_to_screen(&D::zero())
-            };
-            let val = if is_x {
-                transform.x_to_screen(&units)
-            } else {
-                transform.y_to_screen(&units)
-            };
-            (val - zero).abs()
-        }
     }
 }

@@ -84,68 +84,37 @@ impl<D: Float> Polygon<D> {
             return;
         }
 
-        let center = Point::new(
+        let center_point = Point::new(
             transform.x_to_screen(&self.center.x),
             transform.y_to_screen(&self.center.y),
         );
 
-        // For Polygons, we treat radius isotropically (min scale)
-        let radius_px = resolve_isotropic(transform, self.radius);
+        // For Polygons, we treat radius isotropically. We take the minimum scale
+        // to ensure the polygon is not distorted if axes have different scales.
+        let radius_pixels_x = self.radius.resolve_x(transform);
+        let radius_pixels_y = self.radius.resolve_y(transform);
+        let radius_pixels = radius_pixels_x.min(radius_pixels_y);
 
-        if radius_px < 0.5 {
+        if radius_pixels < 0.5 {
             return;
         }
 
         let stroke_info = self.stroke.as_ref().map(|s| {
-            let width = match s.thickness {
-                Measure::Screen(w) => w,
-                Measure::Plot(w) => resolve_isotropic(transform, Measure::Plot(w)),
-            };
-            (s, width)
+            // Isotropic stroke width using the same logic (minimum scale)
+            let width_x = s.thickness.resolve_x(transform);
+            let width_y = s.thickness.resolve_y(transform);
+            let width_pixels = width_x.min(width_y);
+            (s, width_pixels)
         });
 
         tess.draw_polygon(
             buffer,
-            center,
-            radius_px,
+            center_point,
+            radius_pixels,
             self.vertices,
             self.rotation,
             self.fill,
             stroke_info,
         );
-    }
-}
-
-fn resolve_isotropic<D: Float>(transform: &Transform<D, f32, f32>, measure: Measure<D>) -> f32 {
-    match measure {
-        Measure::Screen(px) => px,
-        Measure::Plot(units) => {
-            let px_x = resolve_measure(transform, Measure::Plot(units), true);
-            let px_y = resolve_measure(transform, Measure::Plot(units), false);
-            px_x.min(px_y)
-        }
-    }
-}
-
-fn resolve_measure<D: Float>(
-    transform: &Transform<D, f32, f32>,
-    measure: Measure<D>,
-    is_x: bool,
-) -> f32 {
-    match measure {
-        Measure::Screen(px) => px,
-        Measure::Plot(units) => {
-            let zero = if is_x {
-                transform.x_to_screen(&D::zero())
-            } else {
-                transform.y_to_screen(&D::zero())
-            };
-            let val = if is_x {
-                transform.x_to_screen(&units)
-            } else {
-                transform.y_to_screen(&units)
-            };
-            (val - zero).abs()
-        }
     }
 }
