@@ -14,7 +14,7 @@ use lyon_tessellation::{
 ///
 #[derive(Default)]
 pub struct ComplexTessellator {
-    #[allow(dead_code)]
+    #[allow(unused)]
     pub fill: FillTessellator,
     pub stroke: StrokeTessellator,
 }

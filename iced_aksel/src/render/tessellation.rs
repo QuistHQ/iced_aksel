@@ -39,7 +39,7 @@ impl Default for Tessellator {
     }
 }
 
-#[allow(dead_code)]
+#[allow(unused)]
 impl Tessellator {
     /// Creates a new, default tessellator.
     pub fn new() -> Self {
