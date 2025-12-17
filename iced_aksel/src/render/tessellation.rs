@@ -39,7 +39,6 @@ impl Default for Tessellator {
     }
 }
 
-#[allow(unused)]
 impl Tessellator {
     /// Creates a new, default tessellator.
     pub fn new() -> Self {
@@ -442,20 +441,14 @@ impl Tessellator {
         let mut draw_end = raw_end;
         let is_infinite = extensions.0 || extensions.1;
 
+        // --- CHANGE START ---
         // 1. Resolve Infinite Geometry
-        // If infinite, we MUST clamp to the clip_bounds, otherwise coordinates explode.
         if is_infinite {
-            // Expand clip bounds by line width so we don't see the "cut" at the edge
             let margin = width.max(1.0);
-            let clip_rect = (
-                clip_bounds.x - margin,
-                clip_bounds.y - margin,
-                clip_bounds.x + clip_bounds.width + margin,
-                clip_bounds.y + clip_bounds.height + margin,
-            );
+            // Replace tuple with Bounds struct
+            let bounds = Bounds::new(clip_bounds, margin);
 
-            if let Some((edge_start, edge_end)) = clip_infinite_line(raw_start, raw_end, clip_rect)
-            {
+            if let Some((edge_start, edge_end)) = clip_infinite_line(raw_start, raw_end, bounds) {
                 if extensions.0 {
                     draw_start = edge_start;
                 }
@@ -463,7 +456,20 @@ impl Tessellator {
                     draw_end = edge_end;
                 }
             } else {
-                // Infinite line is off-screen
+                return;
+            }
+        }
+
+        // 2. Resolve Finite Clipping
+        if !is_infinite {
+            let margin = width.max(1.0);
+            // Replace tuple with Bounds struct
+            let bounds = Bounds::new(clip_bounds, margin);
+
+            if let Some((clipped_p1, clipped_p2)) = clip_segment(draw_start, draw_end, bounds) {
+                draw_start = clipped_p1;
+                draw_end = clipped_p2;
+            } else {
                 return;
             }
         }
@@ -540,26 +546,22 @@ impl Tessellator {
         let p0 = point_list[0];
         let pn = point_list[last_idx];
 
+        // --- CHANGE START ---
         // 1. Handle Infinite Extensions
-        // We only clip if we are extending to infinity.
         if extensions.0 || extensions.1 {
             let margin = width.max(1.0);
-            let clip_rect = (
-                clip_bounds.x - margin,
-                clip_bounds.y - margin,
-                clip_bounds.x + clip_bounds.width + margin,
-                clip_bounds.y + clip_bounds.height + margin,
-            );
+            // Replace tuple with Bounds struct
+            let bounds = Bounds::new(clip_bounds, margin);
 
             if extensions.0 {
                 let p1 = point_list[1];
-                if let Some((edge_start, _)) = clip_infinite_line(p0, p1, clip_rect) {
+                if let Some((edge_start, _)) = clip_infinite_line(p0, p1, bounds) {
                     point_list[0] = edge_start;
                 }
             }
             if extensions.1 {
                 let p_prev = point_list[last_idx - 1];
-                if let Some((_, edge_end)) = clip_infinite_line(p_prev, pn, clip_rect) {
+                if let Some((_, edge_end)) = clip_infinite_line(p_prev, pn, bounds) {
                     point_list[last_idx] = edge_end;
                 }
             }
@@ -1059,6 +1061,7 @@ impl Tessellator {
         self.stroke_polyline(buffer, points, stroke, resolved_width, true);
     }
 
+    #[allow(unused)]
     /// Internal adapter for filling complex polygons using Lyon.
     fn fill_polygon<I>(&mut self, buffer: &mut MeshBuffer, points: I, color: Color)
     where
