@@ -83,6 +83,6 @@ impl<D: Float> Area<D> {
             (s, width_pixels)
         });
 
-        tess.draw_zone(buffer, &screen_points, self.fill, stroke_info);
+        tess.draw_area(buffer, &screen_points, self.fill, stroke_info);
     }
 }

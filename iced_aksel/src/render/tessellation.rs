@@ -932,7 +932,7 @@ impl Tessellator {
     ///
     /// * **Convex Polygons:** Automatically detected and rendered using a fast fan.
     /// * **Concave Polygons:** Automatically detected and triangulated using Earcut.
-    pub fn draw_zone<D>(
+    pub fn draw_area<D>(
         &mut self,
         buffer: &mut MeshBuffer,
         points: &[Point],
@@ -1061,7 +1061,7 @@ impl Tessellator {
         self.stroke_polyline(buffer, points, stroke, resolved_width, true);
     }
 
-    #[allow(unused)]
+    // TODO: This could be considered to be removed later. Kept for now to allow for lyon
     /// Internal adapter for filling complex polygons using Lyon.
     fn fill_polygon<I>(&mut self, buffer: &mut MeshBuffer, points: I, color: Color)
     where
