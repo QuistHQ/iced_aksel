@@ -4,7 +4,7 @@
 //! The main entry point is the [`PlotData`] trait, which you implement to draw your data.
 
 use crate::{
-    render::{MeshBuffer, Tessellators},
+    render::{MeshBuffer, Tessellator},
     shape::Shape,
 };
 
@@ -109,7 +109,7 @@ pub struct Context<'a, D: Float, Renderer: self::Renderer = iced_renderer::Rende
     transform: &'a Transform<'a, D, f32, f32>,
     clip_bounds: &'a iced_core::Rectangle,
     renderer: &'a mut Renderer,
-    tessellators: &'a mut Tessellators,
+    tessellators: &'a mut Tessellator,
     mesh_buffer: &'a mut MeshBuffer,
     last_drawn: ShapeType,
 }
@@ -123,7 +123,7 @@ impl<'a, D: Float, Renderer: self::Renderer> Context<'a, D, Renderer> {
 
     pub fn render_mesh<F>(&mut self, f: F)
     where
-        F: FnOnce(&Transform<'a, D, f32, f32>, &mut MeshBuffer, &mut Tessellators),
+        F: FnOnce(&Transform<'a, D, f32, f32>, &mut MeshBuffer, &mut Tessellator),
     {
         if matches!(self.last_drawn, ShapeType::Text) {
             // Since meshes are always drawn under text, we have to start a new layer in order to
@@ -173,7 +173,7 @@ where
     ///
     /// This is typically called internally by the Chart widget.
     pub fn new(
-        tessellators: &'a mut Tessellators,
+        tessellators: &'a mut Tessellator,
         renderer: &'a mut R,
         clip_bounds: &'a iced_core::Rectangle,
         mesh_buffer: &'a mut MeshBuffer,

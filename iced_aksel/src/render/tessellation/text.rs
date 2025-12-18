@@ -1,4 +1,4 @@
-use crate::{font::GeometricFont, render::MeshBuffer};
+use crate::render::{MeshBuffer, font::GeometricFont};
 use ab_glyph::{Font, PxScale, ScaleFont};
 use iced_core::{
     Color, Point,
@@ -13,6 +13,32 @@ use lyon::tessellation::{
     BuffersBuilder, FillOptions, FillTessellator, FillVertex, FillVertexConstructor, VertexBuffers,
 };
 use ttf_parser::OutlineBuilder;
+
+/// The rendering quality of the vector text.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Quality {
+    High,
+    Medium,
+    Low,
+    Custom(f32),
+}
+
+impl Quality {
+    pub fn to_tolerance(self) -> f32 {
+        match self {
+            Self::High => 0.2,
+            Self::Medium => 0.5,
+            Self::Low => 1.5,
+            Self::Custom(val) => val.max(0.001),
+        }
+    }
+}
+
+impl Default for Quality {
+    fn default() -> Self {
+        Self::Medium
+    }
+}
 
 // --- Adapter to bridge ttf-parser and lyon ---
 struct LyonPathBuilder<'a>(pub &'a mut dyn PathBuilder);
@@ -59,7 +85,7 @@ pub fn draw_geometric_text(
     font: &GeometricFont,
     horizontal_alignment: Horizontal,
     vertical_alignment: Vertical,
-    screen_tolerance: f32,
+    quality: Quality,
 ) {
     if content.is_empty() {
         return;
@@ -76,11 +102,8 @@ pub fn draw_geometric_text(
     let geometry_scale = size_px / units_per_em;
 
     // --- LOD CALCULATION ---
-    // Formula: tolerance_in_font_units = (desired_pixel_error / scale_factor)
-    // where scale_factor = size_px / units_per_em
-    // Therefore: tolerance = (pixel_error * units_per_em) / size_px
-    //
-    // Safety: Avoid division by zero if text is microscopic
+    let screen_tolerance = quality.to_tolerance(); // <--- Convert Enum to f32
+
     let safe_size = size_px.max(0.001);
     let lyon_tolerance = (screen_tolerance * units_per_em) / safe_size;
 

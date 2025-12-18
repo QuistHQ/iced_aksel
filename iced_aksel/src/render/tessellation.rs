@@ -3,7 +3,11 @@ pub mod manual;
 pub mod math;
 pub mod text;
 
-use crate::{Stroke, font::GeometricFont, render::MeshBuffer, stroke::StrokeStyle};
+use crate::{
+    Stroke,
+    render::{MeshBuffer, font::GeometricFont},
+    stroke::StrokeStyle,
+};
 use complex::{ComplexTessellator, DashedPolyline, LyonAdapter, SolidVertexConstructor};
 use iced_core::{Color, Point, Rectangle};
 use iced_graphics::color::pack;
@@ -11,6 +15,7 @@ use lyon_path::{LineCap, LineJoin, Path, PathEvent, iterator::FromPolyline, trai
 use lyon_tessellation::{FillOptions, StrokeOptions};
 use math::*;
 
+pub use text::Quality;
 /// The central driver for the rendering engine.
 ///
 /// The `Tessellator` acts as the "Brain" of the graphics pipeline. It orchestrates the
@@ -1076,10 +1081,10 @@ impl Tessellator {
         size_px: f32,
         rotation: f32,
         color: Color,
-        font: &crate::font::GeometricFont,
+        font: &GeometricFont,
         horizontal_alignment: iced_core::alignment::Horizontal,
         vertical_alignment: iced_core::alignment::Vertical,
-        screen_tolerance: f32, // <--- NEW ARGUMENT
+        quality: Quality, // <--- Accept the Enum
     ) {
         text::draw_geometric_text(
             buffer,
@@ -1091,7 +1096,7 @@ impl Tessellator {
             font,
             horizontal_alignment,
             vertical_alignment,
-            screen_tolerance,
+            quality, // <--- Pass it down
         );
     }
 

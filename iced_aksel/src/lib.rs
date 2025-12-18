@@ -98,7 +98,6 @@ mod state;
 mod style;
 
 pub mod axis;
-pub mod font;
 pub mod plot;
 pub mod shape;
 pub mod stroke;
@@ -106,6 +105,8 @@ pub mod stroke;
 pub use axis::Axis;
 pub use measure::Measure;
 pub use plot::{Plot, PlotData};
+pub use render::Quality;
+pub use render::font;
 pub use shape::Shape;
 pub use state::State;
 pub use stroke::Stroke;
@@ -160,7 +161,7 @@ struct Memory<AxisId> {
     action: Action<AxisId>,
     previous_click: Option<mouse::Click>,
     // Add the persistent tessellators here
-    tessellators: RefCell<render::Tessellators>,
+    tessellators: RefCell<render::Tessellator>,
 }
 
 impl<AxisId> Default for Memory<AxisId> {
@@ -169,7 +170,7 @@ impl<AxisId> Default for Memory<AxisId> {
             action: Action::default(),
             previous_click: None,
             // Initialize them once. Lyon will reuse the internal Vec capacities.
-            tessellators: RefCell::new(render::Tessellators::default()),
+            tessellators: RefCell::new(render::Tessellator::default()),
         }
     }
 }

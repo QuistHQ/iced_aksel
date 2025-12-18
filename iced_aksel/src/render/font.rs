@@ -3,7 +3,8 @@ use std::{fmt, sync::OnceLock};
 use ttf_parser::Face;
 
 // Embed the default font data globally
-const DEFAULT_FONT_DATA: &[u8] = include_bytes!("../fonts/ibm_plex_mono/IBMPlexMono-Regular.ttf");
+const DEFAULT_FONT_DATA: &[u8] =
+    include_bytes!("../../fonts/ibm_plex_mono/IBMPlexMono-Regular.ttf");
 // The cache for the parsed default font
 static DEFAULT_FONT: OnceLock<GeometricFont<'static>> = OnceLock::new();
 

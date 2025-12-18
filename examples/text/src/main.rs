@@ -132,7 +132,7 @@ impl PlotData<f64> for TextLayer {
                             .fill(item.color)
                             .size(size)
                             .rotation(item.rotation)
-                            .tolerance(self.tolerance),
+                            .quality(iced_aksel::Quality::Custom(self.tolerance)),
                     );
                 }
             }
