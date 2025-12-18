@@ -23,7 +23,7 @@ const AXIS_Y: &str = "y";
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AppMode {
     Stress,
-    Showcase, // The new "Alphabet Grid" mode
+    Showcase,
 }
 
 impl std::fmt::Display for AppMode {

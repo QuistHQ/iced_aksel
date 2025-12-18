@@ -1071,32 +1071,40 @@ impl Tessellator {
     //  Text (Vector)
     // =========================================================================
 
-    /// Draws text as a vector mesh using the `text` tessellation engine.
+    /// Draws text as a vector mesh using the tessellation engine.
+    ///
+    /// Unlike standard text, this method generates raw geometry (triangles) which can be
+    /// freely rotated and scaled without losing quality.
+    ///
+    /// **OBS:** Only use this if you need rotation or dynamic sizing text.
+    ///
+    /// This is alot more CPU intensive than its `Label` counterpart, so if you need thousands
+    /// of labels at the same time, you can run into lower performance.
     #[allow(clippy::too_many_arguments)]
     pub fn draw_vector_text(
         &mut self,
         buffer: &mut MeshBuffer,
         content: &str,
         position: Point,
-        size_px: f32,
-        rotation: f32,
+        size_in_pixels: f32,
+        rotation_radians: f32,
         color: Color,
         font: &GeometricFont,
         horizontal_alignment: iced_core::alignment::Horizontal,
         vertical_alignment: iced_core::alignment::Vertical,
-        quality: Quality, // <--- Accept the Enum
+        quality: Quality,
     ) {
         text::draw_geometric_text(
             buffer,
             content,
             position,
-            size_px,
-            rotation,
+            size_in_pixels,
+            rotation_radians,
             color,
             font,
             horizontal_alignment,
             vertical_alignment,
-            quality, // <--- Pass it down
+            quality,
         );
     }
 
