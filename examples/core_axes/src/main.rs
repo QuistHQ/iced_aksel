@@ -4,7 +4,7 @@ use iced::{
 };
 use iced_aksel::{
     Axis, Chart, Measure, PlotPoint, State, Stroke,
-    axis::{self, GridLine, LabelDecision, TickLine, TickResult},
+    axis::{self, GridLine, LabelDecision, TickResult},
     plot::{Plot, PlotData},
     scale::Linear,
     shape::Polyline,
@@ -133,7 +133,7 @@ impl AxesExample {
     /// It demonstrates the standard pipeline:
     /// Scale -> Position -> Dimensions -> Logic -> Visuals
     fn configure_axis(&self, kind: AxisKind) -> Axis<f64> {
-        let s = self.settings;
+        let settings = self.settings;
 
         // ---------------------------------------------------------------------
         // 1. BASE CONFIGURATION
@@ -142,7 +142,7 @@ impl AxesExample {
         let (scale, position) = match kind {
             AxisKind::X => (Linear::new(0.0, 100.0), axis::Position::Bottom),
             AxisKind::Y => {
-                let pos = if s.y_position_right {
+                let pos = if settings.y_position_right {
                     axis::Position::Right
                 } else {
                     axis::Position::Left
@@ -152,8 +152,8 @@ impl AxesExample {
         };
 
         let mut axis = Axis::new(scale, position)
-            .with_thickness(s.thickness)
-            .with_label_spacing(s.label_spacing)
+            .with_thickness(settings.thickness)
+            .with_label_spacing(settings.label_spacing)
             .without_grid(); // Start clean so we can toggle it conditionally later
 
         // ---------------------------------------------------------------------
@@ -161,8 +161,8 @@ impl AxesExample {
         // ---------------------------------------------------------------------
         // If the user wants this axis hidden, we hide it and stop configuring.
         let is_visible = match kind {
-            AxisKind::X => s.x_visible,
-            AxisKind::Y => s.y_visible,
+            AxisKind::X => settings.x_visible,
+            AxisKind::Y => settings.y_visible,
         };
 
         if !is_visible {
@@ -172,7 +172,7 @@ impl AxesExample {
         // ---------------------------------------------------------------------
         // 3. LABEL POLICY (Collision Avoidance)
         // ---------------------------------------------------------------------
-        if s.sparse_labels {
+        if settings.sparse_labels {
             // OPTION A: Manual Logic
             // "I want full control over exactly which numbers appear."
             axis = axis.with_custom_label_policy(move |ctx| {
@@ -190,7 +190,7 @@ impl AxesExample {
                     LabelDecision::Skip
                 }
             });
-        } else if s.skip_overlap {
+        } else if settings.skip_overlap {
             // OPTION B: Automatic Logic
             // "Just make sure they don't touch each other."
             axis = axis.skip_overlapping_labels(10.0);
@@ -199,7 +199,7 @@ impl AxesExample {
         // ---------------------------------------------------------------------
         // 4. INTERACTIVITY
         // ---------------------------------------------------------------------
-        if s.show_cursor {
+        if settings.show_cursor {
             axis = axis.with_cursor_formatter(|val| {
                 Some(axis::Label {
                     content: format!("{:.1}", val),
@@ -213,21 +213,14 @@ impl AxesExample {
         // 5. VISUALS (Ticks, Grids & Labels)
         //    This uses the modern `TickResult` pattern to return all parts at once.
         // ---------------------------------------------------------------------
-        axis = match s.tick_style {
+        axis = match settings.tick_style {
             // STYLE 1: Render everything
             TickStyle::Simple => axis.with_tick_renderer(move |ctx| {
-                // 1. Prepare the Grid (only if enabled)
-                let grid = if s.show_grid {
-                    Some(GridLine::default())
-                } else {
-                    None
-                };
-
                 // 2. Return the result
                 TickResult {
-                    tick_line: Some(TickLine::default()),
-                    grid_line: grid,
+                    grid_line: settings.show_grid.then_some(GridLine::default()),
                     label: Some(format!("{:.0}", ctx.tick.value).into()),
+                    ..Default::default()
                 }
             }),
 
@@ -238,18 +231,11 @@ impl AxesExample {
                     return TickResult::default();
                 }
 
-                // 2. Prepare the Grid (only if enabled)
-                let grid = if s.show_grid {
-                    Some(GridLine::default())
-                } else {
-                    None
-                };
-
                 // 3. Return the result (Major ticks only)
                 TickResult {
-                    tick_line: Some(TickLine::default()),
-                    grid_line: grid,
+                    grid_line: settings.show_grid.then_some(GridLine::default()),
                     label: Some(format!("{:.0}", ctx.tick.value).into()),
+                    ..Default::default()
                 }
             }),
         };

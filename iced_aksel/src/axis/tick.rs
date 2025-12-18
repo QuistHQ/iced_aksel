@@ -1,18 +1,22 @@
 use crate::axis::GridLine;
 
-use super::Orientation;
+use super::{
+    Orientation,
+    label::{Label, LabelBounds},
+};
 
 use aksel::{Float, Tick};
-use iced_core::{Pixels, Rectangle};
-
-pub mod label;
-
-pub use label::*;
+use derivative::Derivative;
+use iced_core::{
+    Pixels, Point, Rectangle,
+    text::{self, paragraph::Plain},
+};
 
 pub struct TickResult {
     pub tick_line: Option<TickLine>,
     pub grid_line: Option<GridLine>,
     pub label: Option<Label>,
+    pub label_priority: Option<u8>,
 }
 
 impl Default for TickResult {
@@ -21,6 +25,7 @@ impl Default for TickResult {
             tick_line: Some(TickLine::default()),
             grid_line: Some(GridLine::default()),
             label: None,
+            label_priority: None,
         }
     }
 }
@@ -32,6 +37,7 @@ impl TickResult {
             tick_line: None,
             grid_line: None,
             label: None,
+            label_priority: None,
         }
     }
 
@@ -57,6 +63,14 @@ impl TickResult {
             grid_line: Some(line),
             ..Self::new()
         }
+    }
+
+    /// Sets the rendering-priority of the label
+    ///
+    /// 0 == Highest priority
+    pub fn label_priority(mut self, priority: u8) -> Self {
+        self.label_priority = Some(priority);
+        self
     }
 
     /// Adds a label to the [TickResult]
@@ -171,5 +185,107 @@ impl<D: Float> TickContext<D> {
     pub fn scale_span(&self) -> D {
         let (min, max) = self.scale_domain;
         min.abs_sub(max)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PlacedLabelInfo<D> {
+    pub tick: Tick<D>,
+    pub normalized_position: f32,
+    pub bounds: LabelBounds,
+}
+
+/// Decision on whether to render or skip a tick label.
+///
+/// Used by custom label policies provided to [`Axis::with_custom_label_policy`](crate::Axis::with_custom_label_policy).
+///
+/// # Example
+///
+/// ```rust
+/// use iced_aksel::{Axis, axis::LabelDecision, scale::Linear};
+///
+/// // Only show labels for even values
+/// let axis = Axis::new(Linear::new(0.0, 100.0), iced_aksel::axis::Position::Bottom)
+///     .with_custom_label_policy(|ctx| {
+///         if ctx.tick.value as i32 % 2 == 0 {
+///             LabelDecision::Render
+///         } else {
+///             LabelDecision::Skip
+///         }
+///     });
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LabelDecision {
+    /// Render this label at its position.
+    Render,
+    /// Skip rendering this label (e.g., due to overlap or custom filtering).
+    Skip,
+}
+
+pub struct LabelCandidate<D> {
+    pub(crate) tick: Tick<D>,
+    pub(crate) normalized_position: f32,
+    pub(crate) label: Label,
+    pub(crate) priority: u8,
+}
+
+pub struct ResolvedLabelCandidate<Renderer, D>
+where
+    Renderer: text::Renderer,
+{
+    pub(crate) tick: Tick<D>,
+    pub(crate) normalized_position: f32,
+    pub(crate) bounds: LabelBounds,
+    pub(crate) paragraph: Plain<Renderer::Paragraph>,
+    pub(crate) position: Point,
+}
+
+#[derive(Debug)]
+pub struct LabelDecisionContext<'a, D> {
+    pub tick: Tick<D>,
+    pub normalized_position: f32,
+    pub bounds: LabelBounds,
+    pub orientation: Orientation,
+    pub accepted: &'a [PlacedLabelInfo<D>],
+}
+
+type LabelPolicyFn<D> = dyn for<'a> Fn(LabelDecisionContext<'a, D>) -> LabelDecision + 'static;
+
+#[derive(Derivative, Default)]
+#[derivative(Debug)]
+pub enum LabelPolicy<D> {
+    #[default]
+    All,
+    SkipOverlapping {
+        min_gap: f32,
+    },
+    Custom(#[derivative(Debug = "ignore")] Box<LabelPolicyFn<D>>),
+}
+
+impl<D> LabelPolicy<D> {
+    pub const fn all() -> Self {
+        Self::All
+    }
+
+    pub const fn skip_overlapping(min_gap: f32) -> Self {
+        Self::SkipOverlapping { min_gap }
+    }
+
+    pub fn custom<F>(policy: F) -> Self
+    where
+        F: for<'a> Fn(LabelDecisionContext<'a, D>) -> LabelDecision + 'static,
+    {
+        Self::Custom(Box::new(policy))
+    }
+
+    pub(crate) fn should_render(&self, context: LabelDecisionContext<'_, D>) -> bool {
+        match self {
+            Self::All => true,
+            Self::SkipOverlapping { min_gap } => context
+                .accepted
+                .iter()
+                .all(|placed| !context.bounds.overlaps_with_gap(&placed.bounds, *min_gap)),
+            Self::Custom(policy) => matches!(policy(context), LabelDecision::Render),
+        }
     }
 }

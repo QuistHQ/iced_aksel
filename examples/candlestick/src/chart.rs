@@ -470,6 +470,7 @@ impl CandlestickChart {
                 label,
                 grid_line,
                 tick_line,
+                ..Default::default()
             }
         };
 
@@ -489,14 +490,10 @@ impl CandlestickChart {
     /// Factory for creating the Price Y-axis.
     fn create_y_axis(range: (f64, f64)) -> Axis<f64> {
         let scale = Linear::new(range.0, range.1);
-        let tick_renderer = |ctx: TickContext<f64>| -> TickResult {
-            TickResult {
-                label: Some(format!("{:.2}", ctx.tick.value).into()),
-                ..Default::default()
-            }
-        };
         Axis::new(scale, Position::Right)
-            .with_tick_renderer(tick_renderer)
+            .with_tick_renderer(|ctx: TickContext<f64>| -> TickResult {
+                TickResult::default().label(format!("{:.2}", ctx.tick.value))
+            })
             .with_cursor_formatter(|x| {
                 Some(axis::Label {
                     content: format!("{x:.2}"),

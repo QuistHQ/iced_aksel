@@ -51,61 +51,18 @@ use crate::{
 };
 
 mod grid;
+mod label;
 mod position;
 mod tick;
 
-pub use grid::GridLine;
-pub use position::{Orientation, Position};
-pub use tick::{
-    Label, LabelBounds, LabelCandidate, LabelDecision, LabelDecisionContext, PlacedLabelInfo,
-    ResolvedLabelCandidate, TickContext, TickLine, TickResult,
-};
+pub use grid::*;
+pub use label::*;
+pub use position::*;
+pub use tick::*;
 
 // TODO: Can we, somehow, refactor out Rc<RefCell<T>>? Or is it okay as it is?
 type TickRendererFn<D> = Rc<RefCell<dyn FnMut(TickContext<D>) -> TickResult>>;
 type LabelFormatter<D> = Box<dyn Fn(D) -> Option<Label>>;
-
-type LabelPolicyFn<D> = dyn for<'a> Fn(LabelDecisionContext<'a, D>) -> LabelDecision + 'static;
-
-// Making this inaccessible to user for simplicity.
-#[derive(Derivative, Default)]
-#[derivative(Debug)]
-pub enum LabelPolicy<D> {
-    #[default]
-    All,
-    SkipOverlapping {
-        min_gap: f32,
-    },
-    Custom(#[derivative(Debug = "ignore")] Box<LabelPolicyFn<D>>),
-}
-
-impl<D> LabelPolicy<D> {
-    pub const fn all() -> Self {
-        Self::All
-    }
-
-    pub const fn skip_overlapping(min_gap: f32) -> Self {
-        Self::SkipOverlapping { min_gap }
-    }
-
-    pub fn custom<F>(policy: F) -> Self
-    where
-        F: for<'a> Fn(LabelDecisionContext<'a, D>) -> LabelDecision + 'static,
-    {
-        Self::Custom(Box::new(policy))
-    }
-
-    fn should_render(&self, context: LabelDecisionContext<'_, D>) -> bool {
-        match self {
-            Self::All => true,
-            Self::SkipOverlapping { min_gap } => context
-                .accepted
-                .iter()
-                .all(|placed| !context.bounds.overlaps_with_gap(&placed.bounds, *min_gap)),
-            Self::Custom(policy) => matches!(policy(context), LabelDecision::Render),
-        }
-    }
-}
 
 /// An axis that maps data values to screen coordinates.
 ///
@@ -519,9 +476,10 @@ impl<D: Float> Axis<D> {
             });
 
             if let Some(TickResult {
-                mut label,
                 mut tick_line,
                 mut grid_line,
+                mut label,
+                label_priority,
             }) = tick_result
             {
                 if self.is_visible() {
@@ -530,6 +488,7 @@ impl<D: Float> Axis<D> {
                             tick,
                             normalized_position: pos_norm,
                             label,
+                            priority: label_priority.unwrap_or(tick.level),
                         });
                     }
 
@@ -548,7 +507,7 @@ impl<D: Float> Axis<D> {
 
         // Sort so the lowest tick levels (major) get processed first - E.g. they have higher
         // priority
-        label_candidates.sort_by_key(LabelCandidate::priority);
+        label_candidates.sort_by_key(|candidate| candidate.priority);
 
         self.layout_labels(
             renderer,
