@@ -50,11 +50,13 @@ use crate::{
     style::{AxisStyle, Style},
 };
 
+mod cursor;
 mod grid;
 mod label;
 mod position;
 mod tick;
 
+pub use cursor::*;
 pub use grid::*;
 pub use label::*;
 pub use position::*;
@@ -62,7 +64,7 @@ pub use tick::*;
 
 // TODO: Can we, somehow, refactor out Rc<RefCell<T>>? Or is it okay as it is?
 type TickRendererFn<D> = Rc<RefCell<dyn FnMut(TickContext<D>) -> TickResult>>;
-type LabelFormatter<D> = Box<dyn Fn(D) -> Option<Label>>;
+type CursorRendererFn<D> = Rc<RefCell<dyn FnMut(D) -> Option<Label>>>;
 
 /// An axis that maps data values to screen coordinates.
 ///
@@ -104,23 +106,9 @@ pub struct Axis<D> {
     #[derivative(Debug = "ignore")]
     pub(crate) tick_renderer: Option<TickRendererFn<D>>,
     #[derivative(Debug = "ignore")]
-    pub(crate) cursor_formatter: Option<LabelFormatter<D>>,
+    pub(crate) cursor_formatter: Option<CursorRendererFn<D>>,
     #[derivative(Debug = "ignore")]
     label_policy: LabelPolicy<D>,
-}
-
-impl<D: Float> Deref for Axis<D> {
-    type Target = dyn Scale<Domain = D, Normalized = f32>;
-
-    fn deref(&self) -> &Self::Target {
-        &*self.scale
-    }
-}
-
-impl<D: Float> DerefMut for Axis<D> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut *self.scale
-    }
 }
 
 impl<D: Float> Axis<D> {
@@ -139,12 +127,12 @@ impl<D: Float> Axis<D> {
     ) -> Self {
         let tick_renderer = Rc::new(RefCell::new(|ctx: TickContext<D>| {
             let mut result = TickResult::with_tick_line(TickLine {
-                thickness: 1.0.into(),
                 length: match ctx.tick.level {
                     0 => 10.0,
                     _ => 5.0,
                 }
                 .into(),
+                ..Default::default()
             });
 
             if ctx.tick.level == 0 {
@@ -308,7 +296,7 @@ impl<D: Float> Axis<D> {
     where
         F: Fn(D) -> Option<Label> + 'static,
     {
-        self.cursor_formatter = Some(Box::new(renderer));
+        self.cursor_formatter = Some(Rc::new(RefCell::new(renderer)));
         self
     }
 
@@ -455,6 +443,7 @@ impl<D: Float> Axis<D> {
 
         let theme = style.axis;
         let bounds = layout.bounds();
+        let full_bounds = plot_bounds.union(&bounds);
         let orientation = Orientation::from(self.position());
 
         let mut label_candidates = Vec::new();
@@ -505,6 +494,12 @@ impl<D: Float> Axis<D> {
             }
         }
 
+        // We can early return here if the axis is invisible, as we would've already rendered all
+        // the gridlines
+        if self.invisible {
+            return;
+        }
+
         // Sort so the lowest tick levels (major) get processed first - E.g. they have higher
         // priority
         label_candidates.sort_by_key(|candidate| candidate.priority);
@@ -518,47 +513,40 @@ impl<D: Float> Axis<D> {
             viewport,
         );
 
-        // Combined plot and axis bounds
-        let full_bounds = plot_bounds.union(&bounds);
-
-        if self.is_visible()
-            && self.render_cursor
+        if self.render_cursor
             && let Some(cursor_pos) = cursor.position_over(full_bounds)
+            && let Some(cursor_renderer) = &self.cursor_formatter
         {
             renderer.start_layer(bounds);
 
             let mut cursor_rect = match orientation {
                 // Create a vertical rect
                 Orientation::Horizontal => Rectangle {
-                    x: cursor_pos.x - (theme.cursor.width.0 / 2.0),
+                    x: cursor_pos.x - (theme.cursor.base_width.0 / 2.0),
                     y: bounds.y,
                     height: bounds.height,
-                    width: theme.cursor.width.0,
+                    width: theme.cursor.base_width.0,
                 },
                 // Create a horizontal rect
                 Orientation::Vertical => Rectangle {
                     x: bounds.x,
-                    y: cursor_pos.y - (theme.cursor.width.0 / 2.0),
-                    height: theme.cursor.width.0,
+                    y: cursor_pos.y - (theme.cursor.base_width.0 / 2.0),
+                    height: theme.cursor.base_width.0,
                     width: bounds.width,
                 },
             };
 
-            if let Some(cursor_formatter) = &self.cursor_formatter
-                && let Some(label) = {
-                    let position_to_format = match orientation {
-                        Orientation::Horizontal => {
-                            (cursor_pos.x - plot_bounds.x) / plot_bounds.width
-                        }
-                        Orientation::Vertical => {
-                            1.0 - ((cursor_pos.y - plot_bounds.y) / plot_bounds.height)
-                        }
-                    };
+            if let Some(label) = {
+                let value_to_render = match orientation {
+                    Orientation::Horizontal => (cursor_pos.x - plot_bounds.x) / plot_bounds.width,
+                    Orientation::Vertical => {
+                        1.0 - ((cursor_pos.y - plot_bounds.y) / plot_bounds.height)
+                    }
+                };
 
-                    self.denormalize_opt(position_to_format)
-                        .and_then(cursor_formatter)
-                }
-            {
+                self.denormalize_opt(value_to_render)
+                    .and_then(|pos| cursor_renderer.borrow_mut()(pos))
+            } {
                 // Set alignment based on axis position to keep text within bounds
                 let (align_x, align_y) = match self.position {
                     Position::Top => (Alignment::Center, Vertical::Top),
@@ -580,31 +568,50 @@ impl<D: Float> Axis<D> {
                     wrapping: Wrapping::None,
                 });
 
-                // Position cursor label at cursor position with padding
-                let position = match self.position {
-                    Position::Top => Point::new(cursor_pos.x, bounds.y + self.label_spacing.0),
-                    Position::Bottom => Point::new(
-                        cursor_pos.x,
-                        bounds.y + bounds.height - self.label_spacing.0,
-                    ),
-                    Position::Left => Point::new(bounds.x + self.label_spacing.0, cursor_pos.y),
-                    Position::Right => {
-                        Point::new(bounds.x + bounds.width - self.label_spacing.0, cursor_pos.y)
-                    }
-                };
-
                 let min_bounds = text.min_bounds();
 
-                cursor_rect = match orientation {
-                    Orientation::Vertical => cursor_rect, // Do nothing for now on vertical
-                    Orientation::Horizontal => Rectangle {
-                        x: cursor_pos.x - (min_bounds.width / 2.0),
-                        y: position.y - min_bounds.height,
-                        width: min_bounds.width,
-                        height: min_bounds.height,
-                    },
-                }
-                .expand(label.padding);
+                // Resize cusor rect to fit text
+                let horizontal_padding = label.padding.right + label.padding.left;
+                let vertical_padding = label.padding.top + label.padding.bottom;
+                let wanted_width = min_bounds.width + horizontal_padding;
+                let wanted_height = min_bounds.height + vertical_padding;
+                cursor_rect.width = wanted_width.clamp(0.0, bounds.width);
+                cursor_rect.height = wanted_height.clamp(0.0, bounds.height);
+
+                // Position cursor label at cursor position with padding and position cursor rect
+                // properly
+                let position = match self.position {
+                    Position::Top => {
+                        let pos = Point::new(cursor_pos.x, bounds.y + self.label_spacing.0);
+                        cursor_rect.x = cursor_pos.x - (cursor_rect.width / 2.0);
+                        cursor_rect.y = pos.y - label.padding.top;
+                        pos
+                    }
+                    Position::Bottom => {
+                        let pos = Point::new(
+                            cursor_pos.x,
+                            bounds.y + bounds.height - self.label_spacing.0,
+                        );
+                        cursor_rect.x = cursor_pos.x - (cursor_rect.width / 2.0);
+                        cursor_rect.y = pos.y - cursor_rect.height + label.padding.top;
+                        pos
+                    }
+                    Position::Left => {
+                        let pos = Point::new(bounds.x + self.label_spacing.0, cursor_pos.y);
+                        cursor_rect.x = pos.x - label.padding.left;
+                        cursor_rect.y = cursor_pos.y - (cursor_rect.height / 2.0);
+                        pos
+                    }
+                    Position::Right => {
+                        let pos = Point::new(
+                            bounds.x + bounds.width - self.label_spacing.0,
+                            cursor_pos.y,
+                        );
+                        cursor_rect.x = pos.x - cursor_rect.width + label.padding.left;
+                        cursor_rect.y = cursor_pos.y - (cursor_rect.height / 2.0);
+                        pos
+                    }
+                };
 
                 renderer.fill_text(
                     text.as_text().with_content(text.content().to_string()),
@@ -612,10 +619,12 @@ impl<D: Float> Axis<D> {
                     theme.label_color,
                     bounds,
                 );
-            };
+            }
 
             let quad = Quad {
                 bounds: cursor_rect,
+                border: theme.cursor.border,
+                shadow: theme.cursor.shadow,
                 ..Default::default()
             };
 
@@ -890,5 +899,19 @@ impl<D: Float> Axis<D> {
                 },
             ],
         );
+    }
+}
+
+// Deref to `Scale` for ease of use
+impl<D: Float> Deref for Axis<D> {
+    type Target = dyn Scale<Domain = D, Normalized = f32>;
+
+    fn deref(&self) -> &Self::Target {
+        &*self.scale
+    }
+}
+impl<D: Float> DerefMut for Axis<D> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut *self.scale
     }
 }

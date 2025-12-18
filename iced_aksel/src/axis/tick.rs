@@ -289,3 +289,22 @@ impl<D> LabelPolicy<D> {
         }
     }
 }
+
+pub(super) fn default_tick_renderer<D: 'static>(ctx: TickContext<D>) -> TickResult {
+    let mut result = TickResult::with_tick_line(TickLine {
+        thickness: 1.0.into(),
+        length: match ctx.tick.level {
+            0 => 10.0,
+            _ => 5.0,
+        }
+        .into(),
+    });
+
+    if ctx.tick.level == 0 {
+        result = result.grid_line(GridLine {
+            thickness: 1.0.into(),
+        });
+    }
+
+    result
+}

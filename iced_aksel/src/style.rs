@@ -1,4 +1,4 @@
-use iced_core::{Color, Pixels, Theme};
+use iced_core::{Border, Color, Pixels, Shadow, Theme};
 
 /// Style of a `Chart`.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -20,7 +20,9 @@ pub struct AxisStyle {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AxisCursor {
     pub color: Color,
-    pub width: Pixels,
+    pub base_width: Pixels,
+    pub border: Border,
+    pub shadow: Shadow,
 }
 
 /// Style of the plot cursor that follows the mouse position over the chart.
@@ -90,8 +92,10 @@ pub fn default(theme: &Theme) -> Style {
         },
         axis: AxisStyle {
             cursor: AxisCursor {
-                color: palette.background.weak.color,
-                width: 10.0.into(),
+                color: palette.primary.base.color,
+                base_width: 1.0.into(),
+                border: Border::default().rounded(5.0),
+                shadow: Shadow::default(),
             },
             tick_color: palette.background.weak.color,
             label_color: palette.background.weak.text,

@@ -54,6 +54,7 @@ impl std::fmt::Display for TickStyle {
 struct AxisSettings {
     // Visibility & Layout
     x_visible: bool,
+    x_position_top: bool,
     y_visible: bool,
     y_position_right: bool,
     show_grid: bool,
@@ -73,6 +74,7 @@ impl Default for AxisSettings {
     fn default() -> Self {
         Self {
             x_visible: true,
+            x_position_top: false,
             y_visible: true,
             y_position_right: false,
             show_grid: true,
@@ -89,6 +91,7 @@ impl Default for AxisSettings {
 #[derive(Debug, Clone)]
 pub enum Message {
     ToggleX(bool),
+    ToggleXSide(bool),
     ToggleY(bool),
     ToggleYSide(bool),
     ToggleGrid(bool),
@@ -140,7 +143,14 @@ impl AxesExample {
         //    Set up the scale (domain) and where the axis sits on the screen.
         // ---------------------------------------------------------------------
         let (scale, position) = match kind {
-            AxisKind::X => (Linear::new(0.0, 100.0), axis::Position::Bottom),
+            AxisKind::X => {
+                let pos = if settings.x_position_top {
+                    axis::Position::Top
+                } else {
+                    axis::Position::Bottom
+                };
+                (Linear::new(0.0, 100.0), pos)
+            }
             AxisKind::Y => {
                 let pos = if settings.y_position_right {
                     axis::Position::Right
@@ -246,6 +256,7 @@ impl AxesExample {
     fn update(&mut self, message: Message) -> iced::Task<Message> {
         match message {
             Message::ToggleX(v) => self.settings.x_visible = v,
+            Message::ToggleXSide(v) => self.settings.x_position_top = v,
             Message::ToggleY(v) => self.settings.y_visible = v,
             Message::ToggleYSide(v) => self.settings.y_position_right = v,
             Message::ToggleGrid(v) => self.settings.show_grid = v,
@@ -268,43 +279,38 @@ impl AxesExample {
             text("Layout & Visibility")
                 .size(14)
                 .color(Color::from_rgb(0.7, 0.7, 0.7)),
-            row![
-                checkbox(self.settings.x_visible).on_toggle(Message::ToggleX),
-                text("X Axis")
-            ]
-            .spacing(10),
-            row![
-                checkbox(self.settings.y_visible).on_toggle(Message::ToggleY),
-                text("Y Axis")
-            ]
-            .spacing(10),
-            row![
-                checkbox(self.settings.y_position_right).on_toggle(Message::ToggleYSide),
-                text("Y Axis on Right")
-            ]
-            .spacing(10),
-            row![
-                checkbox(self.settings.show_grid).on_toggle(Message::ToggleGrid),
-                text("Grid Lines")
+            column![
+                checkbox(self.settings.x_visible)
+                    .on_toggle(Message::ToggleX)
+                    .label("X Axis"),
+                checkbox(self.settings.x_position_top)
+                    .on_toggle(Message::ToggleXSide)
+                    .label("X Axis on Top"),
+                checkbox(self.settings.y_visible)
+                    .on_toggle(Message::ToggleY)
+                    .label("Y Axis"),
+                checkbox(self.settings.y_position_right)
+                    .on_toggle(Message::ToggleYSide)
+                    .label("Y Axis on Right"),
+                checkbox(self.settings.show_grid)
+                    .on_toggle(Message::ToggleGrid)
+                    .label("Grid Lines"),
             ]
             .spacing(10),
             // --- Section: Features ---
             text("Labels & Ticks")
                 .size(14)
                 .color(Color::from_rgb(0.7, 0.7, 0.7)),
-            row![
-                checkbox(self.settings.show_cursor).on_toggle(Message::ToggleCursor),
-                text("Cursor Labels")
-            ]
-            .spacing(10),
-            row![
-                checkbox(self.settings.skip_overlap).on_toggle(Message::ToggleSkipOverlap),
-                text("Skip Overlapping")
-            ]
-            .spacing(10),
-            row![
-                checkbox(self.settings.sparse_labels).on_toggle(Message::ToggleSparse),
-                text("Sparse Policy (Custom)")
+            column![
+                checkbox(self.settings.show_cursor)
+                    .on_toggle(Message::ToggleCursor)
+                    .label("Cursor Labels"),
+                checkbox(self.settings.skip_overlap)
+                    .on_toggle(Message::ToggleSkipOverlap)
+                    .label("Skip Overlapping"),
+                checkbox(self.settings.sparse_labels)
+                    .on_toggle(Message::ToggleSparse)
+                    .label("Sparse Policy (Custom)"),
             ]
             .spacing(10),
             // --- Section: Styling ---
