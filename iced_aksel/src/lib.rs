@@ -98,6 +98,7 @@ mod state;
 mod style;
 
 pub mod axis;
+pub mod font;
 pub mod plot;
 pub mod shape;
 pub mod stroke;

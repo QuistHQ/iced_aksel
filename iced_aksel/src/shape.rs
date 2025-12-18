@@ -53,6 +53,7 @@ mod polyline;
 mod rectangle;
 mod spline;
 mod triangle;
+mod vector_label;
 
 pub use arc::Arc;
 pub use area::Area;
@@ -65,7 +66,7 @@ pub use polyline::Polyline;
 pub use rectangle::Rectangle;
 pub use spline::Spline;
 pub use triangle::Triangle;
-
+pub use vector_label::VectorLabel;
 /// Trait for shapes that can be rendered on a plot.
 ///
 /// Implement this trait for custom shapes. The rendering context provides access

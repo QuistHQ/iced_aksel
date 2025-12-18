@@ -4,7 +4,7 @@ pub mod mesh;
 pub mod polygon;
 pub mod radial;
 
-use crate::render::MeshBuffer;
+use crate::{font::GeometricFont, render::MeshBuffer};
 use iced_core::{Color, Point, Vector};
 
 /// The "Fast Path" rendering engine.

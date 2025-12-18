@@ -1,8 +1,9 @@
 pub mod complex;
 pub mod manual;
 pub mod math;
+pub mod text;
 
-use crate::{Stroke, render::MeshBuffer, stroke::StrokeStyle};
+use crate::{Stroke, font::GeometricFont, render::MeshBuffer, stroke::StrokeStyle};
 use complex::{ComplexTessellator, DashedPolyline, LyonAdapter, SolidVertexConstructor};
 use iced_core::{Color, Point, Rectangle};
 use iced_graphics::color::pack;
@@ -1059,6 +1060,39 @@ impl Tessellator {
             })
             .collect();
         self.stroke_polyline(buffer, points, stroke, resolved_width, true);
+    }
+
+    // =========================================================================
+    //  Text (Vector)
+    // =========================================================================
+
+    /// Draws text as a vector mesh using the `text` tessellation engine.
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_vector_text(
+        // Renamed for consistency
+        &mut self,
+        buffer: &mut MeshBuffer, // We pass the buffer explicitly
+        content: &str,
+        position: Point,
+        size_px: f32,
+        rotation: f32,
+        color: Color,
+        font: &crate::font::GeometricFont,
+        horizontal_alignment: iced_core::alignment::Horizontal,
+        vertical_alignment: iced_core::alignment::Vertical,
+    ) {
+        // We delegate to the new module
+        text::draw_geometric_text(
+            buffer,
+            content,
+            position,
+            size_px,
+            rotation,
+            color,
+            font,
+            horizontal_alignment,
+            vertical_alignment,
+        );
     }
 
     // TODO: This could be considered to be removed later. Kept for now to allow for lyon
