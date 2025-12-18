@@ -1,4 +1,4 @@
-use ab_glyph::FontRef;
+use ab_glyph::{Font, FontRef};
 use std::{fmt, sync::OnceLock};
 use ttf_parser::Face;
 
@@ -37,6 +37,11 @@ impl<'a> GeometricFont<'a> {
         let geometry = Face::parse(data, 0).ok()?;
 
         Some(Self { layout, geometry })
+    }
+
+    /// Returns an iterator over all characters available in this font.
+    pub fn characters(&self) -> impl Iterator<Item = char> + '_ {
+        self.layout.codepoint_ids().map(|(_, c)| c)
     }
 }
 

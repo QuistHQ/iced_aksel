@@ -59,7 +59,7 @@ pub fn draw_geometric_text(
     font: &GeometricFont,
     horizontal_alignment: Horizontal,
     vertical_alignment: Vertical,
-    screen_tolerance: f32, // <--- NEW ARGUMENT
+    screen_tolerance: f32,
 ) {
     if content.is_empty() {
         return;
@@ -175,7 +175,6 @@ fn flush_char_to_mesh(
     local_offset_y: f32,
     scale: f32,
 ) {
-    // FIX: Access the real buffer using get_mesh_mut()
     let mesh = target.get_mesh_mut();
 
     let start_index = mesh.vertices.len() as u32;
