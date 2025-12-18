@@ -59,12 +59,12 @@ pub fn draw_geometric_text(
     font: &GeometricFont,
     horizontal_alignment: Horizontal,
     vertical_alignment: Vertical,
+    screen_tolerance: f32, // <--- NEW ARGUMENT
 ) {
     if content.is_empty() {
         return;
     }
 
-    // Use the pre-parsed fields directly
     let font_layout = &font.layout;
     let font_geometry = &font.geometry;
 
@@ -74,6 +74,15 @@ pub fn draw_geometric_text(
 
     let units_per_em = font_geometry.units_per_em() as f32;
     let geometry_scale = size_px / units_per_em;
+
+    // --- LOD CALCULATION ---
+    // Formula: tolerance_in_font_units = (desired_pixel_error / scale_factor)
+    // where scale_factor = size_px / units_per_em
+    // Therefore: tolerance = (pixel_error * units_per_em) / size_px
+    //
+    // Safety: Avoid division by zero if text is microscopic
+    let safe_size = size_px.max(0.001);
+    let lyon_tolerance = (screen_tolerance * units_per_em) / safe_size;
 
     // 3. Layout Calculation
     let mut width = 0.0;
@@ -108,8 +117,9 @@ pub fn draw_geometric_text(
     // 5. Tessellation
     let mut geometry: VertexBuffers<Point, u16> = VertexBuffers::new();
     let mut tessellator = FillTessellator::new();
-    // FIX: Use `with_tolerance` instead of `tolerance`
-    let options = FillOptions::default().with_tolerance(0.1);
+
+    // APPLY THE CALCULATED TOLERANCE
+    let options = FillOptions::default().with_tolerance(lyon_tolerance);
 
     let mut cursor_x = 0.0;
     last_glyph_id = None;
@@ -136,7 +146,6 @@ pub fn draw_geometric_text(
             );
         }
 
-        // Flush this character to the main mesh immediately
         flush_char_to_mesh(
             buffer,
             &geometry,

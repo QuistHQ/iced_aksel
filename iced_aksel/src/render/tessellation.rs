@@ -1069,9 +1069,8 @@ impl Tessellator {
     /// Draws text as a vector mesh using the `text` tessellation engine.
     #[allow(clippy::too_many_arguments)]
     pub fn draw_vector_text(
-        // Renamed for consistency
         &mut self,
-        buffer: &mut MeshBuffer, // We pass the buffer explicitly
+        buffer: &mut MeshBuffer,
         content: &str,
         position: Point,
         size_px: f32,
@@ -1080,8 +1079,8 @@ impl Tessellator {
         font: &crate::font::GeometricFont,
         horizontal_alignment: iced_core::alignment::Horizontal,
         vertical_alignment: iced_core::alignment::Vertical,
+        screen_tolerance: f32, // <--- NEW ARGUMENT
     ) {
-        // We delegate to the new module
         text::draw_geometric_text(
             buffer,
             content,
@@ -1092,6 +1091,7 @@ impl Tessellator {
             font,
             horizontal_alignment,
             vertical_alignment,
+            screen_tolerance,
         );
     }
 
