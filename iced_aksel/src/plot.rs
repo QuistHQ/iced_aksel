@@ -4,12 +4,14 @@
 //! The main entry point is the [`PlotData`] trait, which you implement to draw your data.
 
 use crate::{
-    render::{MeshBuffer, Tessellator},
+    render::{
+        MeshBuffer, Tessellator,
+        text::{GeometricFont, Text},
+    },
     shape::Shape,
 };
 
 use aksel::{Float, PlotRect, Transform};
-use iced_core::{Color, Point, Text};
 
 /// Normalized drag delta for panning operations.
 ///
@@ -35,12 +37,16 @@ pub struct DragDelta {
 ///
 /// This trait is automatically implemented for any renderer that satisfies the requirements.
 pub trait Renderer:
-    iced_core::Renderer + iced_graphics::mesh::Renderer + iced_core::text::Renderer
+    iced_core::Renderer
+    + iced_graphics::mesh::Renderer
+    + iced_core::text::Renderer<Font = iced_core::Font>
 {
 }
 
 impl<T> Renderer for T where
-    T: iced_core::Renderer + iced_graphics::mesh::Renderer + iced_core::text::Renderer
+    T: iced_core::Renderer
+        + iced_graphics::mesh::Renderer
+        + iced_core::text::Renderer<Font = iced_core::Font>
 {
 }
 
@@ -81,27 +87,17 @@ where
     fn draw(&self, plot: &mut Plot<D, R>, theme: &Theme);
 }
 
-#[derive(Debug, Clone, Copy)]
-enum ShapeType {
-    Mesh,
-    Text,
+pub struct TextRenderer<'a, Renderer: iced_graphics::mesh::Renderer> {
+    renderer: &'a mut Renderer,
+    buffer: &'a mut MeshBuffer,
+    tessellator: &'a mut Tessellator,
+    font: &'a GeometricFont<'a>,
 }
 
-pub struct TextRenderer<'a, Renderer: iced_core::text::Renderer>(&'a mut Renderer);
-
-impl<Renderer: iced_core::text::Renderer> TextRenderer<'_, Renderer> {
-    pub fn fill_text(
-        &mut self,
-        text: Text<String, Renderer::Font>,
-        position: Point,
-        color: Color,
-        clip_bounds: iced_core::Rectangle,
-    ) {
-        self.0.fill_text(text, position, color, clip_bounds);
-    }
-
-    pub fn default_font(&self) -> Renderer::Font {
-        self.0.default_font()
+impl<Renderer: iced_graphics::mesh::Renderer> TextRenderer<'_, Renderer> {
+    pub fn draw_text(&mut self, text: Text) {
+        self.tessellator
+            .draw_vector_text(self.buffer, text, self.font);
     }
 }
 
@@ -110,8 +106,8 @@ pub struct Context<'a, D: Float, Renderer: self::Renderer = iced_renderer::Rende
     clip_bounds: &'a iced_core::Rectangle,
     renderer: &'a mut Renderer,
     tessellators: &'a mut Tessellator,
+    font: GeometricFont<'a>,
     mesh_buffer: &'a mut MeshBuffer,
-    last_drawn: ShapeType,
 }
 
 impl<'a, D: Float, Renderer: self::Renderer> Context<'a, D, Renderer> {
@@ -125,13 +121,6 @@ impl<'a, D: Float, Renderer: self::Renderer> Context<'a, D, Renderer> {
     where
         F: FnOnce(&Transform<'a, D, f32, f32>, &mut MeshBuffer, &mut Tessellator),
     {
-        if matches!(self.last_drawn, ShapeType::Text) {
-            // Since meshes are always drawn under text, we have to start a new layer in order to
-            // ensure Z-ordering
-            self.last_drawn = ShapeType::Mesh;
-            self.reset_layer();
-        }
-
         // Draw mesh
         f(self.transform, self.mesh_buffer, self.tessellators);
 
@@ -143,16 +132,15 @@ impl<'a, D: Float, Renderer: self::Renderer> Context<'a, D, Renderer> {
 
     pub fn render_text<F>(&mut self, f: F)
     where
-        F: FnOnce(&Transform<'a, D, f32, f32>, &mut TextRenderer<'_, Renderer>),
+        F: FnOnce(&Transform<'a, D, f32, f32>, &mut TextRenderer<Renderer>),
     {
-        if matches!(self.last_drawn, ShapeType::Mesh) {
-            // Since text is always drawn over meshes, we don't **have** to start a new layer.
-            self.last_drawn = ShapeType::Text;
-        }
-
-        let mut renderer = TextRenderer(self.renderer);
-
-        f(self.transform, &mut renderer)
+        let mut text_renderer = TextRenderer {
+            tessellator: self.tessellators,
+            renderer: self.renderer,
+            buffer: self.mesh_buffer,
+            font: &self.font,
+        };
+        f(&self.transform, &mut text_renderer)
     }
 }
 
@@ -178,6 +166,7 @@ where
         clip_bounds: &'a iced_core::Rectangle,
         mesh_buffer: &'a mut MeshBuffer,
         transform: &'a Transform<'a, D, f32, f32>,
+        font: GeometricFont<'a>,
     ) -> Self {
         renderer.start_layer(*clip_bounds);
         let context = Context {
@@ -186,7 +175,7 @@ where
             renderer,
             tessellators,
             mesh_buffer,
-            last_drawn: ShapeType::Mesh,
+            font,
         };
         Self { context }
     }

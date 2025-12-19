@@ -1,21 +1,26 @@
 use iced::{
-    Color, Element, Point, Subscription, Task, Theme,
+    Color, Element, Point, Task, Theme,
     mouse::ScrollDelta,
     time::Instant,
     widget::{Space, button, checkbox, column, radio, row, slider, text},
 };
 use iced_aksel::{
-    Axis, Chart, Measure, Plot, PlotData, PlotPoint, State,
-    axis::Position,
-    plot::{self, DragDelta},
-    scale::Linear,
-    shape::{Label, VectorLabel},
+    Axis, Chart, Measure, Plot, PlotData, PlotPoint, State, axis::Position, plot::DragDelta,
+    scale::Linear, shape::VectorLabel,
 };
 use rand::Rng;
 
 // -----------------------------------------------------------------------------
 // Constants & Types
 // -----------------------------------------------------------------------------
+
+const SYMBOLS: [char; 38] = [
+    'A', 'B', 'C', 'X', 'Y', 'Z', 'a', 'b', 'c', 'x', 'y', 'z', // Basic Latin
+    'Á', 'É', 'Í', 'Ó', 'Ú', 'á', 'é', 'í', 'ó', 'ú', 'ñ', 'ç', 'ø', 'ß', // Accented Latin
+    'Δ', 'Ω', 'π', 'λ', // Greek
+    'Ж', 'Я', 'ю', 'ф', // Cyrillic
+    '∞', '✓', '§', '→', // Symbols & punctuation
+];
 
 const AXIS_X: &str = "x";
 const AXIS_Y: &str = "y";
@@ -107,35 +112,21 @@ impl PlotData<f64> for TextLayer {
             return;
         }
 
-        match self.label_type {
-            LabelType::Native => {
-                for item in &self.items {
-                    let px_size = self.base_size * item.scale_factor;
-                    plot.add_shape(
-                        Label::new(&item.text, item.position)
-                            .fill(item.color)
-                            .size(px_size),
-                    );
+        for item in &self.items {
+            let size = match self.size_mode {
+                SizeMode::Screen => Measure::Screen(self.base_size * item.scale_factor),
+                SizeMode::Plot => {
+                    Measure::Plot((self.base_size / 10.0) as f64 * item.scale_factor as f64)
                 }
-            }
-            LabelType::Vector => {
-                for item in &self.items {
-                    let size = match self.size_mode {
-                        SizeMode::Screen => Measure::Screen(self.base_size * item.scale_factor),
-                        SizeMode::Plot => {
-                            Measure::Plot((self.base_size / 10.0) as f64 * item.scale_factor as f64)
-                        }
-                    };
+            };
 
-                    plot.add_shape(
-                        VectorLabel::new(&item.text, item.position)
-                            .fill(item.color)
-                            .size(size)
-                            .rotation(item.rotation)
-                            .quality(iced_aksel::Quality::Custom(self.tolerance)),
-                    );
-                }
-            }
+            plot.add_shape(
+                VectorLabel::new(&item.text, item.position)
+                    .fill(item.color)
+                    .size(size)
+                    .rotation(item.rotation)
+                    .quality(iced_aksel::Quality::Custom(self.tolerance)),
+            );
         }
     }
 }
@@ -227,16 +218,6 @@ impl TextStressApp {
             AppMode::Stress => {
                 self.layer.items.reserve(self.stress_count);
 
-                // Get symbols if needed
-                let all_symbols: Vec<char> = if self.stress_content_mode == ContentMode::Symbols {
-                    iced_aksel::font::default()
-                        .characters()
-                        .filter(|c| !c.is_control())
-                        .collect()
-                } else {
-                    Vec::new()
-                };
-
                 for i in 0..self.stress_count {
                     let x = rng.random_range(0.0..bounds_x);
                     let y = rng.random_range(0.0..bounds_y);
@@ -264,13 +245,7 @@ impl TextStressApp {
                                 format!("{}", i)
                             }
                         }
-                        ContentMode::Symbols => {
-                            if all_symbols.is_empty() {
-                                "?".to_string()
-                            } else {
-                                all_symbols[i % all_symbols.len()].to_string()
-                            }
-                        }
+                        ContentMode::Symbols => SYMBOLS[i % SYMBOLS.len()].to_string(),
                     };
 
                     self.layer.items.push(TextItem {
@@ -283,16 +258,7 @@ impl TextStressApp {
                 }
             }
             AppMode::Showcase => {
-                // Get EVERY character in the font
-                let all_chars: Vec<char> = iced_aksel::font::default()
-                    .characters()
-                    .filter(|c| !c.is_control())
-                    .collect();
-
-                let count = all_chars.len();
-                if count == 0 {
-                    return;
-                }
+                let count = SYMBOLS.len();
 
                 // Calculate Grid
                 let cols = (count as f64).sqrt().ceil() as usize;
@@ -305,12 +271,12 @@ impl TextStressApp {
                 let start_x = cell_w * 0.5;
                 let start_y = bounds_y - (cell_h * 0.5); // Top down layout
 
-                for (i, &char) in all_chars.iter().enumerate() {
+                for (i, &char) in SYMBOLS.iter().enumerate() {
                     let col = i % cols;
                     let row = i / cols;
 
-                    let x = start_x + (col as f64 * cell_w);
-                    let y = start_y - (row as f64 * cell_h);
+                    let x = (col as f64).mul_add(cell_w, start_x);
+                    let y = (row as f64).mul_add(-cell_h, start_y);
 
                     self.layer.items.push(TextItem {
                         position: PlotPoint::new(x, y),

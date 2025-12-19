@@ -1,5 +1,5 @@
 use crate::render::MeshBuffer;
-use crate::render::font::GeometricFont;
+use crate::render::text::GeometricFont;
 use ab_glyph::{Font, PxScale, ScaleFont};
 use iced_core::{
     Color, Point,

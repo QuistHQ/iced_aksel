@@ -59,7 +59,7 @@ impl MeshBuffer {
         self.vertex_limit
     }
 
-    pub fn render<R>(&mut self, renderer: &mut R, clip_bounds: &Rectangle)
+    pub(crate) fn render<R>(&mut self, renderer: &mut R, clip_bounds: &Rectangle)
     where
         R: mesh::Renderer,
     {

@@ -72,7 +72,7 @@
 //! - **[`PlotData`]**: Trait for drawable data types
 //! - **[`Shape`](crate::shape)**: Primitives for rendering (lines, circles, rectangles, etc.)
 
-use std::{cell::RefCell, fmt::Debug, hash::Hash, ops::Deref};
+use std::{fmt::Debug, hash::Hash, ops::Deref};
 
 use aksel::ScreenRect;
 use derive_more::{Display, Error};
@@ -93,6 +93,7 @@ pub use aksel::{Float, Transform, scale, scale::Scale, transform, transform::Plo
 mod action;
 mod layer;
 mod measure;
+mod memory;
 mod render;
 mod state;
 mod style;
@@ -106,7 +107,6 @@ pub use axis::Axis;
 pub use measure::Measure;
 pub use plot::{Plot, PlotData};
 pub use render::Quality;
-pub use render::font;
 pub use shape::Shape;
 pub use state::State;
 pub use stroke::Stroke;
@@ -115,7 +115,10 @@ pub use style::Catalog;
 use action::Action;
 use axis::{Orientation, Position};
 use layer::Layer;
+use memory::Memory;
 use plot::DragDelta;
+
+use crate::render::text::GeometricFont;
 
 // Default value for how many pixels till a drag actually counts as a drag
 const DEFAULT_DRAG_DEADBAND: f32 = 10.0;
@@ -155,25 +158,6 @@ type AxisDoubleClickHandler<AxisId, Message> = Box<dyn Fn(AxisId, f32) -> Messag
 type AxisDragHandler<AxisId, Message> = Box<dyn Fn(AxisId, f32) -> Message>;
 type AxisHoverHandler<AxisId, Message> = Box<dyn Fn(AxisId, f32) -> Message>;
 type AxisScrollHandler<AxisId, Message> = Box<dyn Fn(AxisId, f32, ScrollDelta) -> Message>;
-
-/// Internal chart memory
-struct Memory<AxisId> {
-    action: Action<AxisId>,
-    previous_click: Option<mouse::Click>,
-    // Add the persistent tessellators here
-    tessellators: RefCell<render::Tessellator>,
-}
-
-impl<AxisId> Default for Memory<AxisId> {
-    fn default() -> Self {
-        Self {
-            action: Action::default(),
-            previous_click: None,
-            // Initialize them once. Lyon will reuse the internal Vec capacities.
-            tessellators: RefCell::new(render::Tessellator::default()),
-        }
-    }
-}
 
 /// The main charting widget that renders axes and plot data.
 ///
@@ -222,6 +206,8 @@ pub struct Chart<
     errors: Vec<Error<AxisId>>,
     drag_deadband: f32,
     padding: Padding,
+    plot_font: Option<Renderer::Font>,
+    axis_font: Option<Renderer::Font>,
 
     // Interactions
     on_error: Option<ErrorHandler<AxisId, Message>>,
@@ -267,6 +253,8 @@ where
             errors: vec![],
             drag_deadband: DEFAULT_DRAG_DEADBAND,
             padding: Padding::new(0.),
+            plot_font: None,
+            axis_font: None,
             on_error: None,
             on_click: None,
             on_double_click: None,
@@ -286,6 +274,18 @@ where
     /// Enables the debug overlay, showing vertex and index counts.
     pub const fn debug(mut self, debug: bool) -> Self {
         self.debug = debug;
+        self
+    }
+
+    /// Sets the font for the labels rendered on the Plot
+    pub fn plot_font(mut self, font: impl Into<Renderer::Font>) -> Self {
+        self.plot_font = Some(font.into());
+        self
+    }
+
+    /// Sets the font for the labels rendered on the Axes
+    pub fn axis_font(mut self, font: impl Into<Renderer::Font>) -> Self {
+        self.axis_font = Some(font.into());
         self
     }
 
@@ -812,7 +812,8 @@ where
     }
 
     fn state(&self) -> tree::State {
-        tree::State::new(Memory::<AxisId>::default())
+        let default_font = Renderer::Font::default();
+        tree::State::new(Memory::<AxisId>::new(default_font, default_font))
     }
 
     fn children(&self) -> Vec<Tree> {
@@ -907,11 +908,21 @@ where
         event: &Event,
         layout: layout::Layout<'_>,
         cursor: mouse::Cursor,
-        _renderer: &Renderer,
+        renderer: &Renderer,
         _clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
     ) {
+        let memory: &mut Memory<AxisId> = tree.state.downcast_mut();
+
+        // Make sure we update font bytes in memory upon updating the selected fonts.
+        //
+        // If no custom fonts are set - Revert back to the default font.
+        memory.update_fonts(
+            self.axis_font.unwrap_or_else(|| renderer.default_font()),
+            self.plot_font.unwrap_or_else(|| renderer.default_font()),
+        );
+
         if !self.errors.is_empty()
             && let Some(handler) = &self.on_error
         {
@@ -928,8 +939,6 @@ where
         if cursor.position_over(bounds).is_none() {
             return;
         }
-
-        let memory: &mut Memory<AxisId> = tree.state.downcast_mut();
 
         // Handle input events
         match event {
@@ -1065,6 +1074,7 @@ where
                 &plot_bounds,
                 &mut mesh_buffer,
                 &transform,
+                GeometricFont::new(&memory.plot_font_bytes).expect("Failed to create font"),
             );
             layer.items.draw(&mut plot, theme);
         }

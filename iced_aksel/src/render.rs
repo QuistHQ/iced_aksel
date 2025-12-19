@@ -1,6 +1,6 @@
 mod buffer;
-pub mod font;
 mod tessellation;
+pub mod text;
 
 pub use buffer::MeshBuffer;
 pub use tessellation::Quality;

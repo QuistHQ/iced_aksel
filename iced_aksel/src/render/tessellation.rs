@@ -5,7 +5,10 @@ pub mod text;
 
 use crate::{
     Stroke,
-    render::{MeshBuffer, font::GeometricFont},
+    render::{
+        MeshBuffer,
+        text::{GeometricFont, Text},
+    },
     stroke::StrokeStyle,
 };
 use complex::{ComplexTessellator, DashedPolyline, LyonAdapter, SolidVertexConstructor};
@@ -16,6 +19,7 @@ use lyon_tessellation::{FillOptions, StrokeOptions};
 use math::*;
 
 pub use text::Quality;
+
 /// The central driver for the rendering engine.
 ///
 /// The `Tessellator` acts as the "Brain" of the graphics pipeline. It orchestrates the
@@ -1081,26 +1085,24 @@ impl Tessellator {
     /// This is alot more CPU intensive than its `Label` counterpart, so if you need thousands
     /// of labels at the same time, you can run into lower performance.
     #[allow(clippy::too_many_arguments)]
-    pub fn draw_vector_text(
-        &mut self,
-        buffer: &mut MeshBuffer,
-        content: &str,
-        position: Point,
-        size_in_pixels: f32,
-        rotation_radians: f32,
-        color: Color,
-        font: &GeometricFont,
-        horizontal_alignment: iced_core::alignment::Horizontal,
-        vertical_alignment: iced_core::alignment::Vertical,
-        quality: Quality,
-    ) {
+    pub fn draw_vector_text(&mut self, buffer: &mut MeshBuffer, text: Text, font: &GeometricFont) {
+        let Text {
+            content,
+            position,
+            size,
+            rotation,
+            horizontal_alignment,
+            vertical_alignment,
+            fill,
+            quality,
+        } = text;
         text::draw_geometric_text(
             buffer,
             content,
             position,
-            size_in_pixels,
-            rotation_radians,
-            color,
+            size.0,
+            rotation,
+            fill,
             font,
             horizontal_alignment,
             vertical_alignment,
