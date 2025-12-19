@@ -1085,7 +1085,14 @@ impl Tessellator {
     /// This is alot more CPU intensive than its `Label` counterpart, so if you need thousands
     /// of labels at the same time, you can run into lower performance.
     #[allow(clippy::too_many_arguments)]
-    pub fn draw_vector_text(&mut self, buffer: &mut MeshBuffer, text: Text, font: &GeometricFont) {
+    // IMPORTANT: Private for a reason! The users should be forced to use `Plot::render_text`
+    // instead of using this directly!
+    pub(crate) fn draw_vector_text(
+        &self,
+        buffer: &mut MeshBuffer,
+        text: Text,
+        font: &GeometricFont,
+    ) {
         let Text {
             content,
             position,
