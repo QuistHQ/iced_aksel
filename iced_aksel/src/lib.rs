@@ -1019,15 +1019,6 @@ where
         let bounds = layout.bounds();
         let plot_bounds = self.get_plot_layout(layout).bounds();
 
-        // Fill in background
-        renderer.fill_quad(
-            Quad {
-                bounds,
-                ..Default::default()
-            },
-            Color::TRANSPARENT,
-        );
-
         // 1. Retrieve the Memory from the Tree directly
         let memory = tree.state.downcast_ref::<Memory<AxisId>>();
 
