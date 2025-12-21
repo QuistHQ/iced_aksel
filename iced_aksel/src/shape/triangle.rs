@@ -38,10 +38,13 @@ enum Geometry<D> {
     },
 }
 
+/// A triangular shape that can be filled and/or stroked.
 #[derive(Debug, Clone)]
 pub struct Triangle<D> {
     geometry: Geometry<D>,
+    /// The fill color for the triangle interior
     pub fill: Option<Color>,
+    /// The stroke style for the triangle border
     pub stroke: Option<Stroke<D>>,
 }
 

@@ -40,6 +40,9 @@ where
     AxisId: Hash + Eq + Clone,
     D: Float,
 {
+    /// Creates a new empty chart state with no axes.
+    ///
+    /// Use [`set_axis`](Self::set_axis) or [`with_axis`](Self::with_axis) to add axes.
     pub fn new() -> Self {
         Self {
             axes: IndexMap::new(),

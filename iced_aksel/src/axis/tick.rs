@@ -9,9 +9,15 @@ pub mod label;
 
 pub use label::*;
 
+/// The result returned from a tick renderer function.
+///
+/// Specifies which visual elements should be rendered for a given tick.
 pub struct TickResult {
+    /// Optional tick line mark on the axis
     pub tick_line: Option<TickLine>,
+    /// Optional grid line extending into the plot area
     pub grid_line: Option<GridLine>,
+    /// Optional text label for this tick
     pub label: Option<Label>,
 }
 
@@ -150,17 +156,25 @@ impl Default for TickLine {
     }
 }
 
-/// This is all the information you would need to define a `TickLine` properly.
+/// Context provided to tick renderer functions.
+///
+/// Contains all the information needed to render a tick appropriately.
 #[derive(Debug, Clone, Copy)]
 pub struct TickContext<D> {
+    /// The tick from the scale
     pub tick: Tick<D>,
+    /// Normalized position (0.0-1.0) along the axis
     pub normalized_position: f32,
+    /// The bounds of the axis in screen coordinates
     pub axis_bounds: Rectangle,
+    /// The domain (min, max) of the scale
     pub scale_domain: (D, D),
+    /// The orientation of the axis (horizontal or vertical)
     pub orientation: Orientation,
 }
 
 impl<D: Float> TickContext<D> {
+    /// Returns the span of the axis in screen pixels.
     pub const fn axis_span(&self) -> f32 {
         match self.orientation {
             Orientation::Horizontal => self.axis_bounds.width,
@@ -168,6 +182,7 @@ impl<D: Float> TickContext<D> {
         }
     }
 
+    /// Returns the span of the scale's domain.
     pub fn scale_span(&self) -> D {
         let (min, max) = self.scale_domain;
         min.abs_sub(max)

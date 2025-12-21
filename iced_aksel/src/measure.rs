@@ -55,8 +55,8 @@ impl<D: Float> Measure<D> {
     /// * If `Plot`, calculates the screen distance covered by the data units on the X axis.
     pub fn resolve_x(&self, transform: &Transform<D, f32, f32>) -> f32 {
         match self {
-            Measure::Screen(px) => *px,
-            Measure::Plot(units) => {
+            Self::Screen(px) => *px,
+            Self::Plot(units) => {
                 let p0 = transform.x_to_screen(&D::zero());
                 let p1 = transform.x_to_screen(units);
                 (p1 - p0).abs()
@@ -70,8 +70,8 @@ impl<D: Float> Measure<D> {
     /// * If `Plot`, calculates the screen distance covered by the data units on the Y axis.
     pub fn resolve_y(&self, transform: &Transform<D, f32, f32>) -> f32 {
         match self {
-            Measure::Screen(px) => *px,
-            Measure::Plot(units) => {
+            Self::Screen(px) => *px,
+            Self::Plot(units) => {
                 let p0 = transform.y_to_screen(&D::zero());
                 let p1 = transform.y_to_screen(units);
                 (p1 - p0).abs()

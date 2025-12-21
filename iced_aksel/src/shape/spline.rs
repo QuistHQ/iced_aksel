@@ -29,8 +29,11 @@ use iced_core::Point;
 /// ```
 #[derive(Debug, Clone)]
 pub struct Spline<D> {
+    /// The points that the curve passes through
     pub points: Vec<PlotPoint<D>>,
+    /// The stroke style (color, thickness, pattern)
     pub stroke: Option<Stroke<D>>,
+    /// The tension of the curve (0.0 = smooth, 1.0 = straight lines)
     pub tension: f32,
 }
 

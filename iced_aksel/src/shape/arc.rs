@@ -25,12 +25,19 @@ use iced_core::Color;
 /// ```
 #[derive(Debug, Clone)]
 pub struct Arc<D> {
+    /// The center point of the arc
     pub center: PlotPoint<D>,
+    /// The outer radius of the arc
     pub radius: Measure<D>,
+    /// The inner radius of the arc (0 for a pie slice)
     pub inner_radius: Measure<D>,
-    pub start_angle: f32, // Radians
-    pub end_angle: f32,   // Radians
+    /// The starting angle in radians
+    pub start_angle: f32,
+    /// The ending angle in radians
+    pub end_angle: f32,
+    /// The fill color for the arc interior
     pub fill: Option<Color>,
+    /// The stroke style for the arc border
     pub stroke: Option<Stroke<D>>,
 }
 

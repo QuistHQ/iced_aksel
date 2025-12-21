@@ -67,27 +67,37 @@ type LabelFormatter<D> = Box<dyn Fn(D) -> Option<Label>>;
 
 type LabelPolicyFn<D> = dyn for<'a> Fn(LabelDecisionContext<'a, D>) -> LabelDecision + 'static;
 
+/// Policy for determining which axis labels to render.
+///
+/// Controls label visibility and overlap detection to ensure readable axis labels.
 // Making this inaccessible to user for simplicity.
 #[derive(Derivative, Default)]
 #[derivative(Debug)]
 pub enum LabelPolicy<D> {
+    /// Render all labels without any overlap detection.
     #[default]
     All,
+    /// Skip labels that would overlap with already-placed labels.
     SkipOverlapping {
+        /// Minimum gap in pixels between labels
         min_gap: f32,
     },
+    /// Use a custom function to decide which labels to render.
     Custom(#[derivative(Debug = "ignore")] Box<LabelPolicyFn<D>>),
 }
 
 impl<D> LabelPolicy<D> {
+    /// Creates a policy that renders all labels.
     pub const fn all() -> Self {
         Self::All
     }
 
+    /// Creates a policy that skips overlapping labels with the specified minimum gap.
     pub const fn skip_overlapping(min_gap: f32) -> Self {
         Self::SkipOverlapping { min_gap }
     }
 
+    /// Creates a custom label policy using the provided function.
     pub fn custom<F>(policy: F) -> Self
     where
         F: for<'a> Fn(LabelDecisionContext<'a, D>) -> LabelDecision + 'static,

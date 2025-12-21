@@ -101,6 +101,9 @@ impl<Renderer: iced_graphics::mesh::Renderer> TextRenderer<'_, Renderer> {
     }
 }
 
+/// Internal rendering context for shapes.
+///
+/// Manages layer ordering and buffering for efficient rendering.
 pub struct Context<'a, D: Float, Renderer: self::Renderer = iced_renderer::Renderer> {
     transform: &'a Transform<'a, D, f32, f32>,
     clip_bounds: &'a iced_core::Rectangle,
@@ -117,6 +120,9 @@ impl<'a, D: Float, Renderer: self::Renderer> Context<'a, D, Renderer> {
         self.renderer.start_layer(*self.clip_bounds);
     }
 
+    /// Renders a mesh-based shape (lines, polygons, etc.).
+    ///
+    /// Used internally by shapes to add geometry to the mesh buffer.
     pub fn render_mesh<F>(&mut self, f: F)
     where
         F: FnOnce(&Transform<'a, D, f32, f32>, &mut MeshBuffer, &mut Tessellator),
@@ -130,6 +136,9 @@ impl<'a, D: Float, Renderer: self::Renderer> Context<'a, D, Renderer> {
         }
     }
 
+    /// Renders a text-based shape.
+    ///
+    /// Used internally by text shapes to render using the text renderer.
     pub fn render_text<F>(&mut self, f: F)
     where
         F: FnOnce(&Transform<'a, D, f32, f32>, &mut TextRenderer<Renderer>),

@@ -118,10 +118,16 @@ impl LabelBounds {
     }
 }
 
+/// Information about a label that has been placed on the axis.
+///
+/// Used internally for overlap detection and spacing calculations.
 #[derive(Debug, Clone)]
 pub struct PlacedLabelInfo<D> {
+    /// The tick associated with this label
     pub tick: Tick<D>,
+    /// Normalized position (0.0-1.0) along the axis
     pub normalized_position: f32,
+    /// The spatial bounds of the label
     pub bounds: LabelBounds,
 }
 
@@ -152,6 +158,9 @@ pub enum LabelDecision {
     Skip,
 }
 
+/// A candidate label that may or may not be rendered.
+///
+/// Used internally during the label rendering process.
 pub struct LabelCandidate<D> {
     pub(crate) tick: Tick<D>,
     pub(crate) normalized_position: f32,
@@ -165,6 +174,9 @@ impl<D> LabelCandidate<D> {
     }
 }
 
+/// A label candidate that has been laid out and measured.
+///
+/// Used internally during the label rendering process.
 pub struct ResolvedLabelCandidate<Renderer, D>
 where
     Renderer: text::Renderer,
@@ -176,11 +188,19 @@ where
     pub(crate) position: Point,
 }
 
+/// Context provided to custom label policy functions.
+///
+/// Contains information needed to decide whether to render a label.
 #[derive(Debug)]
 pub struct LabelDecisionContext<'a, D> {
+    /// The tick associated with this label
     pub tick: Tick<D>,
+    /// Normalized position (0.0-1.0) along the axis
     pub normalized_position: f32,
+    /// The spatial bounds of this label
     pub bounds: LabelBounds,
+    /// The orientation of the axis
     pub orientation: Orientation,
+    /// Labels that have already been accepted for rendering
     pub accepted: &'a [PlacedLabelInfo<D>],
 }

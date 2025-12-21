@@ -1,3 +1,5 @@
+//! Types for describing Stroke around a rendered object
+
 use crate::Measure;
 
 use iced_core::Color;

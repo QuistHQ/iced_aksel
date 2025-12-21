@@ -22,12 +22,19 @@ use iced_core::Point;
 /// ```
 #[derive(Debug, Clone)]
 pub struct Polyline<D> {
+    /// The points that define the polyline path
     pub points: Vec<PlotPoint<D>>,
+    /// The stroke style (color, thickness, pattern)
     pub stroke: Option<Stroke<D>>,
+    /// Whether to extend the first segment infinitely backwards
     pub extend_start: bool,
+    /// Whether to extend the last segment infinitely forwards
     pub extend_end: bool,
+    /// Whether to draw an arrowhead at the start
     pub arrow_start: bool,
+    /// Whether to draw an arrowhead at the end
     pub arrow_end: bool,
+    /// Size multiplier for arrowheads (relative to stroke width)
     pub arrow_size: f32,
 }
 
