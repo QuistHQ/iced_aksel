@@ -309,6 +309,7 @@ impl TextStressApp {
 
     fn view(&self) -> Element<'_, Message> {
         let chart = Chart::new(&self.state)
+            .debug(true)
             .plot_data(&self.layer, AXIS_X, AXIS_Y)
             .on_drag(Message::ChartDragged)
             .on_scroll(Message::ChartScrolled);
