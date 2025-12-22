@@ -78,6 +78,9 @@ fn update_font(system: &mut FontSystem, font: Font) -> Option<(FontVec, Font)> {
             stretch: attrs.stretch,
             style: attrs.style,
         })
+        // TODO: Consider changing this - It shouldnt be necessary but fixes a crash for now
+        // Looks like it has some trouble finding the right font for Dennis'pc atleast
+        .or(Some(system.db().faces().next()?.id))
         .expect("Font not found");
     let bytes = system.get_font(id, attrs.weight).expect("Font not found");
 
