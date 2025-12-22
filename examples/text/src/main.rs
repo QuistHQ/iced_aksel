@@ -2,7 +2,7 @@ use iced::{
     Color, Element, Point, Task, Theme,
     mouse::ScrollDelta,
     time::Instant,
-    widget::{Space, button, checkbox, column, radio, row, slider, text},
+    widget::{Space, button, column, radio, row, slider, text},
 };
 use iced_aksel::{
     Axis, Chart, Measure, Plot, PlotData, PlotPoint, State, axis::Position, plot::DragDelta,
@@ -70,21 +70,6 @@ impl std::fmt::Display for SizeMode {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ContentMode {
-    Labels,
-    Symbols,
-}
-
-impl std::fmt::Display for ContentMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Labels => write!(f, "Random Labels"),
-            Self::Symbols => write!(f, "Random Symbols"),
-        }
-    }
-}
-
 // -----------------------------------------------------------------------------
 // Data Layer
 // -----------------------------------------------------------------------------
@@ -92,7 +77,6 @@ impl std::fmt::Display for ContentMode {
 struct TextItem {
     position: PlotPoint,
     text: String,
-    color: Color,
     rotation: f32,
     scale_factor: f32,
 }
@@ -101,30 +85,40 @@ struct TextLayer {
     items: Vec<TextItem>,
     label_type: LabelType,
     size_mode: SizeMode,
-    base_size: f32,
-    show_labels: bool,
     tolerance: f32,
 }
 
 impl PlotData<f64> for TextLayer {
     fn draw(&self, plot: &mut Plot<f64>, _theme: &Theme) {
-        if !self.show_labels {
-            return;
-        }
+        // Hardcoded base size for consistency
+        let base_size = 24.0;
 
         for item in &self.items {
-            let size = match self.size_mode {
-                SizeMode::Screen => Measure::Screen(self.base_size * item.scale_factor),
-                SizeMode::Plot => {
-                    Measure::Plot((self.base_size / 10.0) as f64 * item.scale_factor as f64)
-                }
+            let size = match self.label_type {
+                // Native always uses Screen size (fixed px)
+                LabelType::Native => Measure::Screen(base_size * item.scale_factor),
+                // Vector respects the user selection
+                LabelType::Vector => match self.size_mode {
+                    SizeMode::Screen => Measure::Screen(base_size * item.scale_factor),
+                    SizeMode::Plot => {
+                        // FIX: Removed the division by 10.0.
+                        // Now the size directly maps to plot units (e.g. 24.0 units on 0-1000 axis)
+                        Measure::Plot(base_size as f64 * item.scale_factor as f64)
+                    }
+                },
+            };
+
+            let rotation = if self.label_type == LabelType::Native {
+                0.0
+            } else {
+                item.rotation
             };
 
             plot.add_shape(
                 VectorLabel::new(&item.text, item.position)
-                    .fill(item.color)
+                    .fill(Color::WHITE)
                     .size(size)
-                    .rotation(item.rotation)
+                    .rotation(rotation)
                     .quality(iced_aksel::Quality::Custom(self.tolerance)),
             );
         }
@@ -144,9 +138,6 @@ struct TextStressApp {
 
     // Stress Controls
     stress_count: usize,
-    stress_max_rotation: f32,
-    stress_randomize_color: bool,
-    stress_content_mode: ContentMode,
 
     // Stats
     fps: f32,
@@ -162,14 +153,9 @@ enum Message {
     // Config
     ModeChanged(AppMode),
     CountChanged(f32),
-    BaseSizeChanged(f32),
-    MaxRotationChanged(f32),
     ToleranceChanged(f32),
     TypeChanged(LabelType),
     SizeModeChanged(SizeMode),
-    ContentModeChanged(ContentMode),
-    ToggleVisibility(bool),
-    ToggleRandomColor(bool),
     Regenerate,
 }
 
@@ -184,19 +170,14 @@ impl TextStressApp {
 
         let mut app = Self {
             state,
-            mode: AppMode::Showcase, // Default to showcase to see the alphabet
+            mode: AppMode::Showcase,
             layer: TextLayer {
                 items: Vec::new(),
                 label_type: LabelType::Vector,
-                size_mode: SizeMode::Screen,
-                base_size: 16.0,
-                show_labels: true,
+                size_mode: SizeMode::Plot,
                 tolerance: 0.5,
             },
             stress_count: 1000,
-            stress_max_rotation: 360.0,
-            stress_randomize_color: true,
-            stress_content_mode: ContentMode::Symbols,
             fps: 0.0,
             last_frame: None,
         };
@@ -222,36 +203,19 @@ impl TextStressApp {
                     let x = rng.random_range(0.0..bounds_x);
                     let y = rng.random_range(0.0..bounds_y);
 
-                    let rotation = if self.stress_max_rotation > 0.0 {
-                        rng.random_range(-self.stress_max_rotation..self.stress_max_rotation)
-                            .to_radians()
-                    } else {
-                        0.0
-                    };
+                    // Random rotation for stress test
+                    let rotation = rng.random_range(0.0..360.0f32).to_radians();
 
-                    let color = if self.stress_randomize_color {
-                        Color::from_rgb(rng.random(), rng.random(), rng.random())
+                    // Simple cycling text
+                    let text = if i % 2 == 0 {
+                        "Text".to_string()
                     } else {
-                        Color::WHITE
-                    };
-
-                    let text = match self.stress_content_mode {
-                        ContentMode::Labels => {
-                            if i % 5 == 0 {
-                                format!("Label {}", i)
-                            } else if i % 5 == 1 {
-                                "Text".to_string()
-                            } else {
-                                format!("{}", i)
-                            }
-                        }
-                        ContentMode::Symbols => SYMBOLS[i % SYMBOLS.len()].to_string(),
+                        "Label".to_string()
                     };
 
                     self.layer.items.push(TextItem {
                         position: PlotPoint::new(x, y),
                         text,
-                        color,
                         rotation,
                         scale_factor: rng.random_range(0.8..1.5),
                     });
@@ -269,7 +233,7 @@ impl TextStressApp {
 
                 // Center the grid in the 0-1000 box
                 let start_x = cell_w * 0.5;
-                let start_y = bounds_y - (cell_h * 0.5); // Top down layout
+                let start_y = bounds_y - (cell_h * 0.5);
 
                 for (i, &char) in SYMBOLS.iter().enumerate() {
                     let col = i % cols;
@@ -281,9 +245,8 @@ impl TextStressApp {
                     self.layer.items.push(TextItem {
                         position: PlotPoint::new(x, y),
                         text: char.to_string(),
-                        color: Color::WHITE,
-                        rotation: 0.0,     // Fixed rotation for showcase
-                        scale_factor: 1.0, // Consistent size
+                        rotation: 0.0,
+                        scale_factor: 2.0, // Multiplier for base size
                     });
                 }
             }
@@ -325,17 +288,6 @@ impl TextStressApp {
                 }
                 Task::none()
             }
-            Message::BaseSizeChanged(s) => {
-                self.layer.base_size = s;
-                Task::none()
-            }
-            Message::MaxRotationChanged(r) => {
-                self.stress_max_rotation = r;
-                if self.mode == AppMode::Stress {
-                    self.generate();
-                }
-                Task::none()
-            }
             Message::ToleranceChanged(t) => {
                 self.layer.tolerance = t;
                 Task::none()
@@ -346,24 +298,6 @@ impl TextStressApp {
             }
             Message::SizeModeChanged(m) => {
                 self.layer.size_mode = m;
-                Task::none()
-            }
-            Message::ContentModeChanged(mode) => {
-                self.stress_content_mode = mode;
-                if self.mode == AppMode::Stress {
-                    self.generate();
-                }
-                Task::none()
-            }
-            Message::ToggleVisibility(v) => {
-                self.layer.show_labels = v;
-                Task::none()
-            }
-            Message::ToggleRandomColor(v) => {
-                self.stress_randomize_color = v;
-                if self.mode == AppMode::Stress {
-                    self.generate();
-                }
                 Task::none()
             }
             Message::Regenerate => {
@@ -389,6 +323,7 @@ impl TextStressApp {
                 .size(12)
                 .color(Color::from_rgb(0.7, 0.7, 0.7)),
             vertical_space(10),
+            // Mode Selection
             text("Mode").size(14),
             row![
                 radio(
@@ -406,7 +341,7 @@ impl TextStressApp {
             ]
             .spacing(10),
             vertical_space(15),
-            // Common Controls (Apply to both)
+            // Rendering Type
             text("Rendering").size(14),
             row![
                 radio(
@@ -425,37 +360,33 @@ impl TextStressApp {
                 .size(12),
             ]
             .spacing(10),
-            control_slider(
-                "Size",
-                self.layer.base_size,
-                100.0,
-                Message::BaseSizeChanged
-            ),
-            row![
-                radio(
-                    "Px",
-                    SizeMode::Screen,
-                    Some(self.layer.size_mode),
-                    Message::SizeModeChanged
-                )
-                .size(12),
-                radio(
-                    "Unit",
-                    SizeMode::Plot,
-                    Some(self.layer.size_mode),
-                    Message::SizeModeChanged
-                )
-                .size(12),
-            ]
-            .spacing(10),
             vertical_space(5),
         ];
 
-        // Vector Specifics
+        // --- Conditional Controls based on Label Type ---
         if self.layer.label_type == LabelType::Vector {
             controls = controls.push(
                 column![
-                    text("Level of Detail").size(12),
+                    text("Size Behavior").size(12),
+                    row![
+                        radio(
+                            "Screen (px)",
+                            SizeMode::Screen,
+                            Some(self.layer.size_mode),
+                            Message::SizeModeChanged
+                        )
+                        .size(12),
+                        radio(
+                            "Plot (units)",
+                            SizeMode::Plot,
+                            Some(self.layer.size_mode),
+                            Message::SizeModeChanged
+                        )
+                        .size(12),
+                    ]
+                    .spacing(10),
+                    vertical_space(5),
+                    text("Mesh Quality (Tolerance)").size(12),
                     row![
                         text("High").size(10),
                         slider(0.1..=5.0, self.layer.tolerance, Message::ToleranceChanged)
@@ -465,13 +396,29 @@ impl TextStressApp {
                     .spacing(5),
                     text(format!("Pixel Error: {:.1}px", self.layer.tolerance)).size(10)
                 ]
+                .spacing(5),
+            );
+        } else {
+            controls = controls.push(
+                column![
+                    text("Native Options").size(12),
+                    text("Native labels are fixed to")
+                        .size(10)
+                        .color(Color::from_rgb(0.7, 0.7, 0.7)),
+                    text("screen pixels and cannot")
+                        .size(10)
+                        .color(Color::from_rgb(0.7, 0.7, 0.7)),
+                    text("rotate or scale with zoom.")
+                        .size(10)
+                        .color(Color::from_rgb(0.7, 0.7, 0.7)),
+                ]
                 .spacing(2),
             );
         }
 
         controls = controls.push(vertical_space(15));
 
-        // Mode Specific Controls
+        // --- Conditional Controls based on App Mode ---
         match self.mode {
             AppMode::Stress => {
                 controls = controls.push(
@@ -482,39 +429,6 @@ impl TextStressApp {
                             self.stress_count as f32,
                             50000.0,
                             Message::CountChanged
-                        ),
-                        if self.layer.label_type == LabelType::Vector {
-                            control_slider(
-                                "Rotation",
-                                self.stress_max_rotation,
-                                360.0,
-                                Message::MaxRotationChanged,
-                            )
-                        } else {
-                            column![].into()
-                        },
-                        vertical_space(5),
-                        row![
-                            radio(
-                                "Labels",
-                                ContentMode::Labels,
-                                Some(self.stress_content_mode),
-                                Message::ContentModeChanged
-                            )
-                            .size(12),
-                            radio(
-                                "Symbols",
-                                ContentMode::Symbols,
-                                Some(self.stress_content_mode),
-                                Message::ContentModeChanged
-                            )
-                            .size(12),
-                        ]
-                        .spacing(5),
-                        checkbox_row(
-                            "Random Colors",
-                            self.stress_randomize_color,
-                            Message::ToggleRandomColor
                         ),
                         vertical_space(10),
                         button("Regenerate")
@@ -531,12 +445,11 @@ impl TextStressApp {
                         text("Displays all available").size(12),
                         text("glyphs in the font.").size(12),
                         vertical_space(5),
-                        text("Zoom in to inspect").size(12).style(|_| text::Style {
-                            color: Some(Color::from_rgb(0.5, 0.8, 1.0))
-                        }),
-                        text("mesh quality.").size(12).style(|_| text::Style {
-                            color: Some(Color::from_rgb(0.5, 0.8, 1.0))
-                        }),
+                        text("Zoom in to inspect quality.")
+                            .size(12)
+                            .style(|_| text::Style {
+                                color: Some(Color::from_rgb(0.5, 0.8, 1.0))
+                            }),
                     ]
                     .spacing(5),
                 );
@@ -559,16 +472,6 @@ fn control_slider(
     ]
     .spacing(2)
     .into()
-}
-
-fn checkbox_row(
-    label: &'static str,
-    value: bool,
-    msg: fn(bool) -> Message,
-) -> Element<'static, Message> {
-    row![checkbox(value).on_toggle(msg), text(label).size(14)]
-        .spacing(10)
-        .into()
 }
 
 fn vertical_space(height: u16) -> Element<'static, Message> {
