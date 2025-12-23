@@ -156,7 +156,7 @@ pub fn draw_geometric_text(
     let safe_font_size = font_size_in_pixels.max(0.001);
 
     let tessellation_tolerance = (desired_pixel_error * font_units_per_em) / safe_font_size;
-    // Define your tracking preference (1.05 = +5% spacing)
+    // Define your tracking preference (1.2 = +20% spacing)
     let spacing_multiplier = 1.2;
 
     // 3. Measure Text Dimensions for Alignment
