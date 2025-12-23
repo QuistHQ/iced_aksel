@@ -50,13 +50,11 @@ use crate::{
     style::{AxisStyle, Style},
 };
 
-mod cursor;
 mod grid;
 mod label;
 mod position;
 mod tick;
 
-pub use cursor::*;
 pub use grid::*;
 pub use label::*;
 pub use position::*;
