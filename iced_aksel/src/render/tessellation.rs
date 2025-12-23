@@ -80,6 +80,10 @@ impl Tessellator {
     pub fn quality(&self) -> f32 {
         self.quality
     }
+    
+    pub fn clear_glyph_cache(&mut self) {
+        self.glyph_cache.clear();
+    }
 
     // =========================================================================
     //  Primitives

@@ -53,6 +53,7 @@ impl<AxisId> Memory<AxisId> {
 
             self.plot_font = font;
             self.plot_font_bytes = layout;
+            self.tessellators.borrow_mut().clear_glyph_cache();
         }
 
         if self.axis_font != axis_font {
