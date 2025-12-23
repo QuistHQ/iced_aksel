@@ -655,7 +655,7 @@ impl PlotData<f64> for LineChart {
                     plot.add_shape(
                         Label::new(&series.name, PlotPoint::new(start_x + text_offset, y_pos))
                             .fill(palette.text)
-                            .size(12.0)
+                            .size(Measure::Screen(12.0))
                             .align(Horizontal::Left, Vertical::Center),
                     );
                 }

@@ -4,12 +4,12 @@ use iced::{
     time::Instant,
     widget::{Space, button, column, radio, row, slider, text},
 };
+use iced_aksel::shape::Label;
 use iced_aksel::{
     Axis, Chart, Measure, Plot, PlotData, PlotPoint, State, axis::Position, plot::DragDelta,
-    scale::Linear, shape::VectorLabel,
+    scale::Linear,
 };
 use rand::Rng;
-
 // -----------------------------------------------------------------------------
 // Constants & Types
 // -----------------------------------------------------------------------------
@@ -115,7 +115,7 @@ impl PlotData<f64> for TextLayer {
             };
 
             plot.add_shape(
-                VectorLabel::new(&item.text, item.position)
+                Label::new(&item.text, item.position)
                     .fill(Color::WHITE)
                     .size(size)
                     .rotation(rotation)

@@ -403,7 +403,7 @@ impl PlotData<f64> for StressLabels {
 
         for (base_label, &color) in self.geometry.iter().zip(self.colors.iter()) {
             let mut label = base_label.clone();
-            label = label.fill(color).size(self.font_size);
+            label = label.fill(color).size(Measure::Screen(self.font_size));
             plot.add_shape(label);
         }
     }
