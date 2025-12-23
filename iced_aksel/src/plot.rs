@@ -96,8 +96,7 @@ pub struct TextRenderer<'a, Renderer: iced_graphics::mesh::Renderer> {
 
 impl<Renderer: iced_graphics::mesh::Renderer> TextRenderer<'_, Renderer> {
     pub fn draw_text(&mut self, text: Text) {
-        self.tessellator
-            .draw_vector_text(self.buffer, text, self.font);
+        self.tessellator.draw_label(self.buffer, text, self.font);
     }
 }
 

@@ -17,8 +17,9 @@ use iced_graphics::color::pack;
 use lyon_path::{LineCap, LineJoin, Path, PathEvent, iterator::FromPolyline, traits::PathIterator};
 use lyon_tessellation::{FillOptions, StrokeOptions, VertexBuffers};
 use math::*;
+use std::collections::HashMap;
 
-pub use text::Quality;
+pub use text::{CachedGlyph, Quality};
 
 /// The central driver for the rendering engine.
 ///
@@ -35,6 +36,9 @@ pub struct Tessellator {
     /// A reusable scratch buffer for intermediate tessellation (e.g., text glyphs).
     /// Prevents re-allocating memory for every single character.
     scratch_geometry: VertexBuffers<Point, u16>,
+    /// Cache for tessellated text glyphs.
+    /// Maps GlyphID (u16) -> Geometry.
+    glyph_cache: HashMap<u16, CachedGlyph>,
     /// Global quality multiplier.
     /// * 1.0 = Standard (Default).
     /// * 0.5 = High Performance (Lower vertex count for curves).
@@ -48,6 +52,7 @@ impl Default for Tessellator {
             complex: ComplexTessellator::default(),
             manual: manual::ManualTessellator::default(),
             scratch_geometry: VertexBuffers::new(),
+            glyph_cache: HashMap::new(),
             quality: 1.0,
         }
     }
@@ -113,7 +118,7 @@ impl Tessellator {
         }
 
         if let Some(color) = fill {
-            // "Bleed fix": Overlap fill and stroke slightly to prevent sub-pixel gaps (anti-aliasing artifacts)
+            // "Bleed fix": Overlap fill and stroke slightly to prevent sub-pixel gaps (antialiasing artifacts)
             let overlap = if stroke.is_some() && width > 1.0 && height > 1.0 {
                 0.5
             } else {
@@ -795,7 +800,7 @@ impl Tessellator {
             let mut draw_in = radius_inner;
             let mut draw_out = radius_outer;
 
-            // Bleed fix for anti-aliasing
+            // Bleed fix for antialiasing
             if stroke.is_some() {
                 draw_out = (radius_outer - 0.5).max(draw_in);
                 draw_in = (radius_inner + 0.5).min(draw_out);
@@ -1091,12 +1096,7 @@ impl Tessellator {
     #[allow(clippy::too_many_arguments)]
     // IMPORTANT: Private for a reason! The users should be forced to use `Plot::render_text`
     // instead of using this directly!
-    pub(crate) fn draw_vector_text(
-        &mut self,
-        buffer: &mut MeshBuffer,
-        text: Text,
-        font: &GeometricFont,
-    ) {
+    pub(crate) fn draw_label(&mut self, buffer: &mut MeshBuffer, text: Text, font: &GeometricFont) {
         let Text {
             content,
             position,
@@ -1107,7 +1107,6 @@ impl Tessellator {
             fill,
             quality,
         } = text;
-
         text::draw_geometric_text(
             buffer,
             content,
@@ -1119,8 +1118,10 @@ impl Tessellator {
             horizontal_alignment,
             vertical_alignment,
             quality,
+            self.quality,
             &mut self.scratch_geometry,
             &mut self.complex.fill,
+            &mut self.glyph_cache,
         );
     }
 

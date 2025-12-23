@@ -13,6 +13,7 @@ use lyon::path::builder::PathBuilder;
 use lyon::tessellation::{
     BuffersBuilder, FillOptions, FillTessellator, FillVertex, FillVertexConstructor, VertexBuffers,
 };
+use std::collections::HashMap;
 use ttf_parser::OutlineBuilder;
 
 /// The rendering quality of the vector text.
@@ -57,6 +58,16 @@ impl Default for Quality {
     }
 }
 
+/// A single tessellated character cached for reuse.
+#[derive(Clone, Debug)]
+pub struct CachedGlyph {
+    /// The raw geometry of the glyph (vertices and indices).
+    pub geometry: VertexBuffers<Point, u16>,
+    /// The tolerance used to generate this geometry.
+    /// Lower value = Higher Quality.
+    pub tolerance: f32,
+}
+
 // --- Adapter to bridge ttf-parser commands to lyon commands ---
 struct LyonPathBuilder<'a>(pub &'a mut dyn PathBuilder);
 
@@ -94,8 +105,8 @@ impl FillVertexConstructor<Point> for TextVertexConstructor {
 /// This function performs the following steps:
 /// 1. Layouts the text using `ab_glyph` (kerning, advance).
 /// 2. Calculates the required tessellation tolerance based on the font size and requested quality.
-/// 3. Extracts vector paths for each character using `ttf_parser`.
-/// 4. Tessellates those paths into triangles using `lyon`.
+/// 3. Checks the cache for existing glyph geometry.
+/// 4. If missing or low-quality, extracts vector paths and tessellates them.
 /// 5. Transforms (scales, rotates, translates) the vertices to their final screen position.
 #[allow(clippy::too_many_arguments)]
 pub fn draw_geometric_text(
@@ -109,8 +120,10 @@ pub fn draw_geometric_text(
     horizontal_alignment: Horizontal,
     vertical_alignment: Vertical,
     quality: Quality,
+    quality_multiplier: f32,
     scratch_geometry: &mut VertexBuffers<Point, u16>,
     tessellator: &mut FillTessellator,
+    glyph_cache: &mut HashMap<u16, CachedGlyph>,
 ) {
     if content.is_empty() {
         return;
@@ -132,7 +145,13 @@ pub fn draw_geometric_text(
     // Lyon's tolerance is in the source coordinate system (Font Units).
     // We want the error to be fixed in Screen Pixels.
     // Formula: Tolerance_Units = (Desired_Pixel_Error * Units_Per_Em) / Font_Size_Px
-    let desired_pixel_error = quality.to_tolerance();
+
+    // Multiplier logic:
+    // > 1.0 (High Quality) -> Smaller Error
+    // < 1.0 (Low Quality)  -> Larger Error
+    let base_error = quality.to_tolerance();
+    let desired_pixel_error = base_error / quality_multiplier.max(0.1);
+
     // Safety: Clamp size to avoid division by zero for microscopic text
     let safe_font_size = font_size_in_pixels.max(0.001);
 
@@ -169,54 +188,71 @@ pub fn draw_geometric_text(
     };
 
     // 5. Tessellation Loop
-    let fill_options = FillOptions::default().with_tolerance(tessellation_tolerance);
-
     let mut cursor_x = 0.0;
     last_glyph_id = None;
+    let fill_options = FillOptions::default().with_tolerance(tessellation_tolerance);
 
     for character in content.chars() {
         let glyph_id = font_layout.glyph_id(character);
+        let glyph_index = glyph_id.0;
 
         // Apply kerning (spacing between specific pairs like 'A' and 'V')
         if let Some(last) = last_glyph_id {
             cursor_x += scaled_font.kern(last, glyph_id);
         }
 
-        // ttf-parser uses u16 ID wrapper
-        let ttf_glyph_id = ttf_parser::GlyphId(glyph_id.0);
+        // --- CACHE LOOKUP START ---
+        // We check if we have a valid cached version of this glyph.
+        // "Valid" means it exists AND its quality (tolerance) is equal or better than what we need.
+        // Note: Lower tolerance = Higher Quality.
+        let needs_update = if let Some(cached) = glyph_cache.get(&glyph_index) {
+            cached.tolerance > tessellation_tolerance + 0.0001
+        } else {
+            true
+        };
 
-        let mut path_builder = Path::builder();
-        let mut builder_adapter = LyonPathBuilder(&mut path_builder);
+        if needs_update {
+            // Cache Miss or Quality Upgrade needed: Tessellate!
+            scratch_geometry.vertices.clear();
+            scratch_geometry.indices.clear();
 
-        // Extract the vector path from the font file
-        if let Some(_) = font_geometry.outline_glyph(ttf_glyph_id, &mut builder_adapter) {
-            let path = path_builder.build();
+            let ttf_glyph_id = ttf_parser::GlyphId(glyph_index);
+            let mut path_builder = Path::builder();
+            let mut builder_adapter = LyonPathBuilder(&mut path_builder);
 
-            // Convert the curves into triangles
-            // We use the persistent scratch buffer here to avoid re-allocation
-            let _ = tessellator.tessellate_path(
-                &path,
-                &fill_options,
-                &mut BuffersBuilder::new(scratch_geometry, TextVertexConstructor),
+            if let Some(_) = font_geometry.outline_glyph(ttf_glyph_id, &mut builder_adapter) {
+                let path = path_builder.build();
+                let _ = tessellator.tessellate_path(
+                    &path,
+                    &fill_options,
+                    &mut BuffersBuilder::new(scratch_geometry, TextVertexConstructor),
+                );
+            }
+
+            // Store result in cache
+            glyph_cache.insert(
+                glyph_index,
+                CachedGlyph {
+                    geometry: scratch_geometry.clone(), // Clone the buffers into the cache
+                    tolerance: tessellation_tolerance,
+                },
             );
         }
+        // --- CACHE LOOKUP END ---
 
-        // Push the generated triangles to the main buffer immediately
-        // (This allows us to transform each character individually based on its cursor position)
-        flush_character_to_mesh(
-            buffer,
-            &scratch_geometry,
-            position,
-            rotation_radians,
-            color,
-            alignment_offset_x + cursor_x,
-            alignment_offset_y,
-            geometry_scale_factor,
-        );
-
-        // Clear for the next character (reusing the allocated capacity)
-        scratch_geometry.vertices.clear();
-        scratch_geometry.indices.clear();
+        // Retrieve from cache (it's guaranteed to be there now)
+        if let Some(cached_glyph) = glyph_cache.get(&glyph_index) {
+            flush_character_to_mesh(
+                buffer,
+                &cached_glyph.geometry,
+                position,
+                rotation_radians,
+                color,
+                alignment_offset_x + cursor_x,
+                alignment_offset_y,
+                geometry_scale_factor,
+            );
+        }
 
         cursor_x += scaled_font.h_advance(glyph_id);
         last_glyph_id = Some(glyph_id);
