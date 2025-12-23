@@ -15,7 +15,7 @@ use complex::{ComplexTessellator, DashedPolyline, LyonAdapter, SolidVertexConstr
 use iced_core::{Color, Point, Rectangle};
 use iced_graphics::color::pack;
 use lyon_path::{LineCap, LineJoin, Path, PathEvent, iterator::FromPolyline, traits::PathIterator};
-use lyon_tessellation::{FillOptions, StrokeOptions};
+use lyon_tessellation::{FillOptions, StrokeOptions, VertexBuffers};
 use math::*;
 
 pub use text::Quality;
@@ -32,6 +32,9 @@ pub use text::Quality;
 pub struct Tessellator {
     complex: ComplexTessellator,
     manual: manual::ManualTessellator,
+    /// A reusable scratch buffer for intermediate tessellation (e.g., text glyphs).
+    /// Prevents re-allocating memory for every single character.
+    scratch_geometry: VertexBuffers<Point, u16>,
     /// Global quality multiplier.
     /// * 1.0 = Standard (Default).
     /// * 0.5 = High Performance (Lower vertex count for curves).
@@ -44,6 +47,7 @@ impl Default for Tessellator {
         Self {
             complex: ComplexTessellator::default(),
             manual: manual::ManualTessellator::default(),
+            scratch_geometry: VertexBuffers::new(),
             quality: 1.0,
         }
     }
@@ -1088,7 +1092,7 @@ impl Tessellator {
     // IMPORTANT: Private for a reason! The users should be forced to use `Plot::render_text`
     // instead of using this directly!
     pub(crate) fn draw_vector_text(
-        &self,
+        &mut self,
         buffer: &mut MeshBuffer,
         text: Text,
         font: &GeometricFont,
@@ -1103,6 +1107,7 @@ impl Tessellator {
             fill,
             quality,
         } = text;
+
         text::draw_geometric_text(
             buffer,
             content,
@@ -1114,6 +1119,8 @@ impl Tessellator {
             horizontal_alignment,
             vertical_alignment,
             quality,
+            &mut self.scratch_geometry,
+            &mut self.complex.fill,
         );
     }
 

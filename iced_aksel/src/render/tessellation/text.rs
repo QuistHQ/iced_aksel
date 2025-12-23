@@ -109,6 +109,8 @@ pub fn draw_geometric_text(
     horizontal_alignment: Horizontal,
     vertical_alignment: Vertical,
     quality: Quality,
+    scratch_geometry: &mut VertexBuffers<Point, u16>,
+    tessellator: &mut FillTessellator,
 ) {
     if content.is_empty() {
         return;
@@ -167,8 +169,6 @@ pub fn draw_geometric_text(
     };
 
     // 5. Tessellation Loop
-    let mut temporary_geometry: VertexBuffers<Point, u16> = VertexBuffers::new();
-    let mut tessellator = FillTessellator::new();
     let fill_options = FillOptions::default().with_tolerance(tessellation_tolerance);
 
     let mut cursor_x = 0.0;
@@ -182,7 +182,7 @@ pub fn draw_geometric_text(
             cursor_x += scaled_font.kern(last, glyph_id);
         }
 
-        // ttf-parser uses a u16 ID wrapper
+        // ttf-parser uses u16 ID wrapper
         let ttf_glyph_id = ttf_parser::GlyphId(glyph_id.0);
 
         let mut path_builder = Path::builder();
@@ -193,10 +193,11 @@ pub fn draw_geometric_text(
             let path = path_builder.build();
 
             // Convert the curves into triangles
+            // We use the persistent scratch buffer here to avoid re-allocation
             let _ = tessellator.tessellate_path(
                 &path,
                 &fill_options,
-                &mut BuffersBuilder::new(&mut temporary_geometry, TextVertexConstructor),
+                &mut BuffersBuilder::new(scratch_geometry, TextVertexConstructor),
             );
         }
 
@@ -204,7 +205,7 @@ pub fn draw_geometric_text(
         // (This allows us to transform each character individually based on its cursor position)
         flush_character_to_mesh(
             buffer,
-            &temporary_geometry,
+            &scratch_geometry,
             position,
             rotation_radians,
             color,
@@ -213,9 +214,9 @@ pub fn draw_geometric_text(
             geometry_scale_factor,
         );
 
-        // Clear for the next character
-        temporary_geometry.vertices.clear();
-        temporary_geometry.indices.clear();
+        // Clear for the next character (reusing the allocated capacity)
+        scratch_geometry.vertices.clear();
+        scratch_geometry.indices.clear();
 
         cursor_x += scaled_font.h_advance(glyph_id);
         last_glyph_id = Some(glyph_id);
