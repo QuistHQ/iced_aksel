@@ -51,10 +51,13 @@ enum Geometry<D> {
     },
 }
 
+/// A rectangular shape that can be filled and/or stroked.
 #[derive(Debug, Clone)]
 pub struct Rectangle<D> {
     geometry: Geometry<D>,
+    /// The fill color for the rectangle interior
     pub fill: Option<Color>,
+    /// The stroke style for the rectangle border
     pub stroke: Option<Stroke<D>>,
 }
 

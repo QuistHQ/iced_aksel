@@ -123,20 +123,30 @@ const DEFAULT_DRAG_DEADBAND: f32 = 10.0;
 pub enum Error<AxisId> {
     /// Two axes with the same ID were assigned to a single layer.
     #[display("Duplicate axis id's received for a layer: {id:?}")]
-    DuplicateAxis { id: AxisId },
+    DuplicateAxis {
+        /// The id of the axis that was duplicated
+        id: AxisId,
+    },
     /// Two axes have conflicting orientations (e.g., both horizontal).
     #[display(
         "Conflicting axis orientations: {horizontal:?}({horizontal_orientation:?}) | {vertical:?}(vertical_orientation:?)"
     )]
     AxisConflict {
+        /// The ID of the horizontal axis
         horizontal: AxisId,
+        /// The orientation of the horizontal axis
         horizontal_orientation: Orientation,
+        /// The ID of the vertical axis
         vertical: AxisId,
+        /// The orientation of the vertical axis
         vertical_orientation: Orientation,
     },
     /// Referenced an axis ID that doesn't exist in the State.
     #[display("Unknown axis id: '{id:?}'")]
-    UnknownAxis { id: AxisId },
+    UnknownAxis {
+        /// The ID of the unknown axis
+        id: AxisId
+    },
 }
 
 // Plot/Chart handlers
@@ -351,6 +361,9 @@ where
         self
     }
 
+    /// Sets the padding around the chart.
+    ///
+    /// This adds space between the chart edges and its container.
     // TODO: Consider removing this. If we can make the chart show itself perfectly centered, this could
     // be handled by the user using wrapper elements in UI
     pub const fn padding(mut self, padding: Padding) -> Self {

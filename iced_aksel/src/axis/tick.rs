@@ -12,9 +12,15 @@ use iced_core::{
     text::{self, paragraph::Plain},
 };
 
+/// The result returned from a tick renderer function.
+///
+/// Specifies which visual elements should be rendered for a given tick.
 pub struct TickResult {
+    /// Optional tick line mark on the axis
     pub tick_line: Option<TickLine>,
+    /// Optional grid line extending into the plot area
     pub grid_line: Option<GridLine>,
+    /// Optional text label for this tick
     pub label: Option<Label>,
     pub label_priority: Option<u8>,
 }
@@ -164,17 +170,25 @@ impl Default for TickLine {
     }
 }
 
-/// This is all the information you would need to define a `TickLine` properly.
+/// Context provided to tick renderer functions.
+///
+/// Contains all the information needed to render a tick appropriately.
 #[derive(Debug, Clone, Copy)]
 pub struct TickContext<D> {
+    /// The tick from the scale
     pub tick: Tick<D>,
+    /// Normalized position (0.0-1.0) along the axis
     pub normalized_position: f32,
+    /// The bounds of the axis in screen coordinates
     pub axis_bounds: Rectangle,
+    /// The domain (min, max) of the scale
     pub scale_domain: (D, D),
+    /// The orientation of the axis (horizontal or vertical)
     pub orientation: Orientation,
 }
 
 impl<D: Float> TickContext<D> {
+    /// Returns the span of the axis in screen pixels.
     pub const fn axis_span(&self) -> f32 {
         match self.orientation {
             Orientation::Horizontal => self.axis_bounds.width,
@@ -182,16 +196,23 @@ impl<D: Float> TickContext<D> {
         }
     }
 
+    /// Returns the span of the scale's domain.
     pub fn scale_span(&self) -> D {
         let (min, max) = self.scale_domain;
         min.abs_sub(max)
     }
 }
 
+/// Information about a label that has been placed on the axis.
+///
+/// Used internally for overlap detection and spacing calculations.
 #[derive(Debug, Clone)]
 pub struct PlacedLabelInfo<D> {
+    /// The tick associated with this label
     pub tick: Tick<D>,
+    /// Normalized position (0.0-1.0) along the axis
     pub normalized_position: f32,
+    /// The spatial bounds of the label
     pub bounds: LabelBounds,
 }
 
@@ -222,6 +243,9 @@ pub enum LabelDecision {
     Skip,
 }
 
+/// A candidate label that may or may not be rendered.
+///
+/// Used internally during the label rendering process.
 pub struct LabelCandidate<D> {
     pub(crate) tick: Tick<D>,
     pub(crate) normalized_position: f32,
@@ -229,6 +253,9 @@ pub struct LabelCandidate<D> {
     pub(crate) priority: u8,
 }
 
+/// A label candidate that has been laid out and measured.
+///
+/// Used internally during the label rendering process.
 pub struct ResolvedLabelCandidate<Renderer, D>
 where
     Renderer: text::Renderer,
@@ -240,37 +267,56 @@ where
     pub(crate) position: Point,
 }
 
+/// Context provided to custom label policy functions.
+///
+/// Contains information needed to decide whether to render a label.
 #[derive(Debug)]
 pub struct LabelDecisionContext<'a, D> {
+    /// The tick associated with this label
     pub tick: Tick<D>,
+    /// Normalized position (0.0-1.0) along the axis
     pub normalized_position: f32,
+    /// The spatial bounds of this label
     pub bounds: LabelBounds,
+    /// The orientation of the axis
     pub orientation: Orientation,
+    /// Labels that have already been accepted for rendering
     pub accepted: &'a [PlacedLabelInfo<D>],
 }
 
 type LabelPolicyFn<D> = dyn for<'a> Fn(LabelDecisionContext<'a, D>) -> LabelDecision + 'static;
 
+/// Policy for determining which axis labels to render.
+///
+/// Controls label visibility and overlap detection to ensure readable axis labels.
+// Making this inaccessible to user for simplicity.
 #[derive(Derivative, Default)]
 #[derivative(Debug)]
 pub enum LabelPolicy<D> {
+    /// Render all labels without any overlap detection.
     #[default]
     All,
+    /// Skip labels that would overlap with already-placed labels.
     SkipOverlapping {
+        /// Minimum gap in pixels between labels
         min_gap: f32,
     },
+    /// Use a custom function to decide which labels to render.
     Custom(#[derivative(Debug = "ignore")] Box<LabelPolicyFn<D>>),
 }
 
 impl<D> LabelPolicy<D> {
+    /// Creates a policy that renders all labels.
     pub const fn all() -> Self {
         Self::All
     }
 
+    /// Creates a policy that skips overlapping labels with the specified minimum gap.
     pub const fn skip_overlapping(min_gap: f32) -> Self {
         Self::SkipOverlapping { min_gap }
     }
 
+    /// Creates a custom label policy using the provided function.
     pub fn custom<F>(policy: F) -> Self
     where
         F: for<'a> Fn(LabelDecisionContext<'a, D>) -> LabelDecision + 'static,

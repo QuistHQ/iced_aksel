@@ -42,10 +42,15 @@ use iced_core::Color;
 /// ```
 #[derive(Debug, Clone)]
 pub struct Ellipse<D> {
+    /// The center point of the ellipse
     pub center: PlotPoint<D>,
+    /// The horizontal radius
     pub radius_x: Measure<D>,
+    /// The vertical radius
     pub radius_y: Measure<D>,
+    /// The fill color for the ellipse interior
     pub fill: Option<Color>,
+    /// The stroke style for the ellipse border
     pub stroke: Option<Stroke<D>>,
 }
 

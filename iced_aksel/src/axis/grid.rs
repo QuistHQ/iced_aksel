@@ -33,6 +33,7 @@ impl Default for GridLine {
 }
 
 impl GridLine {
+    /// Creates a new grid line with the specified thickness.
     pub fn new<I: Into<Pixels>>(thickness: I) -> Self {
         Self {
             thickness: thickness.into(),

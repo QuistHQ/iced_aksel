@@ -30,11 +30,17 @@ use iced_core::{
 /// ```
 #[derive(Debug, Clone)]
 pub struct Label<D> {
+    /// The text content to display
     pub content: String,
+    /// The position in plot coordinates where the label is anchored
     pub position: PlotPoint<D>,
+    /// Horizontal alignment relative to the position
     pub horizontal_alignment: Horizontal,
+    /// Vertical alignment relative to the position
     pub vertical_alignment: Vertical,
+    /// The color of the text
     pub fill: Color,
+    /// The font size in logical pixels
     pub font_size: f32,
 }
 
