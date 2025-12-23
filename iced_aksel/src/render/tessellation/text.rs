@@ -156,6 +156,8 @@ pub fn draw_geometric_text(
     let safe_font_size = font_size_in_pixels.max(0.001);
 
     let tessellation_tolerance = (desired_pixel_error * font_units_per_em) / safe_font_size;
+    // Define your tracking preference (1.05 = +5% spacing)
+    let spacing_multiplier = 1.2;
 
     // 3. Measure Text Dimensions for Alignment
     let mut text_width = 0.0;
@@ -166,7 +168,7 @@ pub fn draw_geometric_text(
         if let Some(last) = last_glyph_id {
             text_width += scaled_font.kern(last, glyph_id);
         }
-        text_width += scaled_font.h_advance(glyph_id);
+        text_width += scaled_font.h_advance(glyph_id) * spacing_multiplier;
         last_glyph_id = Some(glyph_id);
     }
 
@@ -254,7 +256,7 @@ pub fn draw_geometric_text(
             );
         }
 
-        cursor_x += scaled_font.h_advance(glyph_id);
+        cursor_x += scaled_font.h_advance(glyph_id) * spacing_multiplier;
         last_glyph_id = Some(glyph_id);
     }
 }

@@ -8,11 +8,6 @@ use ttf_parser::Face;
 
 use crate::Quality;
 
-// Embed the Roboto Regular font into the binary.
-// This ensures the application always has a high-quality fallback font available.
-const DEFAULT_FONT_DATA: &[u8] =
-    include_bytes!("../../fonts/ibm_plex_mono/IBMPlexMono-Regular.ttf");
-
 /// A container for parsed font data, optimized for geometric rendering.
 ///
 /// This struct holds the parsed tables required to extract vector paths from a font file.
