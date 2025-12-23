@@ -74,7 +74,7 @@ impl TickResult {
     /// Sets the rendering-priority of the label
     ///
     /// 0 == Highest priority
-    pub fn label_priority(mut self, priority: u8) -> Self {
+    pub const fn label_priority(mut self, priority: u8) -> Self {
         self.label_priority = Some(priority);
         self
     }
@@ -334,23 +334,4 @@ impl<D> LabelPolicy<D> {
             Self::Custom(policy) => matches!(policy(context), LabelDecision::Render),
         }
     }
-}
-
-pub(super) fn default_tick_renderer<D: 'static>(ctx: TickContext<D>) -> TickResult {
-    let mut result = TickResult::with_tick_line(TickLine {
-        thickness: 1.0.into(),
-        length: match ctx.tick.level {
-            0 => 10.0,
-            _ => 5.0,
-        }
-        .into(),
-    });
-
-    if ctx.tick.level == 0 {
-        result = result.grid_line(GridLine {
-            thickness: 1.0.into(),
-        });
-    }
-
-    result
 }
