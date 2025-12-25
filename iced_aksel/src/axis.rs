@@ -292,7 +292,7 @@ impl<D: Float> Axis<D> {
     /// ```
     pub fn with_cursor_formatter<F>(mut self, renderer: F) -> Self
     where
-        F: Fn(D) -> Option<Label> + 'static,
+        F: FnMut(D) -> Option<Label> + 'static,
     {
         self.cursor_formatter = Some(Rc::new(RefCell::new(renderer)));
         self
