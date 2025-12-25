@@ -299,7 +299,6 @@ type LabelPolicyFn<D> = dyn for<'a> Fn(LabelDecisionContext<'a, D>) -> LabelDeci
 /// Policy for determining which axis labels to render.
 ///
 /// Controls label visibility and overlap detection to ensure readable axis labels.
-// Making this inaccessible to user for simplicity.
 #[derive(Derivative, Default)]
 #[derivative(Debug)]
 pub enum LabelPolicy<D> {
