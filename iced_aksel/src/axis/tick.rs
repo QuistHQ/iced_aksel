@@ -248,9 +248,13 @@ pub enum LabelDecision {
 ///
 /// Used internally during the label rendering process.
 pub struct LabelCandidate<D> {
+    /// The tick associated with the label
     pub tick: Tick<D>,
+    /// Normalized position (0.0-1.0) along the axis
     pub normalized_position: f32,
+    /// The label to be rendered
     pub label: Label,
+    /// Rendering-priority of the label
     pub priority: u8,
 }
 
@@ -261,10 +265,15 @@ pub struct ResolvedLabelCandidate<Renderer, D>
 where
     Renderer: text::Renderer,
 {
+    /// The tick associated with the label
     pub tick: Tick<D>,
+    /// Normalized position (0.0-1.0) along the axis
     pub normalized_position: f32,
+    /// The bounds that have been laid out for the label
     pub bounds: LabelBounds,
+    /// The Iced-paragraph to render
     pub paragraph: Plain<Renderer::Paragraph>,
+    /// The screen-position to render at
     pub position: Point,
 }
 

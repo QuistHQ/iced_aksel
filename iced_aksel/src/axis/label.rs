@@ -48,15 +48,6 @@ impl From<String> for Label {
     }
 }
 
-impl From<&String> for Label {
-    fn from(content: &String) -> Self {
-        Self {
-            content: content.clone(),
-            ..Default::default()
-        }
-    }
-}
-
 impl From<&str> for Label {
     fn from(content: &str) -> Self {
         Self {
