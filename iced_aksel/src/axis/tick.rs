@@ -22,6 +22,7 @@ pub struct TickResult {
     pub grid_line: Option<GridLine>,
     /// Optional text label for this tick
     pub label: Option<Label>,
+    /// Optional label rendering-priority
     pub label_priority: Option<u8>,
 }
 
@@ -247,10 +248,10 @@ pub enum LabelDecision {
 ///
 /// Used internally during the label rendering process.
 pub struct LabelCandidate<D> {
-    pub(crate) tick: Tick<D>,
-    pub(crate) normalized_position: f32,
-    pub(crate) label: Label,
-    pub(crate) priority: u8,
+    pub tick: Tick<D>,
+    pub normalized_position: f32,
+    pub label: Label,
+    pub priority: u8,
 }
 
 /// A label candidate that has been laid out and measured.
@@ -260,11 +261,11 @@ pub struct ResolvedLabelCandidate<Renderer, D>
 where
     Renderer: text::Renderer,
 {
-    pub(crate) tick: Tick<D>,
-    pub(crate) normalized_position: f32,
-    pub(crate) bounds: LabelBounds,
-    pub(crate) paragraph: Plain<Renderer::Paragraph>,
-    pub(crate) position: Point,
+    pub tick: Tick<D>,
+    pub normalized_position: f32,
+    pub bounds: LabelBounds,
+    pub paragraph: Plain<Renderer::Paragraph>,
+    pub position: Point,
 }
 
 /// Context provided to custom label policy functions.

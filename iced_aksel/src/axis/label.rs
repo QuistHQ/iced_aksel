@@ -31,7 +31,6 @@ pub struct Label {
 }
 
 impl Default for Label {
-    #[inline(always)]
     fn default() -> Self {
         Self {
             size: Pixels(12.0),
@@ -49,8 +48,8 @@ impl From<String> for Label {
     }
 }
 
-impl<'a> From<&'a String> for Label {
-    fn from(content: &'a String) -> Self {
+impl From<&String> for Label {
+    fn from(content: &String) -> Self {
         Self {
             content: content.clone(),
             ..Default::default()
