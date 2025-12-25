@@ -568,7 +568,7 @@ impl<D: Float> Axis<D> {
 
                 let min_bounds = text.min_bounds();
 
-                // Resize cusor rect to fit text
+                // Resize cursor rect to fit text
                 let horizontal_padding = label.padding.right + label.padding.left;
                 let vertical_padding = label.padding.top + label.padding.bottom;
                 let wanted_width = min_bounds.width + horizontal_padding;
