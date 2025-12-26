@@ -643,21 +643,15 @@ impl<D: Float> Axis<D> {
                     pos
                 }
                 Position::Left => {
-                    let pos = Point::new(
-                        bounds.x
-                            + self.label_spacing.0
-                            + label.padding.right
-                            + (cursor_rect.width / 2.0),
-                        cursor_pos.y,
-                    );
-                    cursor_rect.x = pos.x - (cursor_rect.width);
+                    let pos =
+                        Point::new(bounds.x + bounds.width - self.label_spacing.0, cursor_pos.y);
+                    cursor_rect.x = pos.x - cursor_rect.width + label.padding.right;
                     cursor_rect.y = cursor_pos.y - (cursor_rect.height / 2.0);
                     pos
                 }
                 Position::Right => {
-                    let pos =
-                        Point::new(bounds.x + bounds.width - self.label_spacing.0, cursor_pos.y);
-                    cursor_rect.x = pos.x + cursor_rect.width + label.padding.right;
+                    let pos = Point::new(bounds.x + self.label_spacing.0, cursor_pos.y);
+                    cursor_rect.x = pos.x - label.padding.left;
                     cursor_rect.y = cursor_pos.y - (cursor_rect.height / 2.0);
                     pos
                 }
@@ -667,7 +661,7 @@ impl<D: Float> Axis<D> {
                 text.as_text().with_content(text.content().to_string()),
                 position,
                 theme.label_color,
-                bounds,
+                cursor_rect,
             );
         }
 
