@@ -443,12 +443,10 @@ impl<D: Float> Axis<D> {
         let bounds = layout.bounds();
         let full_bounds = plot_bounds.union(&bounds);
         let orientation = Orientation::from(self.position());
-
+        let (&d_min, &d_max) = self.scale.domain();
         let mut label_candidates = Vec::new();
 
         // Render tick-related stuff (Axis ticks and grid)
-        let (&d_min, &d_max) = self.scale.domain();
-
         for tick in self.ticks().into_iter() {
             let pos_norm = self.normalize(&tick.value);
 
@@ -462,33 +460,40 @@ impl<D: Float> Axis<D> {
                 })
             });
 
-            if let Some(TickResult {
-                mut tick_line,
-                mut grid_line,
-                mut label,
+            // If no tick-result, we shouldn't render anything
+            let Some(TickResult {
+                tick_line,
+                grid_line,
+                label,
                 label_priority,
             }) = tick_result
+            else {
+                continue;
+            };
+
+            if self.render_grid
+                && let Some(line) = grid_line
             {
-                if self.is_visible() {
-                    if let Some(label) = label.take() {
-                        label_candidates.push(LabelCandidate {
-                            tick,
-                            normalized_position: pos_norm,
-                            label,
-                            priority: label_priority.unwrap_or(tick.level),
-                        });
-                    }
+                self.draw_grid_line(style, plot_bounds, line, mesh_buffer, pos_norm);
+            }
 
-                    if let Some(line) = tick_line.take() {
-                        self.draw_tick_line(&theme, line, &bounds, mesh_buffer, pos_norm);
-                    }
-                }
+            // We've already rendered the grid-line so if the axis is invisible we don't need to
+            // render anything else
+            if self.invisible {
+                continue;
+            }
 
-                if self.render_grid
-                    && let Some(line) = grid_line.take()
-                {
-                    self.draw_grid_line(style, plot_bounds, line, mesh_buffer, pos_norm);
-                }
+            if let Some(label) = label {
+                label_candidates.push(LabelCandidate {
+                    tick,
+                    normalized_position: pos_norm,
+                    label,
+                    priority: label_priority.unwrap_or(tick.level),
+                });
+            }
+
+            if let Some(line) = tick_line {
+                self.draw_tick_line(&theme, line, &bounds, mesh_buffer, pos_norm);
             }
         }
 
@@ -515,121 +520,167 @@ impl<D: Float> Axis<D> {
             && let Some(cursor_pos) = cursor.position_over(full_bounds)
             && let Some(cursor_renderer) = &self.cursor_formatter
         {
-            renderer.start_layer(bounds);
+            self.draw_cursor(
+                renderer,
+                cursor_pos,
+                cursor_renderer,
+                bounds,
+                plot_bounds,
+                orientation,
+                theme,
+                viewport,
+            )
+        }
+    }
 
-            let mut cursor_rect = match orientation {
-                // Create a vertical rect
-                Orientation::Horizontal => Rectangle {
+    #[allow(clippy::too_many_arguments)]
+    fn draw_cursor<Renderer>(
+        &self,
+        renderer: &mut Renderer,
+        cursor_pos: Point,
+        cursor_renderer: &Rc<RefCell<dyn FnMut(D) -> Option<Label>>>,
+        bounds: Rectangle,
+        plot_bounds: &Rectangle,
+        orientation: Orientation,
+        theme: AxisStyle,
+        viewport: &Rectangle,
+    ) where
+        Renderer: plot::Renderer,
+    {
+        let (mut cursor_rect, cursor_bounds) = match orientation {
+            // Create a vertical rect
+            Orientation::Horizontal => {
+                let cursor_rect = Rectangle {
                     x: cursor_pos.x - (theme.cursor.base_width.0 / 2.0),
                     y: bounds.y,
                     height: bounds.height,
                     width: theme.cursor.base_width.0,
-                },
-                // Create a horizontal rect
-                Orientation::Vertical => Rectangle {
+                };
+                let cursor_bounds = Rectangle {
+                    width: bounds.width.max(viewport.width),
+                    x: bounds.x.min(viewport.x),
+                    ..bounds
+                };
+                (cursor_rect, cursor_bounds)
+            }
+            // Create a horizontal rect
+            Orientation::Vertical => {
+                let cursor_rect = Rectangle {
                     x: bounds.x,
                     y: cursor_pos.y - (theme.cursor.base_width.0 / 2.0),
                     height: theme.cursor.base_width.0,
                     width: bounds.width,
-                },
-            };
-
-            if let Some(label) = {
-                let value_to_render = match orientation {
-                    Orientation::Horizontal => (cursor_pos.x - plot_bounds.x) / plot_bounds.width,
-                    Orientation::Vertical => {
-                        1.0 - ((cursor_pos.y - plot_bounds.y) / plot_bounds.height)
-                    }
                 };
-
-                self.denormalize_opt(value_to_render)
-                    .and_then(|pos| cursor_renderer.borrow_mut()(pos))
-            } {
-                // Set alignment based on axis position to keep text within bounds
-                let (align_x, align_y) = match self.position {
-                    Position::Top => (Alignment::Center, Vertical::Top),
-                    Position::Bottom => (Alignment::Center, Vertical::Bottom),
-                    Position::Left => (Alignment::Left, Vertical::Center),
-                    Position::Right => (Alignment::Right, Vertical::Center),
+                let cursor_bounds = Rectangle {
+                    height: bounds.height.max(viewport.height),
+                    y: bounds.y.min(viewport.y),
+                    ..bounds
                 };
-
-                // Render label on top of cursor position using the label_formatter.
-                let text = Plain::<Renderer::Paragraph>::new(Text {
-                    content: label.content,
-                    bounds: bounds.size(),
-                    size: label.size,
-                    line_height: LineHeight::Relative(1.0),
-                    font: renderer.default_font(),
-                    align_x,
-                    align_y,
-                    shaping: Shaping::Auto,
-                    wrapping: Wrapping::None,
-                });
-
-                let min_bounds = text.min_bounds();
-
-                // Resize cursor rect to fit text
-                let horizontal_padding = label.padding.right + label.padding.left;
-                let vertical_padding = label.padding.top + label.padding.bottom;
-                let wanted_width = min_bounds.width + horizontal_padding;
-                let wanted_height = min_bounds.height + vertical_padding;
-                cursor_rect.width = wanted_width.clamp(0.0, bounds.width);
-                cursor_rect.height = wanted_height.clamp(0.0, bounds.height);
-
-                // Position cursor label at cursor position with padding and position cursor rect
-                // properly
-                let position = match self.position {
-                    Position::Top => {
-                        let pos = Point::new(cursor_pos.x, bounds.y + self.label_spacing.0);
-                        cursor_rect.x = cursor_pos.x - (cursor_rect.width / 2.0);
-                        cursor_rect.y = pos.y - label.padding.top;
-                        pos
-                    }
-                    Position::Bottom => {
-                        let pos = Point::new(
-                            cursor_pos.x,
-                            bounds.y + bounds.height - self.label_spacing.0,
-                        );
-                        cursor_rect.x = cursor_pos.x - (cursor_rect.width / 2.0);
-                        cursor_rect.y = pos.y - cursor_rect.height + label.padding.top;
-                        pos
-                    }
-                    Position::Left => {
-                        let pos = Point::new(bounds.x + self.label_spacing.0, cursor_pos.y);
-                        cursor_rect.x = pos.x - label.padding.left;
-                        cursor_rect.y = cursor_pos.y - (cursor_rect.height / 2.0);
-                        pos
-                    }
-                    Position::Right => {
-                        let pos = Point::new(
-                            bounds.x + bounds.width - self.label_spacing.0,
-                            cursor_pos.y,
-                        );
-                        cursor_rect.x = pos.x - cursor_rect.width + label.padding.left;
-                        cursor_rect.y = cursor_pos.y - (cursor_rect.height / 2.0);
-                        pos
-                    }
-                };
-
-                renderer.fill_text(
-                    text.as_text().with_content(text.content().to_string()),
-                    position,
-                    theme.label_color,
-                    bounds,
-                );
+                (cursor_rect, cursor_bounds)
             }
+        };
 
-            let quad = Quad {
-                bounds: cursor_rect,
-                border: theme.cursor.border,
-                shadow: theme.cursor.shadow,
-                ..Default::default()
+        renderer.start_layer(cursor_bounds);
+
+        if let Some(label) = {
+            let value_to_render = match orientation {
+                Orientation::Horizontal => (cursor_pos.x - plot_bounds.x) / plot_bounds.width,
+                Orientation::Vertical => {
+                    1.0 - ((cursor_pos.y - plot_bounds.y) / plot_bounds.height)
+                }
             };
 
-            renderer.fill_quad(quad, theme.cursor.color);
+            self.denormalize_opt(value_to_render)
+                .and_then(|pos| cursor_renderer.borrow_mut()(pos))
+        } {
+            // Set alignment based on axis position to keep text within bounds
+            let (align_x, align_y) = match self.position {
+                Position::Top => (Alignment::Center, Vertical::Top),
+                Position::Bottom => (Alignment::Center, Vertical::Bottom),
+                Position::Left => (Alignment::Right, Vertical::Center),
+                Position::Right => (Alignment::Left, Vertical::Center),
+            };
 
-            renderer.end_layer();
+            // Render label on top of cursor position using the label_formatter.
+            let text = Plain::<Renderer::Paragraph>::new(Text {
+                content: label.content,
+                bounds: bounds.size(),
+                size: label.size,
+                line_height: LineHeight::Relative(1.0),
+                font: renderer.default_font(),
+                align_x,
+                align_y,
+                shaping: Shaping::Auto,
+                wrapping: Wrapping::None,
+            });
+
+            let min_bounds = text.min_bounds();
+
+            // Resize cursor rect to fit text
+            let horizontal_padding = label.padding.right + label.padding.left;
+            let vertical_padding = label.padding.top + label.padding.bottom;
+            let wanted_width = min_bounds.width + horizontal_padding;
+            let wanted_height = min_bounds.height + vertical_padding;
+            cursor_rect.width = wanted_width.clamp(0.0, bounds.width);
+            cursor_rect.height = wanted_height.clamp(0.0, bounds.height);
+
+            // Position cursor label at cursor position with padding and position cursor rect
+            // properly
+            let position = match self.position {
+                Position::Top => {
+                    let pos = Point::new(cursor_pos.x, bounds.y + self.label_spacing.0);
+                    cursor_rect.x = cursor_pos.x - (cursor_rect.width / 2.0);
+                    cursor_rect.y = pos.y - label.padding.top;
+                    pos
+                }
+                Position::Bottom => {
+                    let pos = Point::new(
+                        cursor_pos.x,
+                        bounds.y + bounds.height - self.label_spacing.0,
+                    );
+                    cursor_rect.x = cursor_pos.x - (cursor_rect.width / 2.0);
+                    cursor_rect.y = pos.y - cursor_rect.height + label.padding.bottom;
+                    pos
+                }
+                Position::Left => {
+                    let pos = Point::new(
+                        bounds.x
+                            + self.label_spacing.0
+                            + label.padding.right
+                            + (cursor_rect.width / 2.0),
+                        cursor_pos.y,
+                    );
+                    cursor_rect.x = pos.x - (cursor_rect.width);
+                    cursor_rect.y = cursor_pos.y - (cursor_rect.height / 2.0);
+                    pos
+                }
+                Position::Right => {
+                    let pos =
+                        Point::new(bounds.x + bounds.width - self.label_spacing.0, cursor_pos.y);
+                    cursor_rect.x = pos.x + cursor_rect.width + label.padding.right;
+                    cursor_rect.y = cursor_pos.y - (cursor_rect.height / 2.0);
+                    pos
+                }
+            };
+
+            renderer.fill_text(
+                text.as_text().with_content(text.content().to_string()),
+                position,
+                theme.label_color,
+                bounds,
+            );
         }
+
+        let quad = Quad {
+            bounds: cursor_rect,
+            border: theme.cursor.border,
+            shadow: theme.cursor.shadow,
+            ..Default::default()
+        };
+
+        renderer.fill_quad(quad, theme.cursor.color);
+
+        renderer.end_layer();
     }
 
     fn layout_labels<Renderer>(
