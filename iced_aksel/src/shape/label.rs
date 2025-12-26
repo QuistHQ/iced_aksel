@@ -56,7 +56,7 @@ impl<D: Float, R: plot::Renderer> Shape<D, R> for Label<D> {
 }
 
 impl<D: Float> Label<D> {
-    /// Creates a new `VectorLabel` at the given position.
+    /// Creates a new `Label` at the given position.
     ///
     /// By default, the label is black, 12px (Screen), centered, and unrotated.
     pub fn new(content: impl ToString, position: PlotPoint<D>) -> Self {
