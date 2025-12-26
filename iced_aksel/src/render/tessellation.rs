@@ -19,6 +19,7 @@ use lyon_tessellation::{FillOptions, StrokeOptions, VertexBuffers};
 use math::*;
 use std::collections::HashMap;
 
+use crate::render::tessellation::text::TextTessellationCache;
 pub use text::{CachedGlyph, Quality};
 
 /// The central driver for the rendering engine.
@@ -37,8 +38,7 @@ pub struct Tessellator {
     /// Prevents re-allocating memory for every single character.
     scratch_geometry: VertexBuffers<Point, u16>,
     /// Cache for tessellated text glyphs.
-    /// Maps GlyphID (u16) -> Geometry.
-    glyph_cache: HashMap<u16, CachedGlyph>,
+    glyph_cache: TextTessellationCache,
     /// Global quality multiplier.
     /// * 1.0 = Standard (Default).
     /// * 0.5 = High Performance (Lower vertex count for curves).
@@ -52,7 +52,7 @@ impl Default for Tessellator {
             complex: ComplexTessellator::default(),
             manual: manual::ManualTessellator::default(),
             scratch_geometry: VertexBuffers::new(),
-            glyph_cache: HashMap::new(),
+            glyph_cache: TextTessellationCache::new(),
             quality: 1.0,
         }
     }
@@ -80,7 +80,7 @@ impl Tessellator {
     pub fn quality(&self) -> f32 {
         self.quality
     }
-    
+
     pub fn clear_glyph_cache(&mut self) {
         self.glyph_cache.clear();
     }
@@ -1119,6 +1119,7 @@ impl Tessellator {
             rotation,
             fill,
             font,
+            font.id,
             horizontal_alignment,
             vertical_alignment,
             quality,

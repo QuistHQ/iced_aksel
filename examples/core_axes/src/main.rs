@@ -202,8 +202,8 @@ impl AxesExample {
         if s.show_cursor {
             axis = axis.with_cursor_formatter(|val| {
                 Some(axis::Label {
-                    content: format!("{:.1}", val),
-                    size: 10.into(),
+                    content: format!("{:.0}", val),
+                    size: 12.into(),
                     ..Default::default()
                 })
             });

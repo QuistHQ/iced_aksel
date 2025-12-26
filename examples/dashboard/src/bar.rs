@@ -247,7 +247,7 @@ impl BarChart {
                 }
 
                 if let Some(label) = labels.get(index - 1) {
-                    return result.label(label).tick_line(TickLine::default());
+                    return result.label(label.clone()).tick_line(TickLine::default());
                 }
 
                 result
