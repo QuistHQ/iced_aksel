@@ -233,7 +233,7 @@ pub fn draw_geometric_text(
                 let mut path_builder = Path::builder();
                 let mut builder_adapter = LyonPathBuilder(&mut path_builder);
 
-                if let Some(_) = font_geometry.outline_glyph(ttf_glyph_id, &mut builder_adapter) {
+                if font_geometry.outline_glyph(ttf_glyph_id, &mut builder_adapter).is_some() {
                     let path = path_builder.build();
                     let _ = tessellator.tessellate_path(
                         &path,
