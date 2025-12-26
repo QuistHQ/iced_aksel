@@ -23,8 +23,8 @@ pub struct Label<D> {
     pub horizontal_alignment: Horizontal,
     pub vertical_alignment: Vertical,
     pub fill: Color,
-    /// The rendering quality (level of detail).
     pub quality: Quality,
+    pub letter_spacing: f32,
 }
 
 impl<D: Float, R: plot::Renderer> Shape<D, R> for Label<D> {
@@ -49,6 +49,7 @@ impl<D: Float, R: plot::Renderer> Shape<D, R> for Label<D> {
                 vertical_alignment: self.vertical_alignment,
                 fill: self.fill,
                 quality: self.quality,
+                letter_spacing: self.letter_spacing,
             });
         });
     }
@@ -68,6 +69,7 @@ impl<D: Float> Label<D> {
             vertical_alignment: Vertical::Center,
             fill: Color::BLACK,
             quality: Quality::default(), // Defaults to Medium
+            letter_spacing: 1.2,
         }
     }
 

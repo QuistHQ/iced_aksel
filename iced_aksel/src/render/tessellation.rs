@@ -1097,9 +1097,9 @@ impl Tessellator {
     ///
     /// This is alot more CPU intensive than its `Label` counterpart, so if you need thousands
     /// of labels at the same time, you can run into lower performance.
-    #[allow(clippy::too_many_arguments)]
     // IMPORTANT: Private for a reason! The users should be forced to use `Plot::render_text`
     // instead of using this directly!
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn draw_label(&mut self, buffer: &mut MeshBuffer, text: Text, font: &GeometricFont) {
         let Text {
             content,
@@ -1110,6 +1110,7 @@ impl Tessellator {
             vertical_alignment,
             fill,
             quality,
+            letter_spacing,
         } = text;
         text::draw_geometric_text(
             buffer,
@@ -1124,6 +1125,7 @@ impl Tessellator {
             vertical_alignment,
             quality,
             self.quality,
+            letter_spacing, // <--- PASS
             &mut self.scratch_geometry,
             &mut self.complex.fill,
             &mut self.glyph_cache,

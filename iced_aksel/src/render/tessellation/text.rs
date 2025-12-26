@@ -133,6 +133,7 @@ pub fn draw_geometric_text(
     vertical_alignment: Vertical,
     quality: Quality,
     quality_multiplier: f32,
+    letter_spacing: f32,
     scratch_geometry: &mut VertexBuffers<Point, u16>,
     tessellator: &mut FillTessellator,
     glyph_cache: &mut TextTessellationCache,
@@ -144,113 +145,134 @@ pub fn draw_geometric_text(
     let font_layout = &font.layout;
     let font_geometry = &font.geometry;
 
+    // 1. Setup Metrics & Scaling
     let pixel_scale = PxScale::from(font_size_in_pixels);
     let scaled_font = font_layout.as_scaled(pixel_scale);
+
     let font_units_per_em = font_geometry.units_per_em() as f32;
     let geometry_scale_factor = font_size_in_pixels / font_units_per_em;
 
+    // Quality Settings
     let base_error = quality.to_tolerance();
     let desired_pixel_error = base_error / quality_multiplier.max(0.1);
     let safe_font_size = font_size_in_pixels.max(0.001);
-
     let tessellation_tolerance = (desired_pixel_error * font_units_per_em) / safe_font_size;
-    let spacing_multiplier = 1.2;
-
-    let mut text_width = 0.0;
-    let mut last_glyph_id = None;
-
-    for character in content.chars() {
-        let glyph_id = font_layout.glyph_id(character);
-        if let Some(last) = last_glyph_id {
-            text_width += scaled_font.kern(last, glyph_id);
-        }
-        text_width += scaled_font.h_advance(glyph_id) * spacing_multiplier;
-        last_glyph_id = Some(glyph_id);
-    }
-
-    let ascent = scaled_font.ascent();
-    let descent = scaled_font.descent();
-    let text_height = ascent - descent;
-
-    let alignment_offset_x = match horizontal_alignment {
-        Horizontal::Left => 0.0,
-        Horizontal::Center => -text_width / 2.0,
-        Horizontal::Right => -text_width,
-    };
-
-    let alignment_offset_y = match vertical_alignment {
-        Vertical::Top => ascent,
-        Vertical::Center => ascent - (text_height / 2.0),
-        Vertical::Bottom => descent,
-    };
-
-    let mut cursor_x = 0.0;
-    last_glyph_id = None;
     let fill_options = FillOptions::default().with_tolerance(tessellation_tolerance);
 
-    for character in content.chars() {
-        let glyph_id = font_layout.glyph_id(character);
-        let glyph_index = glyph_id.0;
+    // Layout Metrics
+    let ascent = scaled_font.ascent();
+    let descent = scaled_font.descent();
+    let line_gap = scaled_font.line_gap();
+    let line_height = ascent - descent + line_gap;
 
-        let cache_key = CacheKey {
-            font_id,
-            glyph_id: glyph_index,
-        };
+    // --- CORRECTION 1: Removed 1.2 spacing multiplier ---
+    // We trust the font designer's metrics 1:1.
+    // If the user wants wider spacing, that should be a `letter_spacing` argument in the future.
 
-        if let Some(last) = last_glyph_id {
-            cursor_x += scaled_font.kern(last, glyph_id);
+    // 2. Layout Phase: Measure lines
+    let lines: Vec<&str> = content.lines().collect();
+    let line_count = lines.len() as f32;
+    let total_block_height = line_height * line_count;
+
+    let mut current_y = match vertical_alignment {
+        Vertical::Top => ascent,
+        Vertical::Center => ascent - (total_block_height / 2.0) + (line_height / 2.0),
+        Vertical::Bottom => ascent - total_block_height + line_height,
+    };
+
+    // 3. Render Phase
+    for line_text in lines {
+        // Measure line width
+        let mut line_width = 0.0;
+        let mut last_glyph_id = None;
+
+        for character in line_text.chars() {
+            let glyph_id = font_layout.glyph_id(character);
+            if let Some(last) = last_glyph_id {
+                line_width += scaled_font.kern(last, glyph_id);
+            }
+            line_width += scaled_font.h_advance(glyph_id) * letter_spacing;
+            last_glyph_id = Some(glyph_id);
         }
 
-        let needs_update = if let Some(cached) = glyph_cache.get(cache_key) {
-            cached.tolerance > tessellation_tolerance + 0.0001
-        } else {
-            true
+        let alignment_offset_x = match horizontal_alignment {
+            Horizontal::Left => 0.0,
+            Horizontal::Center => -line_width / 2.0,
+            Horizontal::Right => -line_width,
         };
 
-        if needs_update {
-            scratch_geometry.vertices.clear();
-            scratch_geometry.indices.clear();
+        let mut cursor_x = 0.0;
+        last_glyph_id = None;
 
-            let ttf_glyph_id = ttf_parser::GlyphId(glyph_index);
-            let mut path_builder = Path::builder();
-            let mut builder_adapter = LyonPathBuilder(&mut path_builder);
+        for character in line_text.chars() {
+            let glyph_id = font_layout.glyph_id(character);
+            let glyph_index = glyph_id.0;
 
-            if let Some(_) = font_geometry.outline_glyph(ttf_glyph_id, &mut builder_adapter) {
-                let path = path_builder.build();
-                let _ = tessellator.tessellate_path(
-                    &path,
-                    &fill_options,
-                    &mut BuffersBuilder::new(scratch_geometry, TextVertexConstructor),
+            let cache_key = CacheKey {
+                font_id,
+                glyph_id: glyph_index,
+            };
+
+            // Apply Kerning (Spacing adjustment between pairs)
+            if let Some(last) = last_glyph_id {
+                cursor_x += scaled_font.kern(last, glyph_id);
+            }
+
+            // --- Cache & Tessellation Logic ---
+            let needs_update = if let Some(cached) = glyph_cache.get(cache_key) {
+                cached.tolerance > tessellation_tolerance + 0.0001
+            } else {
+                true
+            };
+
+            if needs_update {
+                scratch_geometry.vertices.clear();
+                scratch_geometry.indices.clear();
+
+                let ttf_glyph_id = ttf_parser::GlyphId(glyph_index);
+                let mut path_builder = Path::builder();
+                let mut builder_adapter = LyonPathBuilder(&mut path_builder);
+
+                if let Some(_) = font_geometry.outline_glyph(ttf_glyph_id, &mut builder_adapter) {
+                    let path = path_builder.build();
+                    let _ = tessellator.tessellate_path(
+                        &path,
+                        &fill_options,
+                        &mut BuffersBuilder::new(scratch_geometry, TextVertexConstructor),
+                    );
+                }
+
+                glyph_cache.insert(
+                    cache_key,
+                    CachedGlyph {
+                        geometry: scratch_geometry.clone(),
+                        tolerance: tessellation_tolerance,
+                    },
                 );
             }
 
-            glyph_cache.insert(
-                cache_key,
-                CachedGlyph {
-                    geometry: scratch_geometry.clone(),
-                    tolerance: tessellation_tolerance,
-                },
-            );
+            if let Some(cached_glyph) = glyph_cache.get(cache_key) {
+                flush_character_to_mesh(
+                    buffer,
+                    &cached_glyph.geometry,
+                    position,
+                    rotation_radians,
+                    color,
+                    alignment_offset_x + cursor_x,
+                    current_y,
+                    geometry_scale_factor,
+                );
+            }
+
+            // Advance Cursor
+            // --- CORRECTION 2: Use raw h_advance without multipliers ---
+            cursor_x += scaled_font.h_advance(glyph_id) * letter_spacing;
+            last_glyph_id = Some(glyph_id);
         }
 
-        if let Some(cached_glyph) = glyph_cache.get(cache_key) {
-            flush_character_to_mesh(
-                buffer,
-                &cached_glyph.geometry,
-                position,
-                rotation_radians,
-                color,
-                alignment_offset_x + cursor_x,
-                alignment_offset_y,
-                geometry_scale_factor,
-            );
-        }
-
-        cursor_x += scaled_font.h_advance(glyph_id) * spacing_multiplier;
-        last_glyph_id = Some(glyph_id);
+        current_y += line_height;
     }
 }
-
 fn flush_character_to_mesh(
     target_buffer: &mut MeshBuffer,
     source_geometry: &VertexBuffers<Point, u16>,
