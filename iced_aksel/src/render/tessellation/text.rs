@@ -51,7 +51,7 @@ pub struct CachedGlyph {
 
 /// Uniquely identifies a specific glyph's geometry across different fonts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct CacheKey {
+pub(crate) struct CacheKey {
     pub font_id: usize,
     pub glyph_id: u16,
 }
