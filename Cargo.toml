@@ -13,10 +13,10 @@ readme = "README.md"
 keywords = ["iced", "chart", "canvas"]
 categories = ["gui"]
 exclude = [
-"flake.nix",
-"flake.lock",
-".github/*",
-"examples/*"
+    "flake.nix",
+    "flake.lock",
+    ".github/*",
+    "examples/*"
 ]
 
 [workspace.lints.clippy]
@@ -31,7 +31,7 @@ nursery = { level = "deny", priority = -1 }
 aksel = "0.2"
 chrono = "0.4"
 cpal = "0.16.0"
-derive_more = { version = "2.0", features = ["from", "error", "display", "into"]}
+derive_more = { version = "2.0", features = ["from", "error", "display", "into"] }
 derivative = "2.2"
 iced = "0.14.0"
 iced_core = "0.14.0"
@@ -48,3 +48,4 @@ strum_macros = "0.27"
 earcutr = "0.4"
 ab_glyph = "0.2"
 ttf-parser = "0.20"
+lru = "0.16.2"

@@ -102,7 +102,7 @@ mod measure;
 mod memory;
 mod render;
 mod state;
-// Export style module so users can define custom themes
+
 pub mod style;
 
 pub mod axis;

@@ -13,7 +13,9 @@ use lyon::path::builder::PathBuilder;
 use lyon::tessellation::{
     BuffersBuilder, FillOptions, FillTessellator, FillVertex, FillVertexConstructor, VertexBuffers,
 };
-use std::collections::HashMap;
+// CHANGED: Removed HashMap, added lru dependencies
+use lru::LruCache;
+use std::num::NonZeroUsize;
 use ttf_parser::OutlineBuilder;
 
 /// The rendering quality of the vector text.
@@ -56,28 +58,34 @@ pub(crate) struct CacheKey {
     pub glyph_id: u16,
 }
 
-/// A safe wrapper around the glyph cache to enforce correct keying.
+// CHANGED: Defined a capacity for the cache
+const CACHE_CAPACITY: usize = 2000;
+
+/// A safe wrapper around the glyph cache to enforce correct keying and memory limits.
 pub struct TextTessellationCache {
-    map: HashMap<CacheKey, CachedGlyph>,
+    // CHANGED: Wrapped in LruCache instead of HashMap
+    cache: LruCache<CacheKey, CachedGlyph>,
 }
 
 impl TextTessellationCache {
     pub fn new() -> Self {
         Self {
-            map: HashMap::new(),
+            // CHANGED: Initialize LRU with strict capacity
+            cache: LruCache::new(NonZeroUsize::new(CACHE_CAPACITY).unwrap()),
         }
     }
 
-    pub fn get(&self, key: CacheKey) -> Option<&CachedGlyph> {
-        self.map.get(&key)
+    // CHANGED: 'get' is now mutable to allow LRU to update usage history
+    pub fn get(&mut self, key: CacheKey) -> Option<&CachedGlyph> {
+        self.cache.get(&key)
     }
 
     pub fn insert(&mut self, key: CacheKey, glyph: CachedGlyph) {
-        self.map.insert(key, glyph);
+        self.cache.put(key, glyph);
     }
 
     pub fn clear(&mut self) {
-        self.map.clear();
+        self.cache.clear();
     }
 }
 
@@ -165,10 +173,6 @@ pub fn draw_geometric_text(
     let line_gap = scaled_font.line_gap();
     let line_height = ascent - descent + line_gap;
 
-    // --- CORRECTION 1: Removed 1.2 spacing multiplier ---
-    // We trust the font designer's metrics 1:1.
-    // If the user wants wider spacing, that should be a `letter_spacing` argument in the future.
-
     // 2. Layout Phase: Measure lines
     let lines: Vec<&str> = content.lines().collect();
     let line_count = lines.len() as f32;
@@ -219,6 +223,8 @@ pub fn draw_geometric_text(
             }
 
             // --- Cache & Tessellation Logic ---
+            // Note: .get() now requires mutable access, but the borrow checker is fine
+            // because the scope of 'cached' ends before we potentially call .insert()
             let needs_update = if let Some(cached) = glyph_cache.get(cache_key) {
                 cached.tolerance > tessellation_tolerance + 0.0001
             } else {
@@ -233,7 +239,10 @@ pub fn draw_geometric_text(
                 let mut path_builder = Path::builder();
                 let mut builder_adapter = LyonPathBuilder(&mut path_builder);
 
-                if font_geometry.outline_glyph(ttf_glyph_id, &mut builder_adapter).is_some() {
+                if font_geometry
+                    .outline_glyph(ttf_glyph_id, &mut builder_adapter)
+                    .is_some()
+                {
                     let path = path_builder.build();
                     let _ = tessellator.tessellate_path(
                         &path,
@@ -251,6 +260,7 @@ pub fn draw_geometric_text(
                 );
             }
 
+            // We retrieve the item again (marking it as recently used in the LRU)
             if let Some(cached_glyph) = glyph_cache.get(cache_key) {
                 flush_character_to_mesh(
                     buffer,
@@ -265,7 +275,6 @@ pub fn draw_geometric_text(
             }
 
             // Advance Cursor
-            // --- CORRECTION 2: Use raw h_advance without multipliers ---
             cursor_x += scaled_font.h_advance(glyph_id) * letter_spacing;
             last_glyph_id = Some(glyph_id);
         }
@@ -273,6 +282,7 @@ pub fn draw_geometric_text(
         current_y += line_height;
     }
 }
+
 fn flush_character_to_mesh(
     target_buffer: &mut MeshBuffer,
     source_geometry: &VertexBuffers<Point, u16>,
