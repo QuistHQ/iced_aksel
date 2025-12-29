@@ -157,6 +157,7 @@ fn setup_engineering_axes() -> State<&'static str, f64> {
                 }),
                 grid_line: Some(GridLine {
                     thickness: 1.0.into(),
+                    dashed: false,
                 }),
                 label: Some(format!("{:.1}", ctx.tick.value)),
                 ..Default::default()
@@ -169,6 +170,7 @@ fn setup_engineering_axes() -> State<&'static str, f64> {
                 }),
                 grid_line: Some(GridLine {
                     thickness: 0.5.into(),
+                    dashed: false,
                 }),
                 label: None,
                 ..Default::default()
@@ -219,6 +221,7 @@ fn setup_custom_axes() -> State<&'static str, f64> {
                 TickResult {
                     grid_line: Some(GridLine {
                         thickness: if is_major { 1.0.into() } else { 0.0.into() },
+                        dashed: false,
                     }),
                     tick_line: Some(TickLine {
                         thickness: 1.0.into(),
