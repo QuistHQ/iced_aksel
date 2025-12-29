@@ -119,6 +119,7 @@ pub use state::State;
 pub use stroke::Stroke;
 pub use style::Catalog;
 
+use crate::render::text::GeometricFont;
 use action::Action;
 use axis::{Orientation, Position};
 use layer::Layer;
@@ -221,8 +222,6 @@ pub struct Chart<
     errors: Vec<Error<AxisId>>,
     drag_deadband: f32,
     padding: Padding,
-    plot_font: Option<Renderer::Font>,
-    axis_font: Option<Renderer::Font>,
 
     // Interaction Handlers
     on_error: Option<ErrorHandler<AxisId, Message>>,
@@ -838,14 +837,6 @@ where
         _viewport: &Rectangle,
     ) {
         let memory: &mut Memory<AxisId> = tree.state.downcast_mut();
-
-        // Make sure we update font bytes in memory upon updating the selected fonts.
-        //
-        // If no custom fonts are set - Revert back to the default font.
-        memory.update_fonts(
-            self.axis_font.unwrap_or_else(|| renderer.default_font()),
-            self.plot_font.unwrap_or_else(|| renderer.default_font()),
-        );
 
         if !self.errors.is_empty()
             && let Some(handler) = &self.on_error
