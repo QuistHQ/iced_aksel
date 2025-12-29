@@ -1,8 +1,8 @@
 use iced::{
-    Alignment, Color, Element, Point, Subscription, Task, Theme,
+    Color, Element, Point, Subscription, Task, Theme,
     mouse::ScrollDelta,
     time::Instant,
-    widget::{button, checkbox, column, radio, row, slider, text},
+    widget::{column, row, slider, text},
 };
 use iced_aksel::{
     Axis, Chart, Measure, Plot, PlotData, PlotPoint, Quality, State, axis::Position,
@@ -36,21 +36,10 @@ struct TextExample {
     state: State<&'static str, f64>,
     layer: TextLayer,
 
-    // Config
-    mode: AppMode,
-    stress_count: usize,
-    global_quality: f32,
-
-    // Stats
+    // Performance & Config
     fps: f32,
     last_frame: Option<Instant>,
-    frame_times: Vec<f32>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum AppMode {
-    Showcase,
-    Stress,
+    global_quality: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -58,16 +47,13 @@ enum Message {
     Tick(Instant),
     ChartDragged(DragDelta),
     ChartScrolled(Point, ScrollDelta),
-
-    // Config
-    ModeChanged(AppMode),
     QualityChanged(f32),
-    RegenerateStress,
 }
 
 impl TextExample {
     fn new() -> (Self, Task<Message>) {
         let mut state = State::new();
+        // Setup a nice coordinate system
         state.set_axis(
             AXIS_X,
             Axis::new(Linear::new(-10.0, 110.0), Position::Bottom),
@@ -77,12 +63,9 @@ impl TextExample {
         let mut app = Self {
             state,
             layer: TextLayer { labels: Vec::new() },
-            mode: AppMode::Showcase,
-            stress_count: 2500,
-            global_quality: 1.0,
             fps: 0.0,
             last_frame: None,
-            frame_times: Vec::with_capacity(60),
+            global_quality: 1.0, // Default Standard Quality
         };
 
         app.generate_showcase();
@@ -93,72 +76,54 @@ impl TextExample {
     fn generate_showcase(&mut self) {
         self.layer.labels.clear();
 
-        // 1. Measure::Screen (UI Style)
-        // Stays 24px regardless of zoom
+        // 1. Screen-Space Label (UI Style)
+        // Stays 24px tall regardless of zoom level. Good for annotations.
         self.layer.labels.push(
-            Label::new("Screen Size (24px)", PlotPoint::new(10.0, 90.0))
+            Label::new("Screen Fixed (24px)", PlotPoint::new(10.0, 90.0))
                 .size(Measure::Screen(24.0))
                 .fill(Color::from_rgb(0.2, 0.4, 0.8)),
         );
 
-        // 2. Measure::Plot (World Style)
-        // Stays 5 units tall (zooms with chart)
+        // 2. Plot-Space Label (World Style)
+        // Stays 5 units tall. Zooms in/out with the chart. Good for measurements.
         self.layer.labels.push(
-            Label::new("Plot Size (5 Units)", PlotPoint::new(10.0, 70.0))
+            Label::new("World Fixed (5 Units)", PlotPoint::new(10.0, 70.0))
                 .size(Measure::Plot(5.0))
                 .fill(Color::from_rgb(0.8, 0.2, 0.2)),
         );
 
-        // 3. Rotation
+        // 3. Rotation Showcase
         self.layer.labels.push(
-            Label::new("Rotated (45°)", PlotPoint::new(60.0, 70.0))
+            Label::new("Rotated 45°", PlotPoint::new(60.0, 70.0))
                 .size(Measure::Screen(20.0))
                 .rotation(45.0f32.to_radians())
                 .fill(Color::from_rgb(0.2, 0.8, 0.2)),
         );
 
-        // 4. Upside Down (Rotation + Alignment)
+        // 4. Alignment & Upside Down
         self.layer.labels.push(
-            Label::new("Upside Down", PlotPoint::new(60.0, 50.0))
+            Label::new("Upside Down / Centered", PlotPoint::new(60.0, 50.0))
                 .size(Measure::Screen(20.0))
                 .rotation(180.0f32.to_radians())
                 .fill(Color::from_rgb(0.5, 0.5, 0.5)),
         );
 
-        // 5. Quality Override
+        // 5. High Quality Override
+        // This label forces 'High' quality regardless of zoom, useful for large headers.
         self.layer.labels.push(
             Label::new("Forced High Quality", PlotPoint::new(10.0, 30.0))
-                .size(Measure::Plot(8.0)) // Big text to show curves
+                .size(Measure::Plot(8.0))
                 .quality(Quality::High)
                 .fill(Color::BLACK),
         );
 
+        // 6. Tiny Detail
+        // Zoom in here to test the LOD bucketing!
         self.layer.labels.push(
-            Label::new("Tiny Text (Zoom In)", PlotPoint::new(10.0, 10.0))
-                .size(Measure::Plot(0.5))
+            Label::new("Zoom In To Read Me", PlotPoint::new(10.0, 10.0))
+                .size(Measure::Plot(0.5)) // Very small
                 .fill(Color::BLACK),
         );
-    }
-
-    fn generate_stress(&mut self) {
-        self.layer.labels.clear();
-        let side = (self.stress_count as f64).sqrt().ceil() as usize;
-        let step = 100.0 / side as f64;
-
-        for x in 0..side {
-            for y in 0..side {
-                let px = x as f64 * step;
-                let py = y as f64 * step;
-
-                self.layer.labels.push(
-                    Label::new(format!("{}-{}", x, y), PlotPoint::new(px, py))
-                        .size(Measure::Screen(10.0))
-                        .fill(Color::from_rgba(0.0, 0.0, 0.0, 0.6))
-                        // Optimization: Low quality for small bulk labels
-                        .quality(Quality::Low),
-                );
-            }
-        }
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
@@ -169,10 +134,6 @@ impl TextExample {
                     if delta > 0.0 {
                         let instant_fps = 1.0 / delta;
                         self.fps = self.fps * 0.9 + instant_fps * 0.1;
-                        self.frame_times.push(delta * 1000.0);
-                        if self.frame_times.len() > 60 {
-                            self.frame_times.remove(0);
-                        }
                     }
                 }
                 self.last_frame = Some(now);
@@ -189,72 +150,46 @@ impl TextExample {
                 }
                 Task::none()
             }
-            Message::ModeChanged(mode) => {
-                self.mode = mode;
-                match self.mode {
-                    AppMode::Showcase => self.generate_showcase(),
-                    AppMode::Stress => self.generate_stress(),
-                }
-                Task::none()
-            }
             Message::QualityChanged(q) => {
                 self.global_quality = q;
-                Task::none()
-            }
-            Message::RegenerateStress => {
-                if self.mode == AppMode::Stress {
-                    self.generate_stress();
-                }
                 Task::none()
             }
         }
     }
 
     fn view(&self) -> Element<'_, Message> {
-        // NOTE: We assume Chart now accepts .quality(f32) based on the backend changes.
-        // If the Chart widget definition hasn't been updated yet, this method call might need
-        // to be added to iced_aksel/src/chart.rs.
         let chart = Chart::new(&self.state)
-            .debug(true)
+            .debug(true) // Shows the tile boundaries
+            .quality(self.global_quality)
             .plot_data(&self.layer, AXIS_X, AXIS_Y)
             .on_drag(Message::ChartDragged)
             .on_scroll(Message::ChartScrolled);
 
         let sidebar = column![
-            text("Text Engine").size(20),
+            text("Text Engine").size(24),
+            // Performance Stats
             text(format!("FPS: {:.0}", self.fps))
                 .size(16)
                 .color(Color::from_rgb(0.0, 0.8, 0.0)),
-            text(format!("Labels: {}", self.layer.labels.len())).size(12),
-            text("Mode").size(14),
-            row![
-                radio(
-                    "Showcase",
-                    AppMode::Showcase,
-                    Some(self.mode),
-                    Message::ModeChanged
-                ),
-                radio(
-                    "Stress",
-                    AppMode::Stress,
-                    Some(self.mode),
-                    Message::ModeChanged
-                ),
-            ]
-            .spacing(10),
-            text("Global Quality").size(14),
-            text(format!("Multiplier: {:.1}x", self.global_quality)).size(12),
+            text("Global Quality").size(16),
+            text(format!("Multiplier: {:.2}x", self.global_quality)).size(12),
+            // Quality Control Slider
             slider(0.1..=3.0, self.global_quality, Message::QualityChanged).step(0.1),
-            text("Lower = Faster/Blockier")
+            text("Lower (0.1) = Fast / Blocky")
                 .size(10)
-                .color(Color::from_rgb(0.6, 0.6, 0.6)),
-            text("Higher = Smoother/Slower")
+                .color(Color::from_rgb(0.5, 0.5, 0.5)),
+            text("Higher (3.0) = Slow / Smooth")
                 .size(10)
-                .color(Color::from_rgb(0.6, 0.6, 0.6)),
+                .color(Color::from_rgb(0.5, 0.5, 0.5)),
+            text("Instructions:").size(14),
+            text("• Drag to Pan").size(12),
+            text("• Scroll to Zoom").size(12),
+            text("• Observe 'Zoom In To Read Me'").size(12),
+            text("  as it sharpens on zoom.").size(12),
         ]
         .spacing(15)
-        .padding(10)
-        .width(200);
+        .padding(20)
+        .width(250);
 
         row![chart, sidebar].into()
     }

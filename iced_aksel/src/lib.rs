@@ -222,7 +222,7 @@ pub struct Chart<
     errors: Vec<Error<AxisId>>,
     drag_deadband: f32,
     padding: Padding,
-
+    quality: f32,
     // Interaction Handlers
     on_error: Option<ErrorHandler<AxisId, Message>>,
 
@@ -266,7 +266,7 @@ where
             errors: vec![],
             drag_deadband: DEFAULT_DRAG_DEADBAND,
             padding: Padding::new(0.),
-
+            quality: 1.0,
             // Handlers default to None
             on_error: None,
             on_click: None,
@@ -296,6 +296,17 @@ where
     /// vertex and index counts in the corner of the chart.
     pub const fn debug(mut self, debug: bool) -> Self {
         self.debug = debug;
+        self
+    }
+
+    /// Sets the global rendering quality multiplier.
+    ///
+    /// Controls the Level of Detail (LOD) for curves and text.
+    /// * `1.0`: Standard quality (Default).
+    /// * `< 1.0`: Lower quality, higher performance.
+    /// * `> 1.0`: Higher quality, smoother curves.
+    pub const fn quality(mut self, quality: f32) -> Self {
+        self.quality = quality;
         self
     }
 
@@ -935,6 +946,9 @@ where
 
         // Reuse tessellators from memory to avoid re-allocating them every frame
         let mut tessellators = memory.tessellators.borrow_mut();
+
+        // Pass the global quality setting to the tessellator
+        tessellators.set_quality(self.quality);
 
         // Create a new mesh buffer for this frame
         let mut mesh_buffer = render::MeshBuffer::new(100_000);

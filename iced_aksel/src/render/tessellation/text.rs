@@ -7,7 +7,7 @@ use iced_core::{
 };
 use iced_graphics::color::pack;
 use iced_graphics::mesh::SolidVertex2D;
-use lru::LruCache; // Preserving the fix from Topic A
+use lru::LruCache;
 use lyon::math::point;
 use lyon::path::Path;
 use lyon::path::builder::PathBuilder;
@@ -90,10 +90,7 @@ impl Default for TextTessellationCache {
     }
 }
 
-// --- API REFACTORING START ---
-
 /// Holds the mutable "heavy machinery" required to render text.
-/// This groups the buffers and caches to avoid passing them individually.
 pub struct TextRenderContext<'a> {
     pub buffer: &'a mut MeshBuffer,
     pub tessellator: &'a mut FillTessellator,
@@ -115,8 +112,6 @@ pub struct TextRequest<'a> {
     pub quality_multiplier: f32,
     pub letter_spacing: f32,
 }
-
-// --- API REFACTORING END ---
 
 // --- Adapter to bridge ttf-parser commands to lyon commands ---
 struct LyonPathBuilder<'a>(pub &'a mut dyn PathBuilder);
@@ -149,9 +144,25 @@ impl FillVertexConstructor<Point> for TextVertexConstructor {
     }
 }
 
+/// Snaps the calculated tolerance to fixed tiers (LODs) to prevent frequent re-tessellation.
+/// Lower tolerance = Higher Quality (more triangles).
+fn snap_to_bucket(raw_tolerance: f32) -> f32 {
+    if raw_tolerance > 1.5 {
+        2.0 // Very Low
+    } else if raw_tolerance > 1.0 {
+        1.0 // Low
+    } else if raw_tolerance > 0.5 {
+        0.5 // Medium
+    } else if raw_tolerance > 0.2 {
+        0.2 // High
+    } else if raw_tolerance > 0.1 {
+        0.1 // Ultra
+    } else {
+        0.05 // Extreme (High Zoom)
+    }
+}
+
 /// Draws text as a geometric mesh (triangles).
-///
-/// Refactored to use `TextRenderContext` and `TextRequest`.
 pub fn draw_geometric_text(ctx: &mut TextRenderContext, req: TextRequest) {
     if req.content.is_empty() {
         return;
@@ -172,7 +183,14 @@ pub fn draw_geometric_text(ctx: &mut TextRenderContext, req: TextRequest) {
     let base_error = req.quality.to_tolerance();
     let desired_pixel_error = base_error / req.quality_multiplier.max(0.1);
     let safe_font_size = req.size.max(0.001);
-    let tessellation_tolerance = (desired_pixel_error * font_units_per_em) / safe_font_size;
+
+    // Calculate raw tolerance
+    let raw_tolerance = (desired_pixel_error * font_units_per_em) / safe_font_size;
+
+    // Snap to bucket (Fix for Jitter/Churn)
+    // We pick the next highest quality bucket to ensure the user's visual requirement is met.
+    let tessellation_tolerance = snap_to_bucket(raw_tolerance);
+
     let fill_options = FillOptions::default().with_tolerance(tessellation_tolerance);
 
     // Layout Metrics
@@ -232,6 +250,8 @@ pub fn draw_geometric_text(ctx: &mut TextRenderContext, req: TextRequest) {
 
             // --- Cache & Tessellation Logic ---
             let needs_update = if let Some(cached) = ctx.glyph_cache.get(cache_key) {
+                // If the cached version is rougher (higher tolerance) than what we need, update it.
+                // Since we use buckets, this comparison is stable.
                 cached.tolerance > tessellation_tolerance + 0.0001
             } else {
                 true

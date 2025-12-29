@@ -73,7 +73,17 @@ impl Tessellator {
     ///
     /// The value is automatically clamped between `0.1` and `5.0`.
     pub fn set_quality(&mut self, quality: f32) {
-        self.quality = quality.clamp(0.1, 5.0);
+        let new_quality = quality.clamp(0.1, 5.0);
+
+        // If the quality has changed significantly...
+        if (self.quality - new_quality).abs() > 0.001 {
+            self.quality = new_quality;
+
+            // ...NUKE THE CACHE!
+            // This forces the engine to regenerate geometry at the new
+            // quality level (whether higher or lower).
+            self.glyph_cache.clear();
+        }
     }
 
     /// Returns the current quality multiplier.
