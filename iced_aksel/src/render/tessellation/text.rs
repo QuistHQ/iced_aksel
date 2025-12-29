@@ -1,3 +1,14 @@
+//! Vector text rendering engine.
+//!
+//! This module handles the conversion of raw text into geometric meshes (triangles).
+//! Unlike standard rasterization (which creates textures), this approach generates
+//! resolution-independent geometry that remains sharp at any zoom level.
+//!
+//! # Key Features
+//! * **Infinite Zoom:** Text remains crisp because it is essentially a collection of mathematical curves.
+//! * **Dynamic LOD:** The engine automatically adjusts the triangle count based on the size of the text on screen.
+//! * **Memory Safety:** Uses an LRU (Least Recently Used) cache to prevent unbounded memory growth.
+
 use crate::render::MeshBuffer;
 use crate::render::text::GeometricFont;
 use ab_glyph::{Font, PxScale, ScaleFont};
@@ -17,16 +28,34 @@ use lyon::tessellation::{
 use std::num::NonZeroUsize;
 use ttf_parser::OutlineBuilder;
 
+// -----------------------------------------------------------------------------
+// Configuration & Types
+// -----------------------------------------------------------------------------
+
+/// The maximum number of tessellated glyphs to keep in memory.
+///
+/// 2000 glyphs is roughly enough for ~20-30 completely different alphabets
+/// or font sizes active simultaneously.
+const CACHE_CAPACITY: usize = 2000;
+
 /// The rendering quality of the vector text.
+///
+/// This controls the error tolerance of the tessellation algorithms.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Quality {
+    /// High triangle count, very smooth curves. (Tolerance: 0.2)
     High,
+    /// Balanced performance and visual fidelity. (Tolerance: 0.5)
     Medium,
+    /// Low triangle count, "blocky" curves. Best for performance. (Tolerance: 1.5)
     Low,
+    /// Custom tolerance value. Lower is better/slower.
     Custom(f32),
 }
 
 impl Quality {
+    /// Converts the quality setting into a tessellation tolerance value.
+    /// Lower values mean higher precision (more triangles).
     pub fn to_tolerance(self) -> f32 {
         match self {
             Self::High => 0.2,
@@ -43,10 +72,20 @@ impl Default for Quality {
     }
 }
 
+// -----------------------------------------------------------------------------
+// Caching Infrastructure
+// -----------------------------------------------------------------------------
+
 /// A single tessellated character cached for reuse.
+///
+/// Storing the `VertexBuffers` directly allows us to "stamp" this geometry
+/// into the main mesh buffer multiple times without re-running the expensive
+/// tessellation math.
 #[derive(Clone, Debug)]
 pub struct CachedGlyph {
     pub geometry: VertexBuffers<Point, u16>,
+    /// The tolerance used to generate this mesh. Used to determine if we need
+    /// to re-tessellate when the zoom level changes.
     pub tolerance: f32,
 }
 
@@ -57,9 +96,9 @@ pub(crate) struct CacheKey {
     pub glyph_id: u16,
 }
 
-const CACHE_CAPACITY: usize = 2000;
-
 /// A safe wrapper around the glyph cache to enforce correct keying and memory limits.
+///
+/// Internally uses an `LruCache` to ensure we don't leak memory in long-running applications.
 pub struct TextTessellationCache {
     cache: LruCache<CacheKey, CachedGlyph>,
 }
@@ -71,6 +110,10 @@ impl TextTessellationCache {
         }
     }
 
+    /// Retrieves a cached glyph.
+    ///
+    /// **Note:** Takes `&mut self` because accessing an LRU cache updates the
+    /// internal "recency" list.
     pub fn get(&mut self, key: CacheKey) -> Option<&CachedGlyph> {
         self.cache.get(&key)
     }
@@ -79,6 +122,8 @@ impl TextTessellationCache {
         self.cache.put(key, glyph);
     }
 
+    /// Clears the entire cache.
+    /// Should be called when global quality settings change.
     pub fn clear(&mut self) {
         self.cache.clear();
     }
@@ -90,30 +135,50 @@ impl Default for TextTessellationCache {
     }
 }
 
+// -----------------------------------------------------------------------------
+// Rendering Contexts (API Refactor)
+// -----------------------------------------------------------------------------
+
 /// Holds the mutable "heavy machinery" required to render text.
+///
+/// This context groups the buffers and caches to avoid passing 10+ arguments
+/// to rendering functions.
 pub struct TextRenderContext<'a> {
+    /// The final destination for the mesh data.
     pub buffer: &'a mut MeshBuffer,
+    /// The Lyon tessellator instance (reused to avoid allocation).
     pub tessellator: &'a mut FillTessellator,
+    /// The LRU cache for glyph geometry.
     pub glyph_cache: &'a mut TextTessellationCache,
+    /// A scratch buffer for intermediate tessellation results.
     pub scratch_geometry: &'a mut VertexBuffers<Point, u16>,
 }
 
-/// The specific properties for a single draw call.
+/// The specific properties for a single text draw call.
+///
+/// Contains all the "Read-Only" parameters describing *what* to draw.
 pub struct TextRequest<'a> {
     pub content: &'a str,
     pub position: Point,
     pub font: &'a GeometricFont<'a>,
+    /// Font size in screen pixels.
     pub size: f32,
     pub color: Color,
     pub rotation: f32,
     pub horizontal_alignment: Horizontal,
     pub vertical_alignment: Vertical,
+    /// The base quality setting (High/Medium/Low).
     pub quality: Quality,
+    /// A global multiplier for quality (e.g. from the Chart widget).
     pub quality_multiplier: f32,
     pub letter_spacing: f32,
 }
 
-// --- Adapter to bridge ttf-parser commands to lyon commands ---
+// -----------------------------------------------------------------------------
+// Helpers & Adapters
+// -----------------------------------------------------------------------------
+
+// Adapter to bridge ttf-parser commands (MoveTo, LineTo) to lyon commands.
 struct LyonPathBuilder<'a>(pub &'a mut dyn PathBuilder);
 
 impl<'a> OutlineBuilder for LyonPathBuilder<'a> {
@@ -144,25 +209,36 @@ impl FillVertexConstructor<Point> for TextVertexConstructor {
     }
 }
 
-/// Snaps the calculated tolerance to fixed tiers (LODs) to prevent frequent re-tessellation.
-/// Lower tolerance = Higher Quality (more triangles).
+/// Snaps the calculated tolerance to fixed tiers (LODs).
+///
+/// **Why?** Without this, slight zoom changes (e.g. 12.0px -> 12.1px) would
+/// result in a tiny change in required tolerance, forcing the engine to
+/// re-tessellate the entire cache. By "bucketing" the values, we reuse
+/// existing meshes until a significant quality jump is actually needed.
 fn snap_to_bucket(raw_tolerance: f32) -> f32 {
     if raw_tolerance > 1.5 {
-        2.0 // Very Low
+        2.0 // Very Low Detail
     } else if raw_tolerance > 1.0 {
-        1.0 // Low
+        1.0 // Low Detail
     } else if raw_tolerance > 0.5 {
-        0.5 // Medium
+        0.5 // Medium Detail
     } else if raw_tolerance > 0.2 {
-        0.2 // High
+        0.2 // High Detail
     } else if raw_tolerance > 0.1 {
-        0.1 // Ultra
+        0.1 // Ultra Detail
     } else {
-        0.05 // Extreme (High Zoom)
+        0.05 // Extreme Detail (Maximum zoom)
     }
 }
 
+// -----------------------------------------------------------------------------
+// Main Render Logic
+// -----------------------------------------------------------------------------
+
 /// Draws text as a geometric mesh (triangles).
+///
+/// This is the core function of the text-to-mesh engine. It performs layout,
+/// retrieves/generates glyph geometry, and flushes it to the mesh buffer.
 pub fn draw_geometric_text(ctx: &mut TextRenderContext, req: TextRequest) {
     if req.content.is_empty() {
         return;
@@ -177,29 +253,29 @@ pub fn draw_geometric_text(ctx: &mut TextRenderContext, req: TextRequest) {
     let scaled_font = font_layout.as_scaled(pixel_scale);
 
     let font_units_per_em = font_geometry.units_per_em() as f32;
+    // This factor converts font-units (integers) to screen-units (pixels)
     let geometry_scale_factor = req.size / font_units_per_em;
 
-    // Quality Settings
+    // 2. Resolve Level of Detail (LOD)
+    // We calculate the ideal error tolerance based on the requested size and quality.
     let base_error = req.quality.to_tolerance();
+    // Higher multiplier = lower error (better quality)
     let desired_pixel_error = base_error / req.quality_multiplier.max(0.1);
     let safe_font_size = req.size.max(0.001);
 
-    // Calculate raw tolerance
     let raw_tolerance = (desired_pixel_error * font_units_per_em) / safe_font_size;
 
-    // Snap to bucket (Fix for Jitter/Churn)
-    // We pick the next highest quality bucket to ensure the user's visual requirement is met.
+    // Apply the "Bucketing" optimization to prevent cache thrashing
     let tessellation_tolerance = snap_to_bucket(raw_tolerance);
 
     let fill_options = FillOptions::default().with_tolerance(tessellation_tolerance);
 
-    // Layout Metrics
+    // 3. Layout Phase: Measure lines
     let ascent = scaled_font.ascent();
     let descent = scaled_font.descent();
     let line_gap = scaled_font.line_gap();
     let line_height = ascent - descent + line_gap;
 
-    // 2. Layout Phase: Measure lines
     let lines: Vec<&str> = req.content.lines().collect();
     let line_count = lines.len() as f32;
     let total_block_height = line_height * line_count;
@@ -210,9 +286,9 @@ pub fn draw_geometric_text(ctx: &mut TextRenderContext, req: TextRequest) {
         Vertical::Bottom => ascent - total_block_height + line_height,
     };
 
-    // 3. Render Phase
+    // 4. Render Phase: Iterate lines and characters
     for line_text in lines {
-        // Measure line width
+        // Measure line width for horizontal alignment
         let mut line_width = 0.0;
         let mut last_glyph_id = None;
 
@@ -243,21 +319,24 @@ pub fn draw_geometric_text(ctx: &mut TextRenderContext, req: TextRequest) {
                 glyph_id: glyph_index,
             };
 
-            // Apply Kerning
+            // Apply Kerning (Spacing adjustment between specific pairs like 'AV')
             if let Some(last) = last_glyph_id {
                 cursor_x += scaled_font.kern(last, glyph_id);
             }
 
-            // --- Cache & Tessellation Logic ---
+            // --- Cache Check & Update ---
+            // We check if we need to generate new geometry.
+            // This happens if:
+            // 1. The glyph is not in cache.
+            // 2. The cached glyph has a HIGHER tolerance (rougher) than what we need now.
             let needs_update = if let Some(cached) = ctx.glyph_cache.get(cache_key) {
-                // If the cached version is rougher (higher tolerance) than what we need, update it.
-                // Since we use buckets, this comparison is stable.
                 cached.tolerance > tessellation_tolerance + 0.0001
             } else {
                 true
             };
 
             if needs_update {
+                // Generate new geometry
                 ctx.scratch_geometry.vertices.clear();
                 ctx.scratch_geometry.indices.clear();
 
@@ -265,11 +344,14 @@ pub fn draw_geometric_text(ctx: &mut TextRenderContext, req: TextRequest) {
                 let mut path_builder = Path::builder();
                 let mut builder_adapter = LyonPathBuilder(&mut path_builder);
 
+                // Extract contours from font file
                 if font_geometry
                     .outline_glyph(ttf_glyph_id, &mut builder_adapter)
                     .is_some()
                 {
                     let path = path_builder.build();
+
+                    // Tessellate the contours into triangles
                     let _ = ctx.tessellator.tessellate_path(
                         &path,
                         &fill_options,
@@ -277,6 +359,7 @@ pub fn draw_geometric_text(ctx: &mut TextRenderContext, req: TextRequest) {
                     );
                 }
 
+                // Store in LRU cache
                 ctx.glyph_cache.insert(
                     cache_key,
                     CachedGlyph {
@@ -286,6 +369,7 @@ pub fn draw_geometric_text(ctx: &mut TextRenderContext, req: TextRequest) {
                 );
             }
 
+            // Render using the cached data (which is now guaranteed to be ready)
             if let Some(cached_glyph) = ctx.glyph_cache.get(cache_key) {
                 flush_character_to_mesh(
                     ctx.buffer,
@@ -308,6 +392,7 @@ pub fn draw_geometric_text(ctx: &mut TextRenderContext, req: TextRequest) {
     }
 }
 
+/// Transforms local glyph geometry to world/screen space and pushes it to the mesh buffer.
 fn flush_character_to_mesh(
     target_buffer: &mut MeshBuffer,
     source_geometry: &VertexBuffers<Point, u16>,
@@ -323,18 +408,24 @@ fn flush_character_to_mesh(
 
     let (sin, cos) = rotation_radians.sin_cos();
     let packed_color = pack(color);
+    // Fonts are usually Y-up, screens are Y-down.
     let flip_y = -1.0;
 
+    // Transform every vertex in the glyph
     for vertex in &source_geometry.vertices {
+        // 1. Scale from font-units to pixels
         let scaled_x = vertex.x * scale_factor;
         let scaled_y = vertex.y * scale_factor;
 
+        // 2. Position relative to the word/line start
         let local_x = scaled_x + local_offset_x;
         let local_y = (scaled_y * flip_y) + local_offset_y;
 
+        // 3. Rotate around the text origin
         let rotated_x = local_x * cos - local_y * sin;
         let rotated_y = local_x * sin + local_y * cos;
 
+        // 4. Translate to final screen position
         let final_x = screen_origin.x + rotated_x;
         let final_y = screen_origin.y + rotated_y;
 
@@ -344,6 +435,7 @@ fn flush_character_to_mesh(
         });
     }
 
+    // Offset indices to match the new vertex positions in the global buffer
     for index in &source_geometry.indices {
         mesh.indices.push(start_index + *index as u32);
     }

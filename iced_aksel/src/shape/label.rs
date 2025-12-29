@@ -8,11 +8,6 @@ use iced_core::{
 };
 
 /// A text label rendered as a vector mesh.
-///
-/// # Use Cases
-/// - **Rotation:** Can be rotated to any angle (e.g., vertical axis labels).
-/// - **Scaling:** Can use `Measure::Plot` to scale perfectly with the graph zoom.
-/// - **Precision:** Maintains infinite sharpness at any zoom level.
 
 #[derive(Debug, Clone)]
 pub struct Label<D> {
