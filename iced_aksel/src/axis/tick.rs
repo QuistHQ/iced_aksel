@@ -11,15 +11,27 @@ use iced_core::{
 
 /// The result returned from a tick renderer function.
 ///
-/// Specifies which visual elements should be rendered for a given tick.
+/// This struct specifies exactly what should be rendered for a specific tick mark.
+/// It effectively decouples the tick logic from the rendering logic, allowing
+/// for highly customizable axes.
+///
+/// # Example
+///
+/// ```rust
+/// use iced_aksel::axis::{TickResult, TickLine};
+///
+/// // Create a tick that has a label and a short line
+/// let result = TickResult::with_label("100")
+///     .tick_line(TickLine::default());
+/// ```
 pub struct TickResult {
-    /// Optional tick line mark on the axis
+    /// Optional tick line mark on the axis.
     pub tick_line: Option<TickLine>,
-    /// Optional grid line extending into the plot area
+    /// Optional grid line extending into the plot area.
     pub grid_line: Option<GridLine>,
-    /// Optional text label for this tick
+    /// Optional text label for this tick.
     pub label: Option<String>,
-    /// Optional label rendering-priority
+    /// Optional label rendering-priority (lower is higher priority).
     pub label_priority: Option<u8>,
 }
 
@@ -35,7 +47,7 @@ impl Default for TickResult {
 }
 
 impl TickResult {
-    /// Creates a new empty [TickResult]
+    /// Creates a new empty `TickResult` (no lines, no label).
     pub const fn new() -> Self {
         Self {
             tick_line: None,
@@ -45,7 +57,7 @@ impl TickResult {
         }
     }
 
-    /// Creates a new empty [TickResult] with a label
+    /// Creates a new `TickResult` with a specific label.
     pub fn with_label<L: Into<String>>(label: L) -> Self {
         Self {
             label: Some(label.into()),
@@ -53,7 +65,7 @@ impl TickResult {
         }
     }
 
-    /// Creates a new [TickResult] with a tick-line
+    /// Creates a new `TickResult` with a specific tick line.
     pub fn with_tick_line(line: TickLine) -> Self {
         Self {
             tick_line: Some(line),
@@ -61,7 +73,7 @@ impl TickResult {
         }
     }
 
-    /// Creates a new [TickResult] with a grid-line
+    /// Creates a new `TickResult` with a specific grid line.
     pub fn with_grid_line(line: GridLine) -> Self {
         Self {
             grid_line: Some(line),
@@ -69,34 +81,36 @@ impl TickResult {
         }
     }
 
-    /// Sets the rendering-priority of the label
+    /// Sets the rendering-priority of the label.
     ///
-    /// 0 == Highest priority
+    /// Lower values indicate higher priority.
+    /// * `0` = Critical (always try to render)
+    /// * `255` = Optional
     pub const fn label_priority(mut self, priority: u8) -> Self {
         self.label_priority = Some(priority);
         self
     }
 
-    /// Adds a label to the [TickResult]
+    /// Adds a label to the `TickResult`.
     pub fn label<L: Into<String>>(mut self, label: L) -> Self {
         self.label = Some(label.into());
         self
     }
 
-    /// Adds a tick-line to the [TickResult]
+    /// Adds a tick-line to the `TickResult`.
     pub const fn tick_line(mut self, line: TickLine) -> Self {
         self.tick_line = Some(line);
         self
     }
 
-    /// Adds a grid-line to the [TickResult]
+    /// Adds a grid-line to the `TickResult`.
     pub const fn grid_line(mut self, line: GridLine) -> Self {
         self.grid_line = Some(line);
         self
     }
 }
 
-/// Defines the visual styling and content of a single tick mark on an Axis.
+/// Defines the visual styling of a single tick mark on an Axis.
 #[derive(Debug, Clone)]
 pub struct TickLine {
     /// The visual thickness (stroke width) of the tick line.
@@ -118,23 +132,23 @@ impl Default for TickLine {
 
 /// Context provided to tick renderer functions.
 ///
-/// Contains all the information needed to render a tick appropriately.
+/// Contains all the information needed to make decisions about how to render a tick.
 #[derive(Debug, Clone, Copy)]
 pub struct TickContext<D> {
-    /// The tick from the scale
+    /// The tick value and metadata from the scale.
     pub tick: Tick<D>,
-    /// Normalized position (0.0-1.0) along the axis
+    /// Normalized position (0.0-1.0) along the axis.
     pub normalized_position: f32,
-    /// The bounds of the axis in screen coordinates
+    /// The bounds of the axis in screen coordinates.
     pub axis_bounds: Rectangle,
-    /// The domain (min, max) of the scale
+    /// The domain (min, max) of the scale.
     pub scale_domain: (D, D),
-    /// The orientation of the axis (horizontal or vertical)
+    /// The orientation of the axis (horizontal or vertical).
     pub orientation: Orientation,
 }
 
 impl<D: Float> TickContext<D> {
-    /// Returns the span of the axis in screen pixels.
+    /// Returns the total span of the axis in screen pixels.
     pub const fn axis_span(&self) -> f32 {
         match self.orientation {
             Orientation::Horizontal => self.axis_bounds.width,
@@ -142,46 +156,42 @@ impl<D: Float> TickContext<D> {
         }
     }
 
-    /// Returns the span of the scale's domain.
+    /// Returns the total span of the scale's domain in data units.
     pub fn scale_span(&self) -> D {
         let (min, max) = self.scale_domain;
         min.abs_sub(max)
     }
 }
 
-/// Information about a label that has been placed on the axis.
+/// Information about a label that has been accepted for rendering.
 ///
-/// Used internally for overlap detection and spacing calculations.
+/// Used internally for overlap detection.
 #[derive(Debug, Clone)]
 pub struct PlacedLabelInfo<D> {
-    /// The tick associated with this label
+    /// The tick associated with this label.
     pub tick: Tick<D>,
-    /// Normalized position (0.0-1.0) along the axis
+    /// Normalized position (0.0-1.0) along the axis.
     pub normalized_position: f32,
-    /// The spatial bounds of the label
+    /// The spatial bounds of the label.
     pub bounds: LabelBounds,
 }
 
-/// Decision on whether to render or skip a tick label.
+/// A decision on whether to render or skip a tick label.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LabelDecision {
     /// Render this label at its position.
     Render,
-    /// Skip rendering this label (e.g., due to overlap or custom filtering).
+    /// Skip rendering this label (e.g., due to overlap).
     Skip,
 }
 
 /// A candidate label that may or may not be rendered.
 ///
-/// Used internally during the label rendering process.
+/// Used internally during the label layout process.
 pub struct LabelCandidate<D> {
-    /// The tick associated with the label
     pub tick: Tick<D>,
-    /// Normalized position (0.0-1.0) along the axis
     pub normalized_position: f32,
-    /// The label to be rendered
     pub label: String,
-    /// Rendering-priority of the label
     pub priority: u8,
 }
 
@@ -192,30 +202,25 @@ pub struct ResolvedLabelCandidate<Renderer, D>
 where
     Renderer: text::Renderer,
 {
-    /// The tick associated with the label
     pub tick: Tick<D>,
-    /// Normalized position (0.0-1.0) along the axis
     pub normalized_position: f32,
-    /// The bounds that have been laid out for the label
     pub bounds: LabelBounds,
-    /// The Iced-paragraph to render
     pub paragraph: Plain<Renderer::Paragraph>,
-    /// The screen-position to render at
     pub position: Point,
 }
 
 /// Context provided to custom label policy functions.
 #[derive(Debug)]
 pub struct LabelDecisionContext<'a, D> {
-    /// The tick associated with this label
+    /// The tick associated with this label.
     pub tick: Tick<D>,
-    /// Normalized position (0.0-1.0) along the axis
+    /// Normalized position (0.0-1.0) along the axis.
     pub normalized_position: f32,
-    /// The spatial bounds of this label
+    /// The calculated screen bounds of this label.
     pub bounds: LabelBounds,
-    /// The orientation of the axis
+    /// The orientation of the axis.
     pub orientation: Orientation,
-    /// Labels that have already been accepted for rendering
+    /// Labels that have already been accepted for rendering in this pass.
     pub accepted: &'a [PlacedLabelInfo<D>],
 }
 
@@ -232,7 +237,7 @@ pub enum LabelPolicy<D> {
     All,
     /// Skip labels that would overlap with already-placed labels.
     SkipOverlapping {
-        /// Minimum gap in pixels between labels
+        /// Minimum gap in pixels between labels.
         min_gap: f32,
     },
     /// Use a custom function to decide which labels to render.

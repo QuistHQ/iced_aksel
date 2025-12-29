@@ -8,7 +8,7 @@ use iced_aksel::{
     plot::{Plot, PlotData},
     scale::Linear,
     shape::Polyline,
-    style::{AxisStyle, Style},
+    style::Style,
 };
 
 pub fn main() -> iced::Result {
@@ -104,7 +104,6 @@ impl AxesExample {
                         radius: 5.0.into(),
                         ..Default::default()
                     }))
-                .padding(10)
         ]
         .width(Length::Fill)
         .height(Length::Fill)
@@ -187,7 +186,7 @@ impl AxesExample {
         state.set_axis(
             Self::Y_ID,
             Axis::new(Linear::new(-50.0, 50.0), axis::Position::Right)
-                .with_thickness(60.0)
+                .with_thickness(50.0)
                 .with_cursor_formatter(currency_fmt)
                 .with_tick_renderer(|ctx| TickResult {
                     grid_line: Some(GridLine::default()),
@@ -221,7 +220,6 @@ fn style_science(theme: &Theme) -> Style {
 
 // Full property breakdown for manual testing
 fn style_finance(theme: &Theme) -> Style {
-    let palette = theme.extended_palette();
     let mut style = iced_aksel::style::default(theme);
 
     // --- AXIS ---

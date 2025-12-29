@@ -16,14 +16,16 @@ pub struct Style {
 /// Style of the grid lines.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GridStyle {
+    /// The color of the grid lines.
     pub color: Color,
+    /// The thickness of the grid lines in pixels.
     pub width: Pixels,
 }
 
-/// Style of a `Chart`s axis.
+/// Style of a `Chart`'s axis.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AxisStyle {
-    /// Distance from the Axis Line to the text baseline (The Rail).
+    /// Distance from the Axis Line to the text baseline (The "Rail").
     pub text_offset: Pixels,
     /// Style of the text labels.
     pub label: TextStyle,
@@ -36,11 +38,13 @@ pub struct AxisStyle {
 /// Style of axis ticks.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TickStyle {
+    /// The color of the tick lines.
     pub color: Color,
+    /// The thickness of the tick lines.
     pub width: Pixels,
 }
 
-/// Style of a `Chart`s axis cursor. 
+/// Style of a `Chart`'s interactive axis cursor.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AxisCursorStyle {
     /// Color of the cursor line.
@@ -52,16 +56,20 @@ pub struct AxisCursorStyle {
 
     /// Style of the text inside the badge.
     pub text: TextStyle,
-    /// Style of the badge background and container.
+    /// Style of the badge container (background, border, shadow).
     pub badge: AxisCursorBadgeStyle,
 }
 
 /// Style of the badge container for the axis cursor.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AxisCursorBadgeStyle {
+    /// Padding around the text inside the badge.
     pub padding: Padding,
+    /// Background color of the badge.
     pub background: Color,
+    /// Border style of the badge.
     pub border: Border,
+    /// Shadow style of the badge.
     pub shadow: Shadow,
 }
 
@@ -74,13 +82,18 @@ pub struct PlotCursorStyle {
     pub width: Pixels,
 }
 
-/// General text styling.
+/// General text styling configuration.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TextStyle {
+    /// The font size in pixels.
     pub size: Pixels,
+    /// The font family to use.
     pub font: Font,
+    /// The text color.
     pub color: Color,
+    /// The line height.
     pub line_height: LineHeight,
+    /// The text shaping strategy.
     pub shaping: Shaping,
 }
 
@@ -117,6 +130,7 @@ impl Catalog for Theme {
     }
 }
 
+/// The default style function for a chart.
 pub fn default(theme: &Theme) -> Style {
     let palette = theme.extended_palette();
 

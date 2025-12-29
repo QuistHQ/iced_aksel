@@ -6,6 +6,11 @@
 //!
 //! # Quick Start
 //!
+//! To create a simple chart, you need to:
+//! 1. Define your [`State`] (which stores axes configuration).
+//! 2. Implement [`PlotData`] for your data type.
+//! 3. Instantiate the [`Chart`] widget in your view logic.
+//!
 //! ```rust,no_run
 //! use iced_aksel::{
 //!     Chart, State, Axis, Plot, PlotPoint, axis, scale::Linear,
@@ -24,6 +29,7 @@
 //! impl App {
 //!     fn new() -> Self {
 //!         let mut chart_state = State::new();
+//!         // Register axes with unique IDs
 //!         chart_state.set_axis("x", Axis::new(Linear::new(0.0, 100.0), axis::Position::Bottom));
 //!         chart_state.set_axis("y", Axis::new(Linear::new(0.0, 100.0), axis::Position::Left));
 //!
@@ -33,13 +39,13 @@
 //!                 points: vec![
 //!                     PlotPoint::new(10.0, 20.0),
 //!                     PlotPoint::new(50.0, 80.0),
-//!                     PlotPoint::new(90.0, 30.0),
 //!                 ],
 //!             },
 //!         }
 //!     }
 //!
 //!     fn view(&self) -> Element<Message> {
+//!         // Render the chart using the persistent state
 //!         Chart::new(&self.chart_state)
 //!             .plot_data(&self.data, "x", "y")
 //!             .into()
@@ -66,11 +72,11 @@
 //!
 //! # Core Concepts
 //!
-//! - **[`Chart`]**: The main widget that renders axes and data
-//! - **[`State`]**: Manages axis configuration and chart state
-//! - **[`Axis`]**: Configures scales, ticks, grids, and labels
-//! - **[`PlotData`]**: Trait for drawable data types
-//! - **[`Shape`](crate::shape)**: Primitives for rendering (lines, circles, rectangles, etc.)
+//! - **[`Chart`]**: The main widget that renders axes and data. It handles layout and user events.
+//! - **[`State`]**: A persistent struct that manages axis configuration. You should store this in your application's state.
+//! - **[`Axis`]**: Configures scales (Linear, Log), ticks, grid lines, and labels.
+//! - **[`PlotData`]**: A trait you implement for your own data types to define how they should be rendered.
+//! - **[`Shape`]**: Visual primitives (lines, circles, rectangles) used within `PlotData::draw`.
 
 use std::{cell::RefCell, fmt::Debug, hash::Hash, ops::Deref};
 
@@ -87,7 +93,7 @@ use iced_core::{
     widget::{Tree, tree},
 };
 
-// Re-export aksel
+// Re-export aksel core types for convenience
 pub use aksel::{Float, Transform, scale, scale::Scale, transform, transform::PlotPoint};
 
 mod action;
@@ -95,7 +101,7 @@ mod layer;
 mod measure;
 mod render;
 mod state;
-// Export style so users can define themes
+// Export style module so users can define custom themes
 pub mod style;
 
 pub mod axis;
@@ -116,7 +122,7 @@ use axis::{Orientation, Position};
 use layer::Layer;
 use plot::DragDelta;
 
-// Default value for how many pixels till a drag actually counts as a drag
+/// Default movement threshold (in pixels) to distinguish a click from a drag operation.
 const DEFAULT_DRAG_DEADBAND: f32 = 10.0;
 
 /// Errors that can occur during chart construction or rendering.
@@ -128,7 +134,7 @@ pub enum Error<AxisId> {
         /// The id of the axis that was duplicated
         id: AxisId,
     },
-    /// Two axes have conflicting orientations (e.g., both horizontal).
+    /// Two axes have conflicting orientations (e.g., both are horizontal).
     #[display(
         "Conflicting axis orientations: {horizontal:?}({horizontal_orientation:?}) | {vertical:?}(vertical_orientation:?)"
     )]
@@ -150,7 +156,7 @@ pub enum Error<AxisId> {
     },
 }
 
-// Plot/Chart handlers
+// Internal type aliases for event handlers
 type ErrorHandler<AxisId, Message> = Box<dyn Fn(Error<AxisId>) -> Message>;
 type ClickHandler<Message> = Box<dyn Fn(Point) -> Message>;
 type DoubleClickHandler<Message> = Box<dyn Fn(Point) -> Message>;
@@ -158,18 +164,21 @@ type DragHandler<Message> = Box<dyn Fn(DragDelta) -> Message>;
 type HoverHandler<Message> = Box<dyn Fn(Point) -> Message>;
 type ScrollHandler<Message> = Box<dyn Fn(Point, ScrollDelta) -> Message>;
 
-// Axis handlers
+// Internal type aliases for axis event handlers
 type AxisClickHandler<AxisId, Message> = Box<dyn Fn(AxisId, f32) -> Message>;
 type AxisDoubleClickHandler<AxisId, Message> = Box<dyn Fn(AxisId, f32) -> Message>;
 type AxisDragHandler<AxisId, Message> = Box<dyn Fn(AxisId, f32) -> Message>;
 type AxisHoverHandler<AxisId, Message> = Box<dyn Fn(AxisId, f32) -> Message>;
 type AxisScrollHandler<AxisId, Message> = Box<dyn Fn(AxisId, f32, ScrollDelta) -> Message>;
 
-/// Internal chart memory
+/// Internal chart memory that persists across frames.
+///
+/// This struct tracks the current interaction state (e.g., dragging) and holds
+/// heavy resources like tessellators to avoid re-allocation.
 struct Memory<AxisId> {
     action: Action<AxisId>,
     previous_click: Option<mouse::Click>,
-    // Add the persistent tessellators here
+    // Persistent tessellators are stored here to reuse internal buffers.
     tessellators: RefCell<render::Tessellators>,
 }
 
@@ -232,13 +241,17 @@ pub struct Chart<
     drag_deadband: f32,
     padding: Padding,
 
-    // Interactions
+    // Interaction Handlers
     on_error: Option<ErrorHandler<AxisId, Message>>,
+
+    // Plot Area Handlers
     on_click: Option<ClickHandler<Message>>,
     on_double_click: Option<DoubleClickHandler<Message>>,
     on_drag: Option<DragHandler<Message>>,
     on_hover: Option<HoverHandler<Message>>,
     on_scroll: Option<ScrollHandler<Message>>,
+
+    // Axis Handlers
     on_axis_click: Option<AxisClickHandler<AxisId, Message>>,
     on_axis_double_click: Option<AxisDoubleClickHandler<AxisId, Message>>,
     on_axis_drag: Option<AxisDragHandler<AxisId, Message>>,
@@ -258,14 +271,9 @@ where
 {
     /// Creates a new chart from the given state.
     ///
-    /// # Example
-    ///
-    /// ```rust,no_run
-    /// # use iced_aksel::{Chart, State};
-    /// # #[derive(Clone)] enum Message {}
-    /// let state: State<&str, f64> = State::new();
-    /// let chart: Chart<&str, f64, Message> = Chart::new(&state);
-    /// ```
+    /// The `State` contains the configuration of all axes. It is separated from the
+    /// `Chart` widget to allow persistence across frames and ease of manipulation
+    /// (e.g., zooming/panning) from your update logic.
     pub fn new(state: &'a State<AxisId, Domain>) -> Self {
         Self {
             state,
@@ -276,6 +284,8 @@ where
             errors: vec![],
             drag_deadband: DEFAULT_DRAG_DEADBAND,
             padding: Padding::new(0.),
+
+            // Handlers default to None
             on_error: None,
             on_click: None,
             on_double_click: None,
@@ -293,38 +303,25 @@ where
     }
 
     /// Sets the style of the chart.
-    ///
-    /// Note: We accept the concrete associated type Class<'a> directly to allow
-    /// for automatic unsizing coercions (e.g. from Box<fn> to Box<dyn Fn>).
     pub fn style(mut self, style: <Theme as Catalog>::Class<'a>) -> Self {
         self.class = style;
         self
     }
 
-    /// Enables the debug overlay, showing vertex and index counts.
+    /// Enables or disables the debug overlay.
+    ///
+    /// When enabled, an overlay will display performance metrics such as
+    /// vertex and index counts in the corner of the chart.
     pub const fn debug(mut self, debug: bool) -> Self {
         self.debug = debug;
         self
     }
 
-    /// Adds a data layer to the chart using the specified axes.
+    /// Adds a data layer to the chart.
     ///
-    /// # Example
-    ///
-    /// ```rust,no_run
-    /// # use iced_aksel::{Chart, State, Axis, axis, scale::Linear, plot::PlotData};
-    /// # #[derive(Clone)] enum Message {}
-    /// # struct MyData;
-    /// # impl PlotData<f64> for MyData {
-    /// #     fn draw(&self, plot: &mut iced_aksel::Plot<f64>, theme: &iced::Theme) {}
-    /// # }
-    /// # let mut state: State<&str, f64> = State::new();
-    /// # state.set_axis("x_axis", Axis::new(Linear::new(0.0, 100.0), axis::Position::Bottom));
-    /// # state.set_axis("y_axis", Axis::new(Linear::new(0.0, 100.0), axis::Position::Left));
-    /// # let data = MyData;
-    /// let chart: Chart<&str, f64, Message> = Chart::new(&state)
-    ///     .plot_data(&data, "x_axis", "y_axis");
-    /// ```
+    /// The data will be plotted using the coordinate system defined by the two specified axes.
+    /// Multiple layers can be added to a single chart, potentially using different axes.
+
     pub fn plot_data<T: plot::PlotData<Domain, Renderer, Theme>>(
         mut self,
         items: &'a T,
@@ -340,32 +337,12 @@ where
     }
 
     /// Sets the width of the chart.
-    ///
-    /// # Example
-    ///
-    /// ```rust,no_run
-    /// # use iced_aksel::{Chart, State};
-    /// # #[derive(Clone)] enum Message {}
-    /// # let state: State<&str, f64> = State::new();
-    /// let chart: Chart<&str, f64, Message> = Chart::new(&state)
-    ///     .width(iced::Length::Fixed(600.0));
-    /// ```
     pub const fn width(mut self, width: Length) -> Self {
         self.width = width;
         self
     }
 
     /// Sets the height of the chart.
-    ///
-    /// # Example
-    ///
-    /// ```rust,no_run
-    /// # use iced_aksel::{Chart, State};
-    /// # #[derive(Clone)] enum Message {}
-    /// # let state: State<&str, f64> = State::new();
-    /// let chart: Chart<&str, f64, Message> = Chart::new(&state)
-    ///     .height(iced::Length::Fixed(400.0));
-    /// ```
     pub const fn height(mut self, height: Length) -> Self {
         self.height = height;
         self
@@ -373,9 +350,7 @@ where
 
     /// Sets the padding around the chart.
     ///
-    /// This adds space between the chart edges and its container.
-    // TODO: Consider removing this. If we can make the chart show itself perfectly centered, this could
-    // be handled by the user using wrapper elements in UI
+    /// This adds space between the widget bounds and the chart contents (axes/plot).
     pub const fn padding(mut self, padding: Padding) -> Self {
         self.padding = padding;
         self
@@ -383,15 +358,16 @@ where
 
     /// Sets the minimum drag distance in pixels before drag events are triggered.
     ///
-    /// Default is 10 pixels. This helps distinguish clicks from drags.
+    /// Default is 10 pixels. This helps prevent accidental drags when the user intended to click.
     pub const fn drag_deadband(mut self, distance: f32) -> Self {
         self.drag_deadband = distance;
         self
     }
 
-    /// Sets a callback for chart errors.
+    /// Sets a callback for chart configuration errors.
     ///
-    /// Errors can occur when axes are misconfigured or missing.
+    /// Errors can occur when axes referenced in `plot_data` are missing from the `State`
+    /// or have conflicting orientations.
     pub fn on_error<F>(mut self, f: F) -> Self
     where
         F: Fn(Error<AxisId>) -> Message + 'static,
@@ -400,19 +376,10 @@ where
         self
     }
 
-    /// Sets a callback for plot area clicks.
+    /// Sets a callback for clicks on the main plot area.
     ///
-    /// The callback receives normalized coordinates (0.0-1.0) relative to the plot area.
-    ///
-    /// # Example
-    ///
-    /// ```rust,no_run
-    /// # use iced_aksel::{Chart, State};
-    /// # #[derive(Clone)] enum Message { PlotClicked(iced::Point) }
-    /// # let state: State<&str, f64> = State::new();
-    /// let chart: Chart<&str, f64, Message> = Chart::new(&state)
-    ///     .on_click(|point| Message::PlotClicked(point));
-    /// ```
+    /// The callback receives the position of the click as normalized coordinates (0.0-1.0)
+    /// relative to the plot bounds.
     pub fn on_click<F>(mut self, f: F) -> Self
     where
         F: Fn(Point) -> Message + 'static,
@@ -421,9 +388,7 @@ where
         self
     }
 
-    /// Sets a callback for plot area double-clicks.
-    ///
-    /// The callback receives normalized coordinates (0.0-1.0).
+    /// Sets a callback for double-clicks on the main plot area.
     pub fn on_double_click<F>(mut self, f: F) -> Self
     where
         F: Fn(Point) -> Message + 'static,
@@ -432,19 +397,10 @@ where
         self
     }
 
-    /// Sets a callback for plot area drag events.
+    /// Sets a callback for drag events on the main plot area.
     ///
-    /// The callback receives normalized deltas that can be used with axis `pan` methods.
-    ///
-    /// # Example
-    ///
-    /// ```rust,no_run
-    /// # use iced_aksel::{Chart, State, plot::DragDelta};
-    /// # #[derive(Clone)] enum Message { Pan(DragDelta) }
-    /// # let state: State<&str, f64> = State::new();
-    /// let chart: Chart<&str, f64, Message> = Chart::new(&state)
-    ///     .on_drag(|delta| Message::Pan(delta));
-    /// ```
+    /// The callback receives a [`DragDelta`] containing the normalized distance dragged.
+    /// This is typically used to implement panning.
     pub fn on_drag<F>(mut self, f: F) -> Self
     where
         F: Fn(DragDelta) -> Message + 'static,
@@ -453,9 +409,7 @@ where
         self
     }
 
-    /// Sets a callback for plot area hover events.
-    ///
-    /// The callback receives normalized coordinates (0.0-1.0).
+    /// Sets a callback for hover events on the main plot area.
     pub fn on_hover<F>(mut self, f: F) -> Self
     where
         F: Fn(Point) -> Message + 'static,
@@ -464,20 +418,10 @@ where
         self
     }
 
-    /// Sets a callback for plot area scroll events.
+    /// Sets a callback for scroll events (mouse wheel) on the main plot area.
     ///
-    /// The callback receives normalized coordinates and scroll delta, useful for zooming.
-    ///
-    /// # Example
-    ///
-    /// ```rust,no_run
-    /// # use iced_aksel::{Chart, State};
-    /// # use iced::mouse::ScrollDelta;
-    /// # #[derive(Clone)] enum Message { Zoom(iced::Point, ScrollDelta) }
-    /// # let state: State<&str, f64> = State::new();
-    /// let chart: Chart<&str, f64, Message> = Chart::new(&state)
-    ///     .on_scroll(|point, delta| Message::Zoom(point, delta));
-    /// ```
+    /// The callback receives the cursor position (normalized) and the scroll delta.
+    /// This is typically used to implement zooming.
     pub fn on_scroll<F>(mut self, f: F) -> Self
     where
         F: Fn(Point, ScrollDelta) -> Message + 'static,
@@ -486,9 +430,10 @@ where
         self
     }
 
-    /// Sets a callback for axis click events.
+    /// Sets a callback for click events on an axis.
     ///
-    /// Receives the axis ID and normalized position (0.0-1.0) along that axis.
+    /// The callback receives the ID of the clicked axis and the normalized position (0.0-1.0)
+    /// along that axis.
     pub fn on_axis_click<F>(mut self, f: F) -> Self
     where
         F: Fn(AxisId, f32) -> Message + 'static,
@@ -497,9 +442,7 @@ where
         self
     }
 
-    /// Sets a callback for axis double-click events.
-    ///
-    /// Receives the axis ID and normalized position (0.0-1.0) along that axis.
+    /// Sets a callback for double-click events on an axis.
     pub fn on_axis_double_click<F>(mut self, f: F) -> Self
     where
         F: Fn(AxisId, f32) -> Message + 'static,
@@ -508,9 +451,9 @@ where
         self
     }
 
-    /// Sets a callback for axis drag events.
+    /// Sets a callback for drag events on an axis.
     ///
-    /// Receives the axis ID and normalized delta along that axis.
+    /// This is often used to implement "pan along one axis" behavior.
     pub fn on_axis_drag<F>(mut self, f: F) -> Self
     where
         F: Fn(AxisId, f32) -> Message + 'static,
@@ -519,9 +462,7 @@ where
         self
     }
 
-    /// Sets a callback for axis scroll events.
-    ///
-    /// Receives the axis ID, normalized position (0.0-1.0), and scroll delta.
+    /// Sets a callback for scroll events on an axis.
     pub fn on_axis_scroll<F>(mut self, f: F) -> Self
     where
         F: Fn(AxisId, f32, ScrollDelta) -> Message + 'static,
@@ -530,9 +471,7 @@ where
         self
     }
 
-    /// Sets a callback for axis hover events.
-    ///
-    /// Receives the axis ID and normalized position (0.0-1.0) along that axis.
+    /// Sets a callback for hover events on an axis.
     pub fn on_axis_hover<F>(mut self, f: F) -> Self
     where
         F: Fn(AxisId, f32) -> Message + 'static,
@@ -541,6 +480,8 @@ where
         self
     }
 
+    /// Internal handler for mouse press events.
+    /// Determines if the user clicked on the plot or an axis and updates the internal state.
     fn handle_mouse_press(
         &self,
         memory: &mut Memory<AxisId>,
@@ -555,8 +496,7 @@ where
 
         let plot_bounds = self.get_plot_layout(layout).bounds();
 
-        // We should be able to ensure that a cursor position exists after the first if statement
-        // Which means it is safe to unwrap.
+        // 1. Check if click is on the plot area
         if cursor.position_over(plot_bounds).is_some() {
             shell.capture_event();
 
@@ -566,23 +506,21 @@ where
                 total_delta: 0.0,
             };
 
-            // Now we check for a double-click
-            let Some((position, handler)) = cursor.position().zip(self.on_double_click.as_ref())
-            else {
-                return;
-            };
+            // Handle double-click immediately
+            if let Some((position, handler)) = cursor.position().zip(self.on_double_click.as_ref())
+            {
+                let new_click =
+                    mouse::Click::new(position, mouse::Button::Left, memory.previous_click);
 
-            let new_click = mouse::Click::new(position, mouse::Button::Left, memory.previous_click);
-
-            if new_click.kind() == mouse::click::Kind::Double {
-                shell.publish(handler(position));
+                if new_click.kind() == mouse::click::Kind::Double {
+                    shell.publish(handler(position));
+                }
+                memory.previous_click = Some(new_click);
             }
-
-            memory.previous_click = Some(new_click);
-
             return;
         }
 
+        // 2. Check if click is on any axis
         for (i, (id, axis)) in self.state.axes().iter().enumerate() {
             let axis_bounds = layout.children().nth(i).unwrap().bounds();
 
@@ -594,8 +532,6 @@ where
                 continue;
             }
 
-            // We should be able to ensure that a cursor position exists after the first if statement
-            // Which means it is safe to unwrap.
             let origin = match axis.orientation() {
                 Orientation::Horizontal => position.x,
                 Orientation::Vertical => position.y,
@@ -610,29 +546,29 @@ where
                 total_delta: 0.0,
             };
 
-            // Now we check for a double-click
-            let Some((position, handler)) =
+            // Handle double-click on axis
+            if let Some((position, handler)) =
                 cursor.position().zip(self.on_axis_double_click.as_ref())
-            else {
-                return;
-            };
+            {
+                let new_click =
+                    mouse::Click::new(position, mouse::Button::Left, memory.previous_click);
 
-            let new_click = mouse::Click::new(position, mouse::Button::Left, memory.previous_click);
-
-            if new_click.kind() == mouse::click::Kind::Double {
-                shell.publish(handler(
-                    id.clone(),
-                    axis.screen_to_normalized(origin, &axis_bounds),
-                ));
+                if new_click.kind() == mouse::click::Kind::Double {
+                    shell.publish(handler(
+                        id.clone(),
+                        axis.screen_to_normalized(origin, &axis_bounds),
+                    ));
+                }
+                memory.previous_click = Some(new_click);
             }
 
-            memory.previous_click = Some(new_click);
-
-            // we can only be over one axis at a time, so we break the loop after capturing
+            // We can only interact with one axis at a time
             break;
         }
     }
 
+    /// Internal handler for mouse release events.
+    /// Triggers click events if the drag distance was within the deadband.
     fn handle_mouse_release(
         &self,
         memory: &mut Memory<AxisId>,
@@ -642,7 +578,7 @@ where
     ) {
         let Memory { action, .. } = memory;
 
-        // If delta is OVER deadband, we shouldn't send click-events
+        // If total drag exceeded deadband, it was a drag, not a click.
         if let Some(total_drag_delta) = action.total_drag_delta()
             && total_drag_delta > self.drag_deadband
         {
@@ -655,7 +591,7 @@ where
                 if let Some(handler) = &self.on_click {
                     let plot_bounds = self.get_plot_layout(layout).bounds();
 
-                    // Translate origin to normalized point (0.0-1.0)
+                    // Convert screen coordinates to normalized plot coordinates
                     let normalized = Point::new(
                         (origin.x - plot_bounds.x) / plot_bounds.width,
                         1.0 - ((origin.y - plot_bounds.y) / plot_bounds.height),
@@ -665,14 +601,10 @@ where
                 }
             }
             Action::DraggingAxis { id, origin, .. } => {
-                // Find the axis and its layout
                 if let Some((i, id, axis)) = self.state.axes().get_full(id) {
                     let axis_bounds = layout.children().nth(i).unwrap().bounds();
-
-                    // Translate origin to normalized value (0.0-1.0)
                     let normalized = axis.screen_to_normalized(*origin, &axis_bounds);
 
-                    // Call the axis click handler if it exists
                     if let Some(handler) = &self.on_axis_click {
                         shell.publish(handler(id.clone(), normalized));
                     }
@@ -681,6 +613,8 @@ where
         }
     }
 
+    /// Internal handler for mouse movement.
+    /// Manages hover states and processes drag deltas.
     fn handle_mouse_moved(
         &self,
         memory: &mut Memory<AxisId>,
@@ -691,21 +625,17 @@ where
         let Memory { action, .. } = memory;
         let plot_bounds = self.get_plot_layout(layout).bounds();
 
-        // We should be able to ensure that a cursor position exists after the first if statement
-        // Which means it is safe to unwrap.
+        // 1. Mouse is over the plot area
         if cursor.position_in(plot_bounds).is_some() {
             match action {
-                Action::DraggingAxis { .. } => (), // Do nothing
+                Action::DraggingAxis { .. } => (), // Ignore if we are busy dragging an axis
                 Action::Idle => {
                     if let Some(handler) = &self.on_hover {
                         let cursor_pos = cursor.position().unwrap();
-
-                        // Translate cursor position to normalized position (0.0-1.0)
                         let normalized = Point::new(
                             (cursor_pos.x - plot_bounds.x) / plot_bounds.width,
                             (cursor_pos.y - plot_bounds.y) / plot_bounds.height,
                         );
-
                         shell.publish(handler(normalized));
                     }
                     return;
@@ -715,29 +645,23 @@ where
                     total_delta,
                     ..
                 } => {
-                    // When dragging an axis, we want to capture the events, as no other widget should handle this event
+                    // Capture event so parent widgets don't steal the drag
                     shell.capture_event();
 
                     let current_pos = cursor.position().unwrap();
-
-                    // Calculate delta from last position
                     let delta_x = current_pos.x - last_position.x;
                     let delta_y = current_pos.y - last_position.y;
 
-                    // Update total_delta with Euclidean distance
-                    let frame_distance = delta_x.hypot(delta_y);
-                    *total_delta += frame_distance;
-
-                    // Update last_position
+                    *total_delta += delta_x.hypot(delta_y);
                     *last_position = current_pos;
 
-                    // Only send drag event if we've exceeded the deadband
+                    // Only trigger drag if we exceeded the deadband
                     if *total_delta > self.drag_deadband
                         && let Some(handler) = &self.on_drag
                     {
-                        // Normalize the delta by plot bounds size
-                        // Negate to convert from screen-space drag to data-space pan:
-                        // dragging right should show data to the left (decrease the scale)
+                        // Normalize the delta.
+                        // Note: X is inverted because dragging right usually implies panning left (moving the view).
+                        // Y is standard.
                         let normalized_delta = DragDelta {
                             x: -delta_x / plot_bounds.width,
                             y: delta_y / plot_bounds.height,
@@ -751,7 +675,7 @@ where
             }
         }
 
-        // Handle axis drag (if currently dragging an axis, handle it regardless of cursor position)
+        // 2. Handle active axis drag (continues even if cursor leaves axis bounds)
         if let Action::DraggingAxis {
             id: dragging_id,
             last_position,
@@ -759,7 +683,6 @@ where
             ..
         } = action
         {
-            // When dragging an axis, we want to capture the events, as no other widget should handle this event
             shell.capture_event();
 
             if let Some((i, (id, axis))) = self
@@ -777,8 +700,7 @@ where
                 };
 
                 let delta = screen_value - *last_position;
-                let frame_distance = delta.abs();
-                *total_delta += frame_distance;
+                *total_delta += delta.abs();
                 *last_position = screen_value;
 
                 if *total_delta > self.drag_deadband
@@ -789,7 +711,7 @@ where
                 }
             }
         }
-        // Handle axis hover (only when idle and cursor is over an axis)
+        // 3. Handle axis hover (only if idle)
         else if matches!(action, Action::Idle) {
             for (i, (id, axis)) in self.state.axes().iter().enumerate() {
                 let axis_bounds = layout.children().nth(i).unwrap().bounds();
@@ -808,13 +730,14 @@ where
                     shell.publish(handler(id.clone(), normalized));
                 }
 
-                break; // Only hover one axis at a time
+                break;
             }
         }
     }
 
     #[inline(always)]
     fn get_plot_layout<'b>(&self, layout: Layout<'b>) -> Layout<'b> {
+        // The plot area is always the last child in the layout list
         layout.children().last().unwrap()
     }
 }
@@ -837,7 +760,7 @@ where
     }
 
     fn children(&self) -> Vec<Tree> {
-        // One child per Axis + one for content.
+        // One child per Axis + one for the content (plot area).
         let mut children: Vec<Tree> = self.state.axes().iter().map(|_| Tree::empty()).collect();
         children.push(Tree::empty()); // content
         children
@@ -854,8 +777,7 @@ where
 
         let axis_count = self.state.axes().len();
 
-        // ---------- 1) First pass: measure axis thicknesses ----------
-
+        // Pass 1: Measure total thickness required for axes on each side
         let mut top_total = self.padding.top;
         let mut bottom_total = self.padding.bottom;
         let mut left_total = self.padding.left;
@@ -871,16 +793,14 @@ where
             }
         }
 
-        // ---------- 2) Compute chart (plot) area ----------
-
+        // Pass 2: Calculate the remaining area for the actual chart
         let chart_height = (bounds.height - top_total - bottom_total).max(0.0);
         let chart_width = (bounds.width - left_total - right_total).max(0.0);
 
         let chart_origin = Point::new(left_total, top_total);
         let chart_size = Size::new(chart_width, chart_height);
 
-        // ---------- 3) Second pass: layout & position everything ----------
-
+        // Pass 3: Generate layout nodes for everything
         let mut children_nodes = Vec::with_capacity(axis_count + 1);
 
         let mut top_y = self.padding.top;
@@ -915,7 +835,7 @@ where
             children_nodes.push(node);
         }
 
-        // --- Chart content (center plot) ---
+        // Add the chart content node (center plot)
         let chart_node = Node::new(chart_size).move_to(chart_origin);
         children_nodes.push(chart_node);
 
@@ -933,18 +853,17 @@ where
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
     ) {
+        // If there are errors (e.g. invalid axes), report them and stop processing events
         if !self.errors.is_empty()
             && let Some(handler) = &self.on_error
         {
             for error in self.errors.drain(..) {
                 shell.publish(handler(error));
             }
-
-            // Don't handle events when errors occur ?
             return;
         }
 
-        // Only redraw and handle events if the cursor is within the chart bounds
+        // Only handle events if the cursor is near the chart
         let bounds = layout.bounds();
         if cursor.position_over(bounds).is_none() {
             return;
@@ -952,7 +871,7 @@ where
 
         let memory: &mut Memory<AxisId> = tree.state.downcast_mut();
 
-        // Handle input events
+        // Dispatch Input Events
         match event {
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
             | Event::Touch(touch::Event::FingerPressed { .. }) => {
@@ -972,16 +891,15 @@ where
                 if let Some(cursor_pos) = cursor.position() {
                     let plot_bounds = self.get_plot_layout(layout).bounds();
 
-                    // Check if scrolling over plot
+                    // Check if scrolling over the plot area
                     if cursor.position_over(plot_bounds).is_some() {
                         if let Some(handler) = &self.on_scroll {
                             // Normalize cursor position (0.0-1.0)
-                            // Invert y since y=0 is at top in Iced but bottom in plot space
                             let normalized = Point::new(
                                 (cursor_pos.x - plot_bounds.x) / plot_bounds.width,
                                 1.0 - ((cursor_pos.y - plot_bounds.y) / plot_bounds.height),
                             );
-                            // Capture scroll events to prevent other widgets from handling
+
                             shell.capture_event();
                             shell.publish(handler(normalized, *delta));
                         }
@@ -1000,7 +918,6 @@ where
                                     let normalized =
                                         axis.screen_to_normalized(screen_value, &axis_bounds);
 
-                                    // Capture scroll events to prevent other widgets from handling
                                     shell.capture_event();
                                     shell.publish(handler(id.clone(), normalized, *delta));
                                 }
@@ -1010,7 +927,7 @@ where
                     }
                 }
             }
-            // This is missing touch support for zooming - We need to track fingers (TBD - Later)
+            // TODO: Add multi-touch support for zooming
             _ => {}
         }
 
@@ -1031,7 +948,7 @@ where
         let bounds = layout.bounds();
         let plot_bounds = self.get_plot_layout(layout).bounds();
 
-        // Fill in background
+        // 1. Draw transparent background (helps with hit testing in some backends)
         renderer.fill_quad(
             Quad {
                 bounds,
@@ -1040,14 +957,14 @@ where
             Color::TRANSPARENT,
         );
 
-        // 1. Retrieve the Memory from the Tree directly
         let memory = tree.state.downcast_ref::<Memory<AxisId>>();
 
-        // 2. Lock the tessellators for the duration of this draw call
+        // Reuse tessellators from memory to avoid re-allocating them every frame
         let mut tessellators = memory.tessellators.borrow_mut();
 
-        // Init mesh-rendering dependencies
+        // Create a new mesh buffer for this frame
         let mut mesh_buffer = render::MeshBuffer::new(100_000);
+
         let screen_rect = ScreenRect {
             x: plot_bounds.x,
             y: plot_bounds.y,
@@ -1055,7 +972,7 @@ where
             height: plot_bounds.height,
         };
 
-        // Render axes and grids
+        // 2. Render axes and grids
         for (i, (_, axis)) in self.state.axes().iter().enumerate() {
             let axis_layout = layout.children().nth(i).unwrap();
             axis.draw::<Renderer>(
@@ -1069,17 +986,16 @@ where
             );
         }
 
-        // Make sure we render the mesh buffer after adding axes/grids to it
+        // Flush the mesh buffer (draws all the lines/ticks aggregated so far)
         mesh_buffer.render(renderer, &bounds);
 
-        // Render layers
+        // 3. Render data layers
         for layer in &self.layers {
-            // This can never fail due to layer verification upon chart initialization
+            // These axes are guaranteed to exist because of `verify_layer` check
             let x_axis = self.state.axis(&layer.horizontal_axis_id);
             let y_axis = self.state.axis(&layer.vertical_axis_id);
             let transform = Transform::new(&screen_rect, x_axis.deref(), y_axis.deref());
 
-            // Pass the dereferenced mut borrow of tessellators
             let mut plot: Plot<Domain, Renderer> = Plot::new(
                 &mut tessellators,
                 renderer,
@@ -1087,13 +1003,15 @@ where
                 &mut mesh_buffer,
                 &transform,
             );
+
+            // User code draws shapes into the plot here
             layer.items.draw(&mut plot, theme);
         }
 
-        // --- NEW DEBUG OVERLAY CODE ---
+        // 4. Draw Debug Overlay (if enabled)
         if self.debug {
             renderer.start_layer(bounds);
-            // Get total counts from the buffer (includes all flushed layers)
+
             let v_count = mesh_buffer.total_vertices();
             let i_count = mesh_buffer.total_indices();
 
@@ -1106,12 +1024,11 @@ where
                 Color::from_rgb(0.9, 0.0, 0.0) // Red
             };
 
-            let text = format!("Vertices: {} | Indices: {}", v_count, i_count);
-
+            let text_content = format!("Vertices: {} | Indices: {}", v_count, i_count);
             let position = [bounds.x + 10.0, bounds.y + 10.0];
 
             let text = iced_core::Text {
-                content: text,
+                content: text_content,
                 bounds: Size::new(500., 500.),
                 size: 32.into(),
                 line_height: LineHeight::default(),
@@ -1122,12 +1039,13 @@ where
                 wrapping: Wrapping::None,
             };
 
-            // Draw Text
             renderer.fill_text(text, position.into(), color, bounds);
             renderer.end_layer();
         }
     }
 }
+
+// Boilerplate conversions and helpers
 
 impl<'a, AxisId, Domain, Message, Theme, Renderer>
     From<Chart<'a, AxisId, Domain, Message, Theme, Renderer>>
