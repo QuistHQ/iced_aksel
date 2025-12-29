@@ -148,7 +148,6 @@ pub fn draw_dashed_line(
     }
 
     let dx = end.x - start.x;
-    let dx = end.x - start.x;
     let dy = end.y - start.y;
     let length = (dx * dx + dy * dy).sqrt();
 
