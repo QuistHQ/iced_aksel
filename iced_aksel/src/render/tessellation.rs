@@ -19,7 +19,7 @@ use lyon_tessellation::{FillOptions, StrokeOptions, VertexBuffers};
 use math::*;
 use std::collections::HashMap;
 
-use crate::render::tessellation::text::TextTessellationCache;
+use crate::render::tessellation::text::{TextRenderContext, TextRequest, TextTessellationCache};
 pub use text::{CachedGlyph, Quality};
 
 /// The central driver for the rendering engine.
@@ -1101,35 +1101,28 @@ impl Tessellator {
     // instead of using this directly!
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn draw_label(&mut self, buffer: &mut MeshBuffer, text: Text, font: &GeometricFont) {
-        let Text {
-            content,
-            position,
-            size,
-            rotation,
-            horizontal_alignment,
-            vertical_alignment,
-            fill,
-            quality,
-            letter_spacing,
-        } = text;
-        text::draw_geometric_text(
+        let ctx = &mut TextRenderContext {
             buffer,
-            content,
-            position,
-            size.0,
-            rotation,
-            fill,
+            tessellator: &mut self.complex.fill,
+            glyph_cache: &mut self.glyph_cache,
+            scratch_geometry: &mut self.scratch_geometry,
+        };
+
+        let req = TextRequest {
+            content: text.content,
+            position: text.position,
             font,
-            font.id,
-            horizontal_alignment,
-            vertical_alignment,
-            quality,
-            self.quality,
-            letter_spacing, // <--- PASS
-            &mut self.scratch_geometry,
-            &mut self.complex.fill,
-            &mut self.glyph_cache,
-        );
+            size: text.size.0,
+            color: text.fill,
+            rotation: text.rotation,
+            horizontal_alignment: text.horizontal_alignment,
+            vertical_alignment: text.vertical_alignment,
+            quality: text.quality,
+            quality_multiplier: self.quality,
+            letter_spacing: text.letter_spacing,
+        };
+
+        text::draw_geometric_text(ctx, req);
     }
 
     // TODO: This could be considered to be removed later. Kept for now to allow for lyon
