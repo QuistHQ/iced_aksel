@@ -12,7 +12,7 @@
 //!     * Benefit: Extremely fast (no heavy math libraries).
 //!
 //! 2.  **Robust Path (Complex):** Uses the `lyon` library for advanced geometry.
-//!     * Used for: Dashed lines, Beziers, Complex Polygons, Text.
+//!     * Used for: Dashed lines, Bezier, Complex Polygons, Text.
 //!     * Benefit: Handles mathematically difficult edge cases (e.g., stroke miters, dash gaps).
 
 pub mod complex;
@@ -32,12 +32,12 @@ use complex::{ComplexTessellator, DashedPolyline, LyonAdapter, SolidVertexConstr
 use iced_core::{Color, Point, Rectangle};
 use iced_graphics::color::pack;
 use lyon_path::{LineCap, LineJoin, Path, PathEvent, iterator::FromPolyline, traits::PathIterator};
-use lyon_tessellation::{FillOptions, StrokeOptions, VertexBuffers};
+use lyon_tessellation::{StrokeOptions, VertexBuffers};
 use math::*;
 // Removed unused std::collections::HashMap import
 
 use crate::render::tessellation::text::{TextRenderContext, TextRequest, TextTessellationCache};
-pub use text::{CachedGlyph, Quality};
+pub use text::Quality;
 
 /// The central driver for the rendering engine.
 ///
@@ -1160,21 +1160,6 @@ impl Tessellator {
     // =========================================================================
     //  Internal Helpers
     // =========================================================================
-
-    /// Internal adapter for filling complex polygons using Lyon.
-    fn fill_polygon<I>(&mut self, buffer: &mut MeshBuffer, points: I, color: Color)
-    where
-        I: IntoIterator<Item = lyon_tessellation::math::Point>,
-    {
-        let options = FillOptions::default();
-        let mesh = buffer.get_mesh_mut();
-        let mut writer = LyonAdapter::new(mesh, SolidVertexConstructor { color: pack(color) });
-        let _ = self.complex.fill.tessellate(
-            FromPolyline::new(true, points.into_iter()),
-            &options,
-            &mut writer,
-        );
-    }
 
     fn resolve_lod(&self, radius: f32) -> usize {
         let raw = radius * 2.0 * self.quality;

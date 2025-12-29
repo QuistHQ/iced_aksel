@@ -842,7 +842,7 @@ where
         event: &Event,
         layout: layout::Layout<'_>,
         cursor: mouse::Cursor,
-        renderer: &Renderer,
+        _renderer: &Renderer,
         _clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
