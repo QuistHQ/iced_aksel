@@ -13,7 +13,7 @@ use std::{
 use aksel::{Float, Scale};
 use derivative::Derivative;
 use iced_core::{
-    Layout, Pixels, Point, Rectangle, Size, Text,
+    Background, Color, Layout, Pixels, Point, Rectangle, Size, Text,
     alignment::Vertical,
     layout::{Limits, Node},
     mouse::Cursor,
@@ -25,7 +25,10 @@ use iced_graphics::{color, mesh::SolidVertex2D};
 
 use crate::{
     plot,
-    render::MeshBuffer,
+    render::{
+        MeshBuffer,
+        tessellation::manual::linear::{draw_dashed_line, draw_line_segment},
+    },
     style::{AxisStyle, GridStyle, Style, TextStyle, TickStyle},
 };
 
@@ -102,6 +105,7 @@ impl<D: Float> Axis<D> {
             if ctx.tick.level == 0 {
                 result = result.grid_line(GridLine {
                     thickness: 1.0.into(),
+                    dashed: false,
                 });
             }
 
@@ -298,17 +302,63 @@ impl<D: Float> Axis<D> {
     ) where
         Renderer: plot::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
     {
+        let theme = style.axis;
+        let bounds = layout.bounds();
+
+        // 1. Draw Axis Container (Background & Border)
+        // We do this first so it sits behind ticks and labels.
+        if theme.container.background.is_some()
+            || theme.container.border.width > 0.0
+            || theme.container.shadow.color.a > 0.0
+        {
+            renderer.fill_quad(
+                Quad {
+                    bounds,
+                    border: theme.container.border,
+                    shadow: theme.container.shadow,
+                    snap: true,
+                },
+                theme
+                    .container
+                    .background
+                    .unwrap_or(Background::Color(Color::TRANSPARENT)),
+            );
+        }
+
+        // 2. Draw Axis Spine (The Line)
+        let spine_width = theme.axis_line.width.0;
+        if spine_width > 0.0 {
+            let (start, end) = match self.position {
+                Position::Bottom => (
+                    Point::new(bounds.x, bounds.y),
+                    Point::new(bounds.x + bounds.width, bounds.y),
+                ),
+                Position::Top => (
+                    Point::new(bounds.x, bounds.y + bounds.height),
+                    Point::new(bounds.x + bounds.width, bounds.y + bounds.height),
+                ),
+                Position::Left => (
+                    Point::new(bounds.x + bounds.width, bounds.y),
+                    Point::new(bounds.x + bounds.width, bounds.y + bounds.height),
+                ),
+                Position::Right => (
+                    Point::new(bounds.x, bounds.y),
+                    Point::new(bounds.x, bounds.y + bounds.height),
+                ),
+            };
+
+            draw_line_segment(mesh_buffer, start, end, spine_width, theme.axis_line.color);
+        }
+
         if self.invisible && !self.render_grid {
             return;
         }
 
-        let theme = style.axis;
-        let bounds = layout.bounds();
         let full_bounds = plot_bounds.union(&bounds);
         let orientation = Orientation::from(self.position());
         let (&d_min, &d_max) = self.scale.domain();
 
-        // 1. Calculate Cursor State (if active)
+        // 3. Calculate Cursor State (if active)
         // We prepare the cursor overlay state here but render it last.
         let cursor_state = if self.render_cursor
             && let Some(cursor_pos) = cursor.position_over(full_bounds)
@@ -344,7 +394,7 @@ impl<D: Float> Axis<D> {
 
         let mut label_candidates = Vec::new();
 
-        // 2. Iterate through ticks to collect renderables
+        // 4. Iterate through ticks to collect renderables
         for tick in self.ticks().into_iter() {
             let pos_norm = self.normalize(&tick.value);
 
@@ -399,7 +449,7 @@ impl<D: Float> Axis<D> {
             return;
         }
 
-        // 3. Resolve and Render Labels
+        // 5. Resolve and Render Labels
         // Sort by priority so important labels (level 0) are processed first
         label_candidates.sort_by_key(|candidate| candidate.priority);
 
@@ -412,7 +462,7 @@ impl<D: Float> Axis<D> {
             viewport,
         );
 
-        // 4. Draw Cursor Overlay
+        // 6. Draw Cursor Overlay
         if let Some((cursor_pos, paragraph)) = cursor_state {
             self.draw_cursor_overlay(
                 renderer,
@@ -809,45 +859,44 @@ impl<D: Float> Axis<D> {
     fn draw_grid_line(
         &self,
         style: &GridStyle,
-        bounds: &Rectangle,
+        plot_bounds: &Rectangle,
         line: GridLine,
         mesh_buffer: &mut MeshBuffer,
         pos_norm: f32,
     ) {
         let orientation = self.orientation();
-        let (x0, y0, x1, y1) = match orientation {
+
+        // Calculate start and end points based on plot bounds
+        let (start, end) = match orientation {
             Orientation::Horizontal => {
-                let x = bounds.width.mul_add(pos_norm, bounds.x).round();
-                (x, bounds.y, x + line.thickness.0, bounds.y + bounds.height)
+                let x = plot_bounds.width.mul_add(pos_norm, plot_bounds.x);
+                (
+                    Point::new(x, plot_bounds.y),
+                    Point::new(x, plot_bounds.y + plot_bounds.height),
+                )
             }
             Orientation::Vertical => {
-                let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y).round();
-                (bounds.x, y, bounds.x + bounds.width, y + line.thickness.0)
+                let y = plot_bounds.height.mul_add(1.0 - pos_norm, plot_bounds.y);
+                (
+                    Point::new(plot_bounds.x, y),
+                    Point::new(plot_bounds.x + plot_bounds.width, y),
+                )
             }
         };
 
-        let packed = color::pack(style.color);
-        mesh_buffer.add(
-            &[0, 1, 2, 2, 1, 3],
-            &[
-                SolidVertex2D {
-                    position: [x0, y0],
-                    color: packed,
-                },
-                SolidVertex2D {
-                    position: [x1, y0],
-                    color: packed,
-                },
-                SolidVertex2D {
-                    position: [x0, y1],
-                    color: packed,
-                },
-                SolidVertex2D {
-                    position: [x1, y1],
-                    color: packed,
-                },
-            ],
-        );
+        if line.dashed {
+            draw_dashed_line(
+                mesh_buffer,
+                start,
+                end,
+                line.thickness.0,
+                style.color,
+                5.0,
+                5.0,
+            );
+        } else {
+            draw_line_segment(mesh_buffer, start, end, line.thickness.0, style.color);
+        }
     }
 }
 

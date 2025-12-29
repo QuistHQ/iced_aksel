@@ -120,3 +120,45 @@ pub fn draw_arrowhead(
     mesh.indices
         .extend_from_slice(&[start_index, start_index + 1, start_index + 2]);
 }
+
+/// Draws a dashed line between two points.
+pub fn draw_dashed_line(
+    buffer: &mut MeshBuffer,
+    start: Point,
+    end: Point,
+    width: f32,
+    color: Color,
+    dash_length: f32,
+    gap_length: f32,
+) {
+    let dx = end.x - start.x;
+    let dy = end.y - start.y;
+    let length = (dx * dx + dy * dy).sqrt();
+
+    // Prevent division by zero
+    if length < 0.0001 {
+        return;
+    }
+
+    let dir_x = dx / length;
+    let dir_y = dy / length;
+
+    let mut current_dist = 0.0;
+
+    while current_dist < length {
+        let segment_end_dist = (current_dist + dash_length).min(length);
+
+        let seg_start = Point::new(
+            start.x + dir_x * current_dist,
+            start.y + dir_y * current_dist,
+        );
+        let seg_end = Point::new(
+            start.x + dir_x * segment_end_dist,
+            start.y + dir_y * segment_end_dist,
+        );
+
+        draw_line_segment(buffer, seg_start, seg_end, width, color);
+
+        current_dist += dash_length + gap_length;
+    }
+}

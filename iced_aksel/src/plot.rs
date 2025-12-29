@@ -3,11 +3,9 @@
 //! This module provides the core plotting infrastructure for rendering data on charts.
 //! The main entry point is the [`PlotData`] trait, which you implement to draw your data.
 
-use crate::{
-    render::{MeshBuffer, Tessellators},
-    shape::Shape,
-};
+use crate::{render::MeshBuffer, shape::Shape};
 
+use crate::render::Tessellator;
 use aksel::{Float, PlotRect, Transform};
 use iced_core::{Color, Point, Text};
 
@@ -117,7 +115,7 @@ pub struct Context<'a, D: Float, Renderer: self::Renderer = iced_renderer::Rende
     transform: &'a Transform<'a, D, f32, f32>,
     clip_bounds: &'a iced_core::Rectangle,
     renderer: &'a mut Renderer,
-    tessellators: &'a mut Tessellators,
+    tessellator: &'a mut Tessellator,
     mesh_buffer: &'a mut MeshBuffer,
     last_drawn: ShapeType,
 }
@@ -134,7 +132,7 @@ impl<'a, D: Float, Renderer: self::Renderer> Context<'a, D, Renderer> {
     /// Used internally by shapes to add geometry to the mesh buffer.
     pub fn render_mesh<F>(&mut self, f: F)
     where
-        F: FnOnce(&Transform<'a, D, f32, f32>, &mut MeshBuffer, &mut Tessellators),
+        F: FnOnce(&Transform<'a, D, f32, f32>, &mut MeshBuffer, &mut Tessellator),
     {
         if matches!(self.last_drawn, ShapeType::Text) {
             // Since meshes are always drawn under text, we have to start a new layer in order to
@@ -144,7 +142,7 @@ impl<'a, D: Float, Renderer: self::Renderer> Context<'a, D, Renderer> {
         }
 
         // Draw mesh
-        f(self.transform, self.mesh_buffer, self.tessellators);
+        f(self.transform, self.mesh_buffer, self.tessellator);
 
         // If buffer exceeds limit, render the mesh
         if self.mesh_buffer.vertices_count() >= self.mesh_buffer.limit() {
@@ -187,7 +185,7 @@ where
     ///
     /// This is typically called internally by the Chart widget.
     pub fn new(
-        tessellators: &'a mut Tessellators,
+        tessellator: &'a mut Tessellator,
         renderer: &'a mut R,
         clip_bounds: &'a iced_core::Rectangle,
         mesh_buffer: &'a mut MeshBuffer,
@@ -198,7 +196,7 @@ where
             transform,
             clip_bounds,
             renderer,
-            tessellators,
+            tessellator,
             mesh_buffer,
             last_drawn: ShapeType::Mesh,
         };

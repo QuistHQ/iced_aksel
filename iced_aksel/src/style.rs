@@ -1,6 +1,6 @@
-use iced_core::{Border, Color, Font, Padding, Pixels, Shadow, Theme};
 use iced_core::text::LineHeight;
 use iced_core::widget::text::Shaping;
+use iced_core::{Background, Border, Color, Font, Padding, Pixels, Shadow, Theme};
 
 /// Global style of a `Chart`.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -20,11 +20,17 @@ pub struct GridStyle {
     pub color: Color,
     /// The thickness of the grid lines in pixels.
     pub width: Pixels,
+    /// Whether the grid lines should be dashed.
+    pub dashed: bool,
 }
 
 /// Style of a `Chart`'s axis.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AxisStyle {
+    /// Style of the axis container (background, border, shadow).
+    pub container: AxisContainerStyle,
+    /// Style of the axis line (the spine).
+    pub axis_line: AxisLineStyle,
     /// Distance from the Axis Line to the text baseline (The "Rail").
     pub text_offset: Pixels,
     /// Style of the text labels.
@@ -33,6 +39,26 @@ pub struct AxisStyle {
     pub ticks: TickStyle,
     /// Style of the cursor badge and line on the axis.
     pub cursor: AxisCursorStyle,
+}
+
+/// Style of the axis container.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AxisContainerStyle {
+    /// The background of the axis.
+    pub background: Option<Background>,
+    /// The border of the axis.
+    pub border: Border,
+    /// The shadow of the axis.
+    pub shadow: Shadow,
+}
+
+/// Style of the axis line (spine).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AxisLineStyle {
+    /// The color of the axis line.
+    pub color: Color,
+    /// The thickness of the axis line.
+    pub width: Pixels,
 }
 
 /// Style of axis ticks.
@@ -142,8 +168,18 @@ pub fn default(theme: &Theme) -> Style {
         grid: GridStyle {
             color: palette.background.strong.color,
             width: 1.0.into(),
+            dashed: false,
         },
         axis: AxisStyle {
+            container: AxisContainerStyle {
+                background: None,
+                border: Border::default(),
+                shadow: Shadow::default(),
+            },
+            axis_line: AxisLineStyle {
+                color: palette.background.strong.color,
+                width: 1.0.into(),
+            },
             text_offset: 12.0.into(),
             label: TextStyle {
                 color: palette.background.strong.text,

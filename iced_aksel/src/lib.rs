@@ -101,7 +101,7 @@ mod layer;
 mod measure;
 mod render;
 mod state;
-// Export style module so users can define custom themes
+
 pub mod style;
 
 pub mod axis;
@@ -179,7 +179,7 @@ struct Memory<AxisId> {
     action: Action<AxisId>,
     previous_click: Option<mouse::Click>,
     // Persistent tessellators are stored here to reuse internal buffers.
-    tessellators: RefCell<render::Tessellators>,
+    tessellators: RefCell<render::Tessellator>,
 }
 
 impl<AxisId> Default for Memory<AxisId> {
@@ -188,7 +188,7 @@ impl<AxisId> Default for Memory<AxisId> {
             action: Action::default(),
             previous_click: None,
             // Initialize them once. Lyon will reuse the internal Vec capacities.
-            tessellators: RefCell::new(render::Tessellators::default()),
+            tessellators: RefCell::new(render::Tessellator::default()),
         }
     }
 }
