@@ -470,6 +470,7 @@ impl CandlestickChart {
                 label,
                 grid_line,
                 tick_line,
+                ..Default::default()
             }
         };
 
@@ -478,10 +479,7 @@ impl CandlestickChart {
             .with_cursor_formatter(|x| {
                 let timestamp_seconds = x as i64 * 60;
                 let datetime = chrono::Utc.timestamp_opt(timestamp_seconds, 0).single()?;
-                Some(axis::Label {
-                    content: datetime.format("%a %d %b '%g %H:%M").to_string(), // Added %H:%M to cursor for precision
-                    ..Default::default()
-                })
+                Some(datetime.format("%a %d %b '%g %H:%M").to_string())
             })
             .skip_overlapping_labels(12.0)
     }
@@ -489,20 +487,11 @@ impl CandlestickChart {
     /// Factory for creating the Price Y-axis.
     fn create_y_axis(range: (f64, f64)) -> Axis<f64> {
         let scale = Linear::new(range.0, range.1);
-        let tick_renderer = |ctx: TickContext<f64>| -> TickResult {
-            TickResult {
-                label: Some(format!("{:.2}", ctx.tick.value).into()),
-                ..Default::default()
-            }
-        };
         Axis::new(scale, Position::Right)
-            .with_tick_renderer(tick_renderer)
-            .with_cursor_formatter(|x| {
-                Some(axis::Label {
-                    content: format!("{x:.2}"),
-                    ..Default::default()
-                })
+            .with_tick_renderer(|ctx: TickContext<f64>| -> TickResult {
+                TickResult::default().label(format!("{:.2}", ctx.tick.value))
             })
+            .with_cursor_formatter(|x| Some(format!("{x:.2}")))
             .skip_overlapping_labels(8.0)
     }
 
