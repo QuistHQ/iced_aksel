@@ -29,8 +29,8 @@ impl GridLine {
         }
     }
 
-    /// Sets the grid line to be dashed.
-    pub fn dashed(mut self, dashed: bool) -> Self {
+    /// Sets whether the grid line should be dashed.
+    pub fn with_dashed(mut self, dashed: bool) -> Self {
         self.dashed = dashed;
         self
     }
