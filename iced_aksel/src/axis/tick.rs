@@ -1,9 +1,6 @@
 use crate::axis::GridLine;
 
-use super::{
-    Orientation,
-    label::{Label, LabelBounds},
-};
+use super::{Orientation, label::LabelBounds};
 
 use aksel::{Float, Tick};
 use derivative::Derivative;
@@ -21,7 +18,7 @@ pub struct TickResult {
     /// Optional grid line extending into the plot area
     pub grid_line: Option<GridLine>,
     /// Optional text label for this tick
-    pub label: Option<Label>,
+    pub label: Option<String>,
     /// Optional label rendering-priority
     pub label_priority: Option<u8>,
 }
@@ -49,7 +46,7 @@ impl TickResult {
     }
 
     /// Creates a new empty [TickResult] with a label
-    pub fn with_label<L: Into<Label>>(label: L) -> Self {
+    pub fn with_label<L: Into<String>>(label: L) -> Self {
         Self {
             label: Some(label.into()),
             ..Self::new()
@@ -81,7 +78,7 @@ impl TickResult {
     }
 
     /// Adds a label to the [TickResult]
-    pub fn label<L: Into<Label>>(mut self, label: L) -> Self {
+    pub fn label<L: Into<String>>(mut self, label: L) -> Self {
         self.label = Some(label.into());
         self
     }
@@ -100,58 +97,6 @@ impl TickResult {
 }
 
 /// Defines the visual styling and content of a single tick mark on an Axis.
-///
-/// # The Tick Rendering Pipeline
-///
-/// Understanding `TickLine` requires understanding how `aksel` processes axes.
-/// The relationship flows as follows:
-///
-/// 1.  **Generation (`Scale`):** The [`Scale`](crate::Scale) (e.g., `Linear`, `Log`) calculates logical positions
-///     and importance levels for potential ticks, creating [`Tick`] objects.
-/// 2.  **Contextualization (`Axis`):** The Axis wraps each logical [`Tick`] into a [`TickLabelContext`](crate::axis::TickLabelContext).
-///     This provides context like the axis bounds, domain, and orientation.
-/// 3.  **Styling (User Logic):** The user provides a closure via [`Axis::with_tick_renderer`](crate::Axis::with_tick_renderer).
-///     This closure receives the context and decides **if** and **how** that tick should be drawn
-///     by returning an `Option<TickLine>`.
-///
-/// This separation allows you to have completely dynamic styling—for example, making every
-/// major tick thick and red, while making minor ticks thin and grey, or hiding specific ticks entirely.
-///
-/// [Image of chart axis anatomy showing major and minor ticks]
-///
-/// # Example
-///
-/// This example demonstrates how to configure an axis to render major ticks with labels
-/// and thick lines, while rendering minor ticks as smaller lines without labels.
-///
-/// ```rust
-/// use iced_aksel::{Axis, axis::TickLine, scale::Linear};
-/// use iced::Pixels;
-///
-/// let axis = Axis::new(Linear::new(0.0, 100.0), iced_aksel::axis::Position::Bottom)
-///     .with_tick_renderer(|ctx| {
-///         match ctx.tick.level {
-///             // Major Tick (Level 0): Thicker, longer, and has a text label
-///             0 => Some(TickLine {
-///                 thickness: Pixels(2.0),
-///                 length: Pixels(10.0),
-///                 // We use the context's value to format the text
-///                 label: Some(iced_aksel::axis::Label {
-///                     content: format!("{:.1}", ctx.tick.value),
-///                     ..Default::default()
-///                 }),
-///             }),
-///             // Minor Tick (Level 1): Thinner, shorter, no label
-///             1 => Some(TickLine {
-///                 thickness: Pixels(1.0),
-///                 length: Pixels(5.0),
-///                 label: None,
-///             }),
-///             // Any other importance level: Do not draw (return None)
-///             _ => None,
-///         }
-///     });
-/// ```
 #[derive(Debug, Clone)]
 pub struct TickLine {
     /// The visual thickness (stroke width) of the tick line.
@@ -218,24 +163,6 @@ pub struct PlacedLabelInfo<D> {
 }
 
 /// Decision on whether to render or skip a tick label.
-///
-/// Used by custom label policies provided to [`Axis::with_custom_label_policy`](crate::Axis::with_custom_label_policy).
-///
-/// # Example
-///
-/// ```rust
-/// use iced_aksel::{Axis, axis::LabelDecision, scale::Linear};
-///
-/// // Only show labels for even values
-/// let axis = Axis::new(Linear::new(0.0, 100.0), iced_aksel::axis::Position::Bottom)
-///     .with_custom_label_policy(|ctx| {
-///         if ctx.tick.value as i32 % 2 == 0 {
-///             LabelDecision::Render
-///         } else {
-///             LabelDecision::Skip
-///         }
-///     });
-/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LabelDecision {
     /// Render this label at its position.
@@ -253,7 +180,7 @@ pub struct LabelCandidate<D> {
     /// Normalized position (0.0-1.0) along the axis
     pub normalized_position: f32,
     /// The label to be rendered
-    pub label: Label,
+    pub label: String,
     /// Rendering-priority of the label
     pub priority: u8,
 }
@@ -278,8 +205,6 @@ where
 }
 
 /// Context provided to custom label policy functions.
-///
-/// Contains information needed to decide whether to render a label.
 #[derive(Debug)]
 pub struct LabelDecisionContext<'a, D> {
     /// The tick associated with this label

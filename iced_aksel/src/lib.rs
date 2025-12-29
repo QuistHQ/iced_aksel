@@ -95,7 +95,8 @@ mod layer;
 mod measure;
 mod render;
 mod state;
-mod style;
+// Export style so users can define themes
+pub mod style;
 
 pub mod axis;
 pub mod plot;
@@ -145,7 +146,7 @@ pub enum Error<AxisId> {
     #[display("Unknown axis id: '{id:?}'")]
     UnknownAxis {
         /// The ID of the unknown axis
-        id: AxisId
+        id: AxisId,
     },
 }
 
@@ -289,6 +290,15 @@ where
 
             debug: false,
         }
+    }
+
+    /// Sets the style of the chart.
+    ///
+    /// Note: We accept the concrete associated type Class<'a> directly to allow
+    /// for automatic unsizing coercions (e.g. from Box<fn> to Box<dyn Fn>).
+    pub fn style(mut self, style: <Theme as Catalog>::Class<'a>) -> Self {
+        self.class = style;
+        self
     }
 
     /// Enables the debug overlay, showing vertex and index counts.
@@ -814,7 +824,7 @@ impl<AxisId, Domain, Message, Theme, Renderer> Widget<Message, Theme, Renderer>
 where
     AxisId: Hash + Eq + Debug + Clone + 'static,
     Domain: Float,
-    Renderer: plot::Renderer,
+    Renderer: plot::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
     Theme: Catalog,
     Message: Clone,
 {
@@ -1127,7 +1137,7 @@ where
     Domain: Float,
     Message: Clone + 'a,
     Theme: Catalog + 'a,
-    Renderer: plot::Renderer,
+    Renderer: plot::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
 {
     fn from(plot: Chart<'a, AxisId, Domain, Message, Theme, Renderer>) -> Self {
         Element::new(plot)
