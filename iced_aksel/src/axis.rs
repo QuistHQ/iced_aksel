@@ -463,7 +463,7 @@ impl<D: Float> Axis<D> {
                 let y = cursor_pos.y - (badge_height / 2.0);
                 let x = match self.position {
                     Position::Right => rail_pos,
-                    _ => rail_pos - padding.right - min_bounds.width - padding.left,
+                    _ => rail_pos - badge_width, // badge_width already includes all padding
                 };
                 Rectangle::new(Point::new(x, y), Size::new(badge_width, badge_height))
             }
