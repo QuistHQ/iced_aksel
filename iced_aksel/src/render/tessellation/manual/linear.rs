@@ -122,6 +122,15 @@ pub fn draw_arrowhead(
 }
 
 /// Draws a dashed line between two points.
+///
+/// # Arguments
+/// * `buffer` - The mesh buffer to draw into
+/// * `start` - Starting point of the line
+/// * `end` - Ending point of the line
+/// * `width` - Thickness of the line in pixels
+/// * `color` - Color of the line
+/// * `dash_length` - Length of each dash segment in pixels
+/// * `gap_length` - Length of gaps between dashes in pixels
 pub fn draw_dashed_line(
     buffer: &mut MeshBuffer,
     start: Point,
@@ -131,6 +140,13 @@ pub fn draw_dashed_line(
     dash_length: f32,
     gap_length: f32,
 ) {
+    // Guard against invalid parameters that could cause infinite loop
+    if dash_length <= 0.0 || gap_length < 0.0 {
+        // Fall back to solid line if dash parameters are invalid
+        draw_line_segment(buffer, start, end, width, color);
+        return;
+    }
+
     let dx = end.x - start.x;
     let dy = end.y - start.y;
     let length = (dx * dx + dy * dy).sqrt();
