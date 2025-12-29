@@ -94,19 +94,6 @@ impl MeshBuffer {
             let v_count = buffer.vertices.len();
             let i_count = buffer.indices.len();
 
-            // --- OBSERVABILITY / SAFETY CHECK ---
-            // If we are pushing a massive amount of geometry in a single batch,
-            // it often indicates a performance bug (e.g. text quality set too high).
-            // We log a warning to the console to help the developer debug.
-            if v_count > 50_000 {
-                println!(
-                    "⚠️ [iced_aksel] High Vertex Count Detected: {} verts / {} indices in a single batch. \
-                    Consider reducing Quality or using a lower LOD.",
-                    v_count, i_count
-                );
-            }
-            // ------------------------------------
-
             self.total_vertices += v_count;
             self.total_indices += i_count;
 
