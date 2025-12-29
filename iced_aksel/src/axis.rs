@@ -302,6 +302,10 @@ impl<D: Float> Axis<D> {
     ) where
         Renderer: plot::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
     {
+        if self.invisible && !self.render_grid {
+            return;
+        }
+
         let theme = style.axis;
         let bounds = layout.bounds();
 
@@ -348,10 +352,6 @@ impl<D: Float> Axis<D> {
             };
 
             draw_line_segment(mesh_buffer, start, end, spine_width, theme.axis_line.color);
-        }
-
-        if self.invisible && !self.render_grid {
-            return;
         }
 
         let full_bounds = plot_bounds.union(&bounds);
