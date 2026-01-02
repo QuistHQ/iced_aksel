@@ -96,21 +96,29 @@ pub fn default(theme: &Theme) -> Style {
         cursor: CursorStyle {
             axis: AxisCursorStyle {
                 badge: BadgeStyle {
-                    text: TextStyle::default(),
+                    text: TextStyle {
+                        color: theme.palette().text,
+                        line_height: LineHeight::default(),
+                        size: 12.0.into(),
+                        shaping: Shaping::Auto,
+
+                        // TODO: Where should we get font from?
+                        font: Font::default(),
+                    },
                     container: ContainerStyle {
                         border: Some(Border {
                             width: 1.0.into(),
-                            color: Color::WHITE,
+                            color: theme.palette().text,
                             radius: 2.0.into(),
                         }),
-                        background: None,
+                        background: Some(theme.palette().background.into()),
                         shadow: Default::default(),
                     },
                     padding: 4.0.into(),
                 },
                 line: LineStyle {
-                    color: Color::WHITE,
-                    width: 2.0.into(),
+                    color: theme.palette().text,
+                    width: 1.0.into(),
                 },
                 line_gap: 4.0.into(),
             },
@@ -122,7 +130,7 @@ pub fn default(theme: &Theme) -> Style {
         },
         axis: AxisStyle {
             container: ContainerStyle {
-                background: None,
+                background: Some(theme.palette().background.into()),
                 border: None,
                 shadow: None,
             },
