@@ -12,7 +12,6 @@ use std::{
 
 use aksel::{Float, Scale};
 use derivative::Derivative;
-use iced_core::text::LineHeight;
 use iced_core::{
     Background, Border, Color, Layout, Pixels, Point, Rectangle, Shadow, Size, Text,
     alignment::Vertical,
@@ -27,7 +26,6 @@ use iced_graphics::{color, mesh::SolidVertex2D};
 use crate::{
     plot,
     render::MeshBuffer,
-    style,
     style::{Style, TextStyle},
 };
 
@@ -448,7 +446,7 @@ impl<D: Float> Axis<D> {
         bounds: Rectangle,
         viewport: &Rectangle,
         orientation: Orientation,
-        style: &style::Style,
+        style: &Style,
     ) where
         Renderer: plot::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
     {
