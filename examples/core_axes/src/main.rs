@@ -62,7 +62,12 @@ impl AxesShowcase {
         )
     }
 
-    fn update(&mut self, _message: Message) -> iced::Task<Message> {
+    fn update(&mut self, message: Message) -> iced::Task<Message> {
+        match message {
+            Message::UpdateAxisLineSize(value) => {
+                self.axis_line_width = value;
+            }
+        }
         iced::Task::none()
     }
 
@@ -189,7 +194,7 @@ fn setup_engineering_axes() -> State<&'static str, f64> {
                 }),
                 grid_line: Some(GridLine {
                     thickness: 1.0.into(),
-                    dashed: false,
+                    dashed: true,
                 }),
                 label: Some(format!("{:.1}", ctx.tick.value)),
                 ..Default::default()
@@ -253,7 +258,7 @@ fn setup_custom_axes() -> State<&'static str, f64> {
                 TickResult {
                     grid_line: Some(GridLine {
                         thickness: if is_major { 1.0.into() } else { 0.0.into() },
-                        dashed: false,
+                        dashed: true,
                     }),
                     tick_line: Some(TickLine {
                         thickness: 1.0.into(),
@@ -283,7 +288,7 @@ fn style_base(theme: &Theme) -> Style {
     let mut style = iced_aksel::style::default(theme);
 
     // Ensure we use the theme's text color
-    style.axis.label.color = palette.background.strong.text;
+    style.axis.text.color = palette.background.strong.text;
     style.axis.ticks.color = palette.background.strong.text;
 
     // Use primary color for interaction elements
@@ -300,7 +305,7 @@ fn style_base(theme: &Theme) -> Style {
 fn style_engineering(theme: &Theme) -> Style {
     let mut style = style_base(theme);
 
-    style.axis.label.font = Font::MONOSPACE;
+    style.axis.text.font = Font::MONOSPACE;
     style.axis.cursor.text.font = Font::MONOSPACE;
 
     style
@@ -310,9 +315,8 @@ fn style_engineering(theme: &Theme) -> Style {
 fn style_playground(theme: &Theme) -> Style {
     let mut style = style_base(theme);
 
-    style.axis.axis_line.width = 2.into();
-    style.axis.axis_line.color = Color::WHITE;
-    // style.axis.
+    style.axis.line.width = 2.into();
+    style.axis.line.color = Color::WHITE;
 
     style
 }

@@ -30,13 +30,13 @@ pub struct AxisStyle {
     /// Style of the axis container (background, border, shadow).
     pub container: AxisContainerStyle,
     /// Style of the axis line (the spine).
-    pub axis_line: AxisLineStyle,
+    pub line: LineStyle,
+    /// Style of the text labels.
+    pub text: TextStyle,
     /// Distance from the Axis Line to the text baseline (The "Rail").
     pub text_offset: Pixels,
-    /// Style of the text labels.
-    pub label: TextStyle,
     /// Style of the ticks (lines).
-    pub ticks: TickStyle,
+    pub ticks: LineStyle,
     /// Style of the cursor badge and line on the axis.
     pub cursor: AxisCursorStyle,
 }
@@ -63,7 +63,7 @@ pub struct AxisLineStyle {
 
 /// Style of axis ticks.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct TickStyle {
+pub struct LineStyle {
     /// The color of the tick lines.
     pub color: Color,
     /// The thickness of the tick lines.
@@ -176,16 +176,16 @@ pub fn default(theme: &Theme) -> Style {
                 border: Border::default(),
                 shadow: Shadow::default(),
             },
-            axis_line: AxisLineStyle {
+            line: LineStyle {
                 color: palette.background.strong.color,
                 width: 1.0.into(),
             },
             text_offset: 12.0.into(),
-            label: TextStyle {
+            text: TextStyle {
                 color: palette.background.strong.text,
                 ..Default::default()
             },
-            ticks: TickStyle {
+            ticks: LineStyle {
                 color: palette.background.strong.color,
                 width: 1.0.into(),
             },

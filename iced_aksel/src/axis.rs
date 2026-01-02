@@ -13,7 +13,7 @@ use std::{
 use aksel::{Float, Scale};
 use derivative::Derivative;
 use iced_core::{
-    Background, Color, Layout, Pixels, Point, Rectangle, Size, Text,
+    Layout, Pixels, Point, Rectangle, Size, Text,
     alignment::Vertical,
     layout::{Limits, Node},
     mouse::Cursor,
@@ -25,11 +25,8 @@ use iced_graphics::{color, mesh::SolidVertex2D};
 
 use crate::{
     plot,
-    render::{
-        MeshBuffer,
-        tessellation::manual::linear::{draw_dashed_line, draw_line_segment},
-    },
-    style::{AxisStyle, GridStyle, Style, TextStyle, TickStyle},
+    render::MeshBuffer,
+    style::{AxisStyle, GridStyle, Style, TextStyle},
 };
 
 mod grid;
@@ -37,6 +34,8 @@ mod label;
 mod position;
 mod tick;
 
+use crate::render::manual::linear::{draw_dashed_line, draw_line_segment};
+use crate::style::LineStyle;
 pub use grid::*;
 pub use label::*;
 pub use position::*;
@@ -308,57 +307,11 @@ impl<D: Float> Axis<D> {
 
         let theme = style.axis;
         let bounds = layout.bounds();
-
-        // 1. Draw Axis Container (Background & Border)
-        // We do this first so it sits behind ticks and labels.
-        if theme.container.background.is_some()
-            || theme.container.border.width > 0.0
-            || theme.container.shadow.color.a > 0.0
-        {
-            renderer.fill_quad(
-                Quad {
-                    bounds,
-                    border: theme.container.border,
-                    shadow: theme.container.shadow,
-                    snap: true,
-                },
-                theme
-                    .container
-                    .background
-                    .unwrap_or(Background::Color(Color::TRANSPARENT)),
-            );
-        }
-
-        // 2. Draw Axis Spine (The Line)
-        let spine_width = theme.axis_line.width.0;
-        if spine_width > 0.0 {
-            let (start, end) = match self.position {
-                Position::Bottom => (
-                    Point::new(bounds.x, bounds.y),
-                    Point::new(bounds.x + bounds.width, bounds.y),
-                ),
-                Position::Top => (
-                    Point::new(bounds.x, bounds.y + bounds.height),
-                    Point::new(bounds.x + bounds.width, bounds.y + bounds.height),
-                ),
-                Position::Left => (
-                    Point::new(bounds.x + bounds.width, bounds.y),
-                    Point::new(bounds.x + bounds.width, bounds.y + bounds.height),
-                ),
-                Position::Right => (
-                    Point::new(bounds.x, bounds.y),
-                    Point::new(bounds.x, bounds.y + bounds.height),
-                ),
-            };
-
-            draw_line_segment(mesh_buffer, start, end, spine_width, theme.axis_line.color);
-        }
-
         let full_bounds = plot_bounds.union(&bounds);
         let orientation = Orientation::from(self.position());
         let (&d_min, &d_max) = self.scale.domain();
 
-        // 3. Calculate Cursor State (if active)
+        // 1. Calculate Cursor State (if active)
         // We prepare the cursor overlay state here but render it last.
         let cursor_state = if self.render_cursor
             && let Some(cursor_pos) = cursor.position_over(full_bounds)
@@ -394,7 +347,7 @@ impl<D: Float> Axis<D> {
 
         let mut label_candidates = Vec::new();
 
-        // 4. Iterate through ticks to collect renderables
+        // 2. Iterate through ticks to collect renderables
         for tick in self.ticks().into_iter() {
             let pos_norm = self.normalize(&tick.value);
 
@@ -449,7 +402,12 @@ impl<D: Float> Axis<D> {
             return;
         }
 
-        // 5. Resolve and Render Labels
+        // 3. Draw Axis Spine (New Logic)
+        // We draw this AFTER ticks and grids so it renders ON TOP of them (meaning ticks look "underneath").
+        // We use the `line` style from AxisStyle.
+        self.draw_axis_spine(&theme.line, &bounds, mesh_buffer);
+
+        // 4. Resolve and Render Labels
         // Sort by priority so important labels (level 0) are processed first
         label_candidates.sort_by_key(|candidate| candidate.priority);
 
@@ -462,7 +420,7 @@ impl<D: Float> Axis<D> {
             viewport,
         );
 
-        // 6. Draw Cursor Overlay
+        // 5. Draw Cursor Overlay
         if let Some((cursor_pos, paragraph)) = cursor_state {
             self.draw_cursor_overlay(
                 renderer,
@@ -657,7 +615,7 @@ impl<D: Float> Axis<D> {
                 candidate,
                 bounds,
                 orientation,
-                &theme.label,
+                &theme.text,
                 theme.text_offset,
             ) else {
                 continue;
@@ -685,7 +643,7 @@ impl<D: Float> Axis<D> {
                         .as_text()
                         .with_content(paragraph.content().to_string()),
                     position,
-                    theme.label.color,
+                    theme.text.color,
                     *viewport,
                 );
 
@@ -796,7 +754,7 @@ impl<D: Float> Axis<D> {
     /// Renders a single tick mark into the mesh buffer.
     fn draw_tick_line(
         &self,
-        style: &TickStyle,
+        style: &LineStyle,
         line: TickLine,
         bounds: &Rectangle,
         mesh_buffer: &mut MeshBuffer,
@@ -897,6 +855,68 @@ impl<D: Float> Axis<D> {
         } else {
             draw_line_segment(mesh_buffer, start, end, line.thickness.0, style.color);
         }
+    }
+
+    /// Renders the main axis spine.
+    ///
+    /// The spine grows "inward" into the axis area (based on its thickness) so that it
+    /// does not overlap with the plot area.
+    fn draw_axis_spine(&self, style: &LineStyle, bounds: &Rectangle, mesh_buffer: &mut MeshBuffer) {
+        let thickness = style.width.0;
+
+        let (x0, y0, x1, y1) = match self.position {
+            // Bottom axis: Boundary is at top (y), grow down
+            Position::Bottom => (
+                bounds.x,
+                bounds.y,
+                bounds.x + bounds.width,
+                bounds.y + thickness,
+            ),
+            // Top axis: Boundary is at bottom (y+h), grow up
+            Position::Top => (
+                bounds.x,
+                bounds.y + bounds.height - thickness,
+                bounds.x + bounds.width,
+                bounds.y + bounds.height,
+            ),
+            // Left axis: Boundary is at right (x+w), grow left
+            Position::Left => (
+                bounds.x + bounds.width - thickness,
+                bounds.y,
+                bounds.x + bounds.width,
+                bounds.y + bounds.height,
+            ),
+            // Right axis: Boundary is at left (x), grow right
+            Position::Right => (
+                bounds.x,
+                bounds.y,
+                bounds.x + thickness,
+                bounds.y + bounds.height,
+            ),
+        };
+
+        let color = color::pack(style.color);
+        mesh_buffer.add(
+            &[0, 1, 2, 2, 1, 3],
+            &[
+                SolidVertex2D {
+                    position: [x0, y0],
+                    color,
+                },
+                SolidVertex2D {
+                    position: [x1, y0],
+                    color,
+                },
+                SolidVertex2D {
+                    position: [x0, y1],
+                    color,
+                },
+                SolidVertex2D {
+                    position: [x1, y1],
+                    color,
+                },
+            ],
+        );
     }
 }
 

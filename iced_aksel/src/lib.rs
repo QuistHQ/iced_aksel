@@ -946,6 +946,7 @@ where
     ) {
         let style = theme.style(&self.class);
         let bounds = layout.bounds();
+
         let plot_bounds = self.get_plot_layout(layout).bounds();
 
         // 1. Draw transparent background (helps with hit testing in some backends)
