@@ -1,3 +1,10 @@
+mod axis;
+mod cursor;
+mod grid;
+
+use crate::style::axis::AxisStyle;
+use crate::style::cursor::{AxisCursorStyle, BadgeStyle, CursorStyle};
+use crate::style::grid::GridStyle;
 use iced_core::text::LineHeight;
 use iced_core::widget::text::Shaping;
 use iced_core::{Background, Border, Color, Font, Padding, Pixels, Shadow, Theme};
@@ -6,59 +13,22 @@ use iced_core::{Background, Border, Color, Font, Padding, Pixels, Shadow, Theme}
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Style {
     /// Style of the crosshair cursor on the plot area.
-    pub plot_cursor: PlotCursorStyle,
+    pub cursor: CursorStyle,
     /// Style of the axes.
     pub axis: AxisStyle,
     /// Style of the grid lines.
     pub grid: GridStyle,
 }
 
-/// Style of the grid lines.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct GridStyle {
-    /// The color of the grid lines.
-    pub color: Color,
-    /// The thickness of the grid lines in pixels.
-    pub width: Pixels,
-    /// Whether the grid lines should be dashed.
-    pub dashed: bool,
-}
-
-/// Style of a `Chart`'s axis.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct AxisStyle {
-    /// Style of the axis container (background, border, shadow).
-    pub container: AxisContainerStyle,
-    /// Style of the axis line (the spine).
-    pub line: LineStyle,
-    /// Style of the text labels.
-    pub text: TextStyle,
-    /// Distance from the Axis Line to the text baseline (The "Rail").
-    pub text_offset: Pixels,
-    /// Style of the ticks (lines).
-    pub ticks: LineStyle,
-    /// Style of the cursor badge and line on the axis.
-    pub cursor: AxisCursorStyle,
-}
-
 /// Style of the axis container.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct AxisContainerStyle {
+pub struct ContainerStyle {
     /// The background of the axis.
     pub background: Option<Background>,
     /// The border of the axis.
-    pub border: Border,
+    pub border: Option<Border>,
     /// The shadow of the axis.
-    pub shadow: Shadow,
-}
-
-/// Style of the axis line (spine).
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct AxisLineStyle {
-    /// The color of the axis line.
-    pub color: Color,
-    /// The thickness of the axis line.
-    pub width: Pixels,
+    pub shadow: Option<Shadow>,
 }
 
 /// Style of axis ticks.
@@ -67,44 +37,6 @@ pub struct LineStyle {
     /// The color of the tick lines.
     pub color: Color,
     /// The thickness of the tick lines.
-    pub width: Pixels,
-}
-
-/// Style of a `Chart`'s interactive axis cursor.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct AxisCursorStyle {
-    /// Color of the cursor line.
-    pub color: Color,
-    /// Width of the cursor line.
-    pub width: Pixels,
-    /// Distance between the end of the cursor line and the start of the badge.
-    pub line_gap: Pixels,
-
-    /// Style of the text inside the badge.
-    pub text: TextStyle,
-    /// Style of the badge container (background, border, shadow).
-    pub badge: AxisCursorBadgeStyle,
-}
-
-/// Style of the badge container for the axis cursor.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct AxisCursorBadgeStyle {
-    /// Padding around the text inside the badge.
-    pub padding: Padding,
-    /// Background color of the badge.
-    pub background: Color,
-    /// Border style of the badge.
-    pub border: Border,
-    /// Shadow style of the badge.
-    pub shadow: Shadow,
-}
-
-/// Style of the plot cursor that follows the mouse position over the chart.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct PlotCursorStyle {
-    /// The color of the cursor crosshair.
-    pub color: Color,
-    /// The thickness of the cursor lines.
     pub width: Pixels,
 }
 
@@ -161,9 +93,27 @@ pub fn default(theme: &Theme) -> Style {
     let palette = theme.extended_palette();
 
     Style {
-        plot_cursor: PlotCursorStyle {
-            color: palette.background.strong.color,
-            width: 1.0.into(),
+        cursor: CursorStyle {
+            axis: AxisCursorStyle {
+                badge: BadgeStyle {
+                    text: TextStyle::default(),
+                    container: ContainerStyle {
+                        border: Some(Border {
+                            width: 1.0.into(),
+                            color: Color::WHITE,
+                            radius: 2.0.into(),
+                        }),
+                        background: None,
+                        shadow: Default::default(),
+                    },
+                    padding: 4.0.into(),
+                },
+                line: LineStyle {
+                    color: Color::WHITE,
+                    width: 2.0.into(),
+                },
+                line_gap: 4.0.into(),
+            },
         },
         grid: GridStyle {
             color: palette.background.strong.color,
@@ -171,10 +121,10 @@ pub fn default(theme: &Theme) -> Style {
             dashed: false,
         },
         axis: AxisStyle {
-            container: AxisContainerStyle {
+            container: ContainerStyle {
                 background: None,
-                border: Border::default(),
-                shadow: Shadow::default(),
+                border: None,
+                shadow: None,
             },
             line: LineStyle {
                 color: palette.background.strong.color,
@@ -188,25 +138,6 @@ pub fn default(theme: &Theme) -> Style {
             ticks: LineStyle {
                 color: palette.background.strong.color,
                 width: 1.0.into(),
-            },
-            cursor: AxisCursorStyle {
-                color: palette.primary.base.color,
-                width: 1.0.into(),
-                line_gap: 4.0.into(),
-                text: TextStyle {
-                    color: palette.primary.strong.text,
-                    ..Default::default()
-                },
-                badge: AxisCursorBadgeStyle {
-                    padding: Padding::new(4.0),
-                    background: palette.primary.base.color,
-                    border: Border {
-                        radius: 4.0.into(),
-                        width: 0.0,
-                        color: Color::TRANSPARENT,
-                    },
-                    shadow: Shadow::default(),
-                },
             },
         },
     }

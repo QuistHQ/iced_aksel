@@ -12,8 +12,9 @@ use std::{
 
 use aksel::{Float, Scale};
 use derivative::Derivative;
+use iced_core::text::LineHeight;
 use iced_core::{
-    Layout, Pixels, Point, Rectangle, Size, Text,
+    Background, Border, Color, Layout, Pixels, Point, Rectangle, Shadow, Size, Text,
     alignment::Vertical,
     layout::{Limits, Node},
     mouse::Cursor,
@@ -26,7 +27,8 @@ use iced_graphics::{color, mesh::SolidVertex2D};
 use crate::{
     plot,
     render::MeshBuffer,
-    style::{AxisStyle, GridStyle, Style, TextStyle},
+    style,
+    style::{Style, TextStyle},
 };
 
 mod grid;
@@ -305,7 +307,6 @@ impl<D: Float> Axis<D> {
             return;
         }
 
-        let theme = style.axis;
         let bounds = layout.bounds();
         let full_bounds = plot_bounds.union(&bounds);
         let orientation = Orientation::from(self.position());
@@ -330,12 +331,12 @@ impl<D: Float> Axis<D> {
                     let paragraph = Plain::<Renderer::Paragraph>::new(Text {
                         content,
                         bounds: bounds.size(),
-                        size: theme.cursor.text.size,
-                        line_height: theme.cursor.text.line_height,
-                        font: theme.cursor.text.font,
+                        size: style.cursor.axis.badge.text.size,
+                        line_height: style.cursor.axis.badge.text.line_height,
+                        font: style.cursor.axis.badge.text.font,
                         align_x: Alignment::Left,
                         align_y: Vertical::Top,
-                        shaping: theme.cursor.text.shaping,
+                        shaping: style.cursor.axis.badge.text.shaping,
                         wrapping: Wrapping::None,
                     });
 
@@ -375,7 +376,7 @@ impl<D: Float> Axis<D> {
             if self.render_grid
                 && let Some(line) = grid_line
             {
-                self.draw_grid_line(&style.grid, plot_bounds, line, mesh_buffer, pos_norm);
+                self.draw_grid_line(&style, plot_bounds, line, mesh_buffer, pos_norm);
             }
 
             if self.invisible {
@@ -394,7 +395,7 @@ impl<D: Float> Axis<D> {
 
             // Draw Tick Marks (Axis style + local config)
             if let Some(line) = tick_line {
-                self.draw_tick_line(&theme.ticks, line, &bounds, mesh_buffer, pos_norm);
+                self.draw_tick_line(&style.axis.ticks, line, &bounds, mesh_buffer, pos_norm);
             }
         }
 
@@ -405,7 +406,7 @@ impl<D: Float> Axis<D> {
         // 3. Draw Axis Spine (New Logic)
         // We draw this AFTER ticks and grids so it renders ON TOP of them (meaning ticks look "underneath").
         // We use the `line` style from AxisStyle.
-        self.draw_axis_spine(&theme.line, &bounds, mesh_buffer);
+        self.draw_axis_spine(&style.axis.line, &bounds, mesh_buffer);
 
         // 4. Resolve and Render Labels
         // Sort by priority so important labels (level 0) are processed first
@@ -413,7 +414,7 @@ impl<D: Float> Axis<D> {
 
         self.layout_labels(
             renderer,
-            &theme,
+            &style,
             &bounds,
             orientation,
             label_candidates,
@@ -429,7 +430,7 @@ impl<D: Float> Axis<D> {
                 bounds,
                 viewport,
                 orientation,
-                theme,
+                &style,
             );
         }
     }
@@ -447,13 +448,13 @@ impl<D: Float> Axis<D> {
         bounds: Rectangle,
         viewport: &Rectangle,
         orientation: Orientation,
-        theme: AxisStyle,
+        style: &style::Style,
     ) where
         Renderer: plot::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
     {
-        let rail_pos = self.calculate_rail_position(&bounds, orientation, theme.text_offset);
+        let rail_pos = self.calculate_rail_position(&bounds, orientation, style.axis.text_offset);
         let min_bounds = paragraph.min_bounds();
-        let padding = theme.cursor.badge.padding;
+        let padding = style.cursor.axis.badge.padding;
         let badge_width = min_bounds.width + padding.left + padding.right;
         let badge_height = min_bounds.height + padding.top + padding.bottom;
 
@@ -497,8 +498,8 @@ impl<D: Float> Axis<D> {
             }
         }
 
-        let gap = theme.cursor.line_gap.0;
-        let line_width = theme.cursor.width.0;
+        let gap = style.cursor.axis.line_gap.0;
+        let line_width = style.cursor.axis.line.width.0;
 
         // Calculate cursor line position (respecting the gap)
         let cursor_line_rect = match orientation {
@@ -519,7 +520,7 @@ impl<D: Float> Axis<D> {
                 Rectangle {
                     x: cursor_pos.x - (line_width / 2.0),
                     y: y_start.min(y_end),
-                    width: line_width,
+                    width: line_width.into(),
                     height: (y_end - y_start).abs(),
                 }
             }
@@ -541,9 +542,27 @@ impl<D: Float> Axis<D> {
                     x: x_start.min(x_end),
                     y: cursor_pos.y - (line_width / 2.0),
                     width: (x_end - x_start).abs(),
-                    height: line_width,
+                    height: line_width.into(),
                 }
             }
+        };
+
+        let border = if let Some(border) = style.cursor.axis.badge.container.border {
+            border
+        } else {
+            Border::default()
+        };
+
+        let background = if let Some(background) = style.cursor.axis.badge.container.background {
+            background
+        } else {
+            Background::Color(Color::TRANSPARENT)
+        };
+
+        let shadow = if let Some(shadow) = style.cursor.axis.badge.container.shadow {
+            shadow
+        } else {
+            Shadow::default()
         };
 
         // Render using the full viewport clip to allow the badge to "bleed" out of the axis bounds
@@ -554,17 +573,17 @@ impl<D: Float> Axis<D> {
                 bounds: cursor_line_rect,
                 ..Default::default()
             },
-            theme.cursor.color,
+            background,
         );
 
         renderer.fill_quad(
             Quad {
                 bounds: badge_rect,
-                border: theme.cursor.badge.border,
-                shadow: theme.cursor.badge.shadow,
+                border,
+                shadow,
                 ..Default::default()
             },
-            theme.cursor.badge.background,
+            background,
         );
 
         let text_pos = Point::new(badge_rect.x + padding.left, badge_rect.y + padding.top);
@@ -574,7 +593,7 @@ impl<D: Float> Axis<D> {
                 .as_text()
                 .with_content(paragraph.content().to_string()),
             text_pos,
-            theme.cursor.text.color,
+            style.cursor.axis.badge.text.color,
             *viewport,
         );
 
@@ -600,7 +619,7 @@ impl<D: Float> Axis<D> {
     fn layout_labels<Renderer>(
         &self,
         renderer: &mut Renderer,
-        theme: &AxisStyle,
+        style: &Style,
         bounds: &Rectangle,
         orientation: Orientation,
         label_candidates: Vec<LabelCandidate<D>>,
@@ -615,8 +634,8 @@ impl<D: Float> Axis<D> {
                 candidate,
                 bounds,
                 orientation,
-                &theme.text,
-                theme.text_offset,
+                &style.axis.text,
+                style.axis.text_offset,
             ) else {
                 continue;
             };
@@ -643,7 +662,7 @@ impl<D: Float> Axis<D> {
                         .as_text()
                         .with_content(paragraph.content().to_string()),
                     position,
-                    theme.text.color,
+                    style.axis.text.color,
                     *viewport,
                 );
 
@@ -816,7 +835,7 @@ impl<D: Float> Axis<D> {
     /// Renders a single grid line into the mesh buffer.
     fn draw_grid_line(
         &self,
-        style: &GridStyle,
+        style: &Style,
         plot_bounds: &Rectangle,
         line: GridLine,
         mesh_buffer: &mut MeshBuffer,
@@ -848,12 +867,12 @@ impl<D: Float> Axis<D> {
                 start,
                 end,
                 line.thickness.0,
-                style.color,
+                style.grid.color,
                 5.0,
                 5.0,
             );
         } else {
-            draw_line_segment(mesh_buffer, start, end, line.thickness.0, style.color);
+            draw_line_segment(mesh_buffer, start, end, line.thickness.0, style.grid.color);
         }
     }
 

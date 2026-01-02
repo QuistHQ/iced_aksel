@@ -1,6 +1,6 @@
-use iced::widget::{Column, Slider};
+use iced::widget::Column;
 use iced::{
-    Border, Color, Element, Font, Length, Padding, Pixels, Shadow, Theme,
+    Color, Element, Font, Length, Padding, Theme,
     widget::{column, container, row, text},
 };
 use iced_aksel::{
@@ -9,7 +9,7 @@ use iced_aksel::{
     plot::{Plot, PlotData},
     scale::Linear,
     shape::Polyline,
-    style::{AxisStyle, Style},
+    style::Style,
 };
 
 pub fn main() -> iced::Result {
@@ -30,9 +30,6 @@ struct AxesShowcase {
 
     custom_state: State<&'static str, f64>,
     custom_data: SineWave,
-
-    // Panel
-    axis_line_width: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -55,19 +52,12 @@ impl AxesShowcase {
 
                 custom_state: setup_custom_axes(),
                 custom_data: SineWave::new(1.5, 0.8, 80),
-
-                axis_line_width: 1.0,
             },
             iced::Task::none(),
         )
     }
 
-    fn update(&mut self, message: Message) -> iced::Task<Message> {
-        match message {
-            Message::UpdateAxisLineSize(value) => {
-                self.axis_line_width = value;
-            }
-        }
+    fn update(&mut self, _message: Message) -> iced::Task<Message> {
         iced::Task::none()
     }
 
@@ -102,15 +92,8 @@ impl AxesShowcase {
                     .style(Box::new(style_playground)),
             );
 
-            let controls = container(Slider::new(
-                0.0..=20.0,
-                self.axis_line_width,
-                Message::UpdateAxisLineSize,
-            ))
-            .padding(10);
-
             // Combine them
-            column![chart, controls].spacing(10)
+            column![chart]
         };
 
         // 3. The Layout Structure
@@ -291,13 +274,6 @@ fn style_base(theme: &Theme) -> Style {
     style.axis.text.color = palette.background.strong.text;
     style.axis.ticks.color = palette.background.strong.text;
 
-    // Use primary color for interaction elements
-    style.axis.cursor.color = palette.primary.base.color;
-    style.axis.cursor.badge.background = palette.primary.base.color;
-    style.axis.cursor.text.color = palette.primary.base.text;
-
-    style.plot_cursor.color = palette.primary.base.color;
-
     style
 }
 
@@ -306,7 +282,6 @@ fn style_engineering(theme: &Theme) -> Style {
     let mut style = style_base(theme);
 
     style.axis.text.font = Font::MONOSPACE;
-    style.axis.cursor.text.font = Font::MONOSPACE;
 
     style
 }
@@ -315,8 +290,8 @@ fn style_engineering(theme: &Theme) -> Style {
 fn style_playground(theme: &Theme) -> Style {
     let mut style = style_base(theme);
 
-    style.axis.line.width = 2.into();
     style.axis.line.color = Color::WHITE;
+    style.axis.line.width = 5.0.into();
 
     style
 }
