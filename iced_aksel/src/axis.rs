@@ -497,7 +497,8 @@ impl<D: Float> Axis<D> {
         }
 
         let gap = style.cursor.axis.line_gap.0;
-        let line_width = style.cursor.axis.line.width.0;
+        let cursor_line_width = style.cursor.axis.line.width.0;
+        let cursor_line_color = style.cursor.axis.line.color;
 
         // Calculate cursor line position (respecting the gap)
         let cursor_line_rect = match orientation {
@@ -516,9 +517,9 @@ impl<D: Float> Axis<D> {
                 };
 
                 Rectangle {
-                    x: cursor_pos.x - (line_width / 2.0),
+                    x: cursor_pos.x - (cursor_line_width / 2.0),
                     y: y_start.min(y_end),
-                    width: line_width.into(),
+                    width: cursor_line_width.into(),
                     height: (y_end - y_start).abs(),
                 }
             }
@@ -538,9 +539,9 @@ impl<D: Float> Axis<D> {
 
                 Rectangle {
                     x: x_start.min(x_end),
-                    y: cursor_pos.y - (line_width / 2.0),
+                    y: cursor_pos.y - (cursor_line_width / 2.0),
                     width: (x_end - x_start).abs(),
-                    height: line_width.into(),
+                    height: cursor_line_width.into(),
                 }
             }
         };
@@ -569,9 +570,10 @@ impl<D: Float> Axis<D> {
         renderer.fill_quad(
             Quad {
                 bounds: cursor_line_rect,
+
                 ..Default::default()
             },
-            background,
+            cursor_line_color,
         );
 
         renderer.fill_quad(
