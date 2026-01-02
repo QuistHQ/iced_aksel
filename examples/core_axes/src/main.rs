@@ -1,3 +1,4 @@
+use iced::widget::{Column, Slider};
 use iced::{
     Border, Color, Element, Font, Length, Padding, Pixels, Shadow, Theme,
     widget::{column, container, row, text},
@@ -20,6 +21,7 @@ pub fn main() -> iced::Result {
 }
 
 struct AxesShowcase {
+    // State
     minimal_state: State<&'static str, f64>,
     minimal_data: SineWave,
 
@@ -28,10 +30,15 @@ struct AxesShowcase {
 
     custom_state: State<&'static str, f64>,
     custom_data: SineWave,
+
+    // Panel
+    axis_line_width: f32,
 }
 
 #[derive(Debug, Clone)]
-pub enum Message {}
+pub enum Message {
+    UpdateAxisLineSize(f32),
+}
 
 impl AxesShowcase {
     const X: &'static str = "x";
@@ -48,6 +55,8 @@ impl AxesShowcase {
 
                 custom_state: setup_custom_axes(),
                 custom_data: SineWave::new(1.5, 0.8, 80),
+
+                axis_line_width: 1.0,
             },
             iced::Task::none(),
         )
@@ -58,28 +67,52 @@ impl AxesShowcase {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        row![
-            self.panel(
-                "1. Minimal Layout",
-                "Hidden Y-axis. No Grid.",
-                Chart::new(&self.minimal_state)
-                    .plot_data(&self.minimal_data, Self::X, Self::Y)
-                    .style(Box::new(style_base))
-            ),
-            self.panel(
-                "2. Engineering Layout",
-                "Custom Ruler Ticks. Monospace.",
-                Chart::new(&self.engineering_state)
-                    .plot_data(&self.engineering_data, Self::X, Self::Y)
-                    .style(Box::new(style_engineering))
-            ),
-            self.panel(
+        // 1. Prepare the content "Atoms"
+        // These are self-contained. They don't know they are in a row yet.
+
+        let minimal_chart_panel = self.panel(
+            "1. Minimal Layout",
+            "Hidden Y-axis. No Grid.",
+            Chart::new(&self.minimal_state)
+                .plot_data(&self.minimal_data, Self::X, Self::Y)
+                .style(Box::new(style_base)),
+        );
+
+        let engineering_chart_panel = self.panel(
+            "2. Engineering Layout",
+            "Custom Ruler Ticks. Monospace.",
+            Chart::new(&self.engineering_state)
+                .plot_data(&self.engineering_data, Self::X, Self::Y)
+                .style(Box::new(style_engineering)),
+        );
+
+        // 2. Compose the "Complex" Atom locally
+        // It is totally fine to build this explicitly here.
+        let custom_placement_panel = {
+            let chart = self.panel(
                 "3. Custom Placement",
                 "Top & Right Axes. Badges.",
                 Chart::new(&self.custom_state)
                     .plot_data(&self.custom_data, Self::X, Self::Y)
-                    .style(Box::new(style_base))
-            ),
+                    .style(Box::new(style_playground)),
+            );
+
+            let controls = container(Slider::new(
+                0.0..=20.0,
+                self.axis_line_width,
+                Message::UpdateAxisLineSize,
+            ))
+            .padding(10);
+
+            // Combine them
+            column![chart, controls].spacing(10)
+        };
+
+        // 3. The Layout Structure
+        row![
+            minimal_chart_panel.width(Length::Fill),
+            engineering_chart_panel.width(Length::Fill),
+            custom_placement_panel.width(Length::Fill),
         ]
         .spacing(20)
         .padding(20)
@@ -91,7 +124,7 @@ impl AxesShowcase {
         title: &'a str,
         subtitle: &'a str,
         chart: Chart<'a, &'static str, f64, Message>,
-    ) -> Element<'a, Message> {
+    ) -> Column<'a, Message> {
         column![
             text(title).size(16).font(Font::MONOSPACE),
             text(subtitle)
@@ -111,7 +144,6 @@ impl AxesShowcase {
         ]
         .spacing(10)
         .width(Length::Fill)
-        .into()
     }
 }
 
@@ -270,6 +302,17 @@ fn style_engineering(theme: &Theme) -> Style {
 
     style.axis.label.font = Font::MONOSPACE;
     style.axis.cursor.text.font = Font::MONOSPACE;
+
+    style
+}
+
+/// Playground style: Monospace font, but same colors
+fn style_playground(theme: &Theme) -> Style {
+    let mut style = style_base(theme);
+
+    style.axis.axis_line.width = 2.into();
+    style.axis.axis_line.color = Color::WHITE;
+    // style.axis.
 
     style
 }
