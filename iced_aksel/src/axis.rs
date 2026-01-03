@@ -899,6 +899,8 @@ impl<D: Float> Axis<D> {
             }
         };
 
+        // TODO: Change this rendering functionality to be horizontal/vertical specific
+        // allowing us to use the same for tick/grid rendering, aligning them properly
         if line.dashed {
             draw_dashed_line(
                 mesh_buffer,
