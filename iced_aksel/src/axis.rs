@@ -878,16 +878,22 @@ impl<D: Float> Axis<D> {
     ) {
         let orientation = self.orientation();
 
+        // The key fix here is adding .round() to the calculated coordinate.
+        // This ensures the grid line snaps to the exact same pixel as the tick mark,
+        // preventing sub-pixel aliasing offsets.
         let (start, end) = match orientation {
             Orientation::Horizontal => {
-                let x = plot_bounds.width.mul_add(pos_norm, plot_bounds.x);
+                let x = plot_bounds.width.mul_add(pos_norm, plot_bounds.x).round();
                 (
                     Point::new(x, plot_bounds.y),
                     Point::new(x, plot_bounds.y + plot_bounds.height),
                 )
             }
             Orientation::Vertical => {
-                let y = plot_bounds.height.mul_add(1.0 - pos_norm, plot_bounds.y);
+                let y = plot_bounds
+                    .height
+                    .mul_add(1.0 - pos_norm, plot_bounds.y)
+                    .round();
                 (
                     Point::new(plot_bounds.x, y),
                     Point::new(plot_bounds.x + plot_bounds.width, y),
