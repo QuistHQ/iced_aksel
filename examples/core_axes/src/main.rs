@@ -108,7 +108,7 @@ fn setup_minimal_axes() -> State<&'static str, f64> {
                         })
                         .grid_line(GridLine {
                             thickness: 1.0.into(),
-                            dashed: true,
+                            dashed: false,
                             color: Color::from_rgb(0.0, 0.0, 0.8), // BLUE
                         });
                 } else {

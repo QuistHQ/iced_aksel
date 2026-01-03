@@ -879,19 +879,9 @@ impl<D: Float> Axis<D> {
     ) {
         let orientation = self.orientation();
 
-        // OFFSET FIX: We add `thickness / 2.0` to the rounded coordinate.
-        // This shifts the "center" of the grid line so that its "left edge" starts
-        // at the integer pixel, matching the behavior of draw_tick_line.
-        //
-        // Example (Width 1.0):
-        // Old: Round(100.0) -> 100.0. Segment draws 99.5 to 100.5 (Blurry, Center 100)
-        // New: Round(100.0) + 0.5 -> 100.5. Segment draws 100.0 to 101.0 (Sharp, Center 100.5)
-
-        let half_width = line.thickness.0 / 2.0;
-
         let (start, end) = match orientation {
             Orientation::Horizontal => {
-                let x = axis_bounds.width.mul_add(pos_norm, axis_bounds.x).round() + half_width;
+                let x = axis_bounds.width.mul_add(pos_norm, axis_bounds.x).round();
                 (
                     Point::new(x, plot_bounds.y),
                     Point::new(x, plot_bounds.y + plot_bounds.height),
@@ -901,8 +891,7 @@ impl<D: Float> Axis<D> {
                 let y = axis_bounds
                     .height
                     .mul_add(1.0 - pos_norm, axis_bounds.y)
-                    .round()
-                    + half_width;
+                    .round();
                 (
                     Point::new(plot_bounds.x, y),
                     Point::new(plot_bounds.x + plot_bounds.width, y),
