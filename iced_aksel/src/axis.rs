@@ -35,9 +35,9 @@ mod label;
 mod position;
 mod tick;
 
-use crate::axis::cursor::CursorResult;
 use crate::render::manual::linear::{draw_dashed_line, draw_line_segment};
 use crate::style::LineStyle;
+pub use cursor::*;
 pub use grid::*;
 pub use label::*;
 pub use position::*;
@@ -79,6 +79,64 @@ pub struct Axis<D> {
     pub(crate) cursor_renderer: Option<CursorRendererFn<D>>,
     #[derivative(Debug = "ignore")]
     label_policy: LabelPolicy<D>,
+}
+
+// Updated to hold the full result, not just string
+pub(crate) struct AxisOverlay<D> {
+    label_candidates: Vec<LabelCandidate<D>>,
+    cursor_state: Option<(Point, CursorResult)>,
+    bounds: Rectangle,
+    orientation: Orientation,
+}
+
+impl<D: Float> AxisOverlay<D> {
+    pub fn draw<Renderer>(
+        self,
+        axis: &Axis<D>,
+        renderer: &mut Renderer,
+        style: &Style,
+        viewport: &Rectangle,
+    ) where
+        Renderer: plot::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
+    {
+        let mut label_candidates = self.label_candidates;
+        label_candidates.sort_by_key(|candidate| candidate.priority);
+
+        axis.layout_labels(
+            renderer,
+            style,
+            &self.bounds,
+            self.orientation,
+            label_candidates,
+            viewport,
+        );
+
+        if let Some((cursor_pos, result)) = self.cursor_state {
+            // Reconstruct paragraph using style from result
+            let paragraph = Plain::<Renderer::Paragraph>::new(Text {
+                content: result.label.clone(),
+                bounds: self.bounds.size(),
+                size: result.badge.text_style.size,
+                line_height: result.badge.text_style.line_height,
+                font: result.badge.text_style.font,
+                align_x: Alignment::Left,
+                align_y: Vertical::Top,
+                shaping: result.badge.text_style.shaping,
+                wrapping: Wrapping::None,
+            });
+
+            axis.draw_cursor_overlay(
+                renderer,
+                cursor_pos,
+                paragraph,
+                result, // Pass the full result object
+                self.bounds,
+                viewport,
+                self.orientation,
+                style,
+            );
+        }
+    }
 }
 
 impl<D: Float> Axis<D> {
@@ -293,31 +351,66 @@ impl<D: Float> Axis<D> {
         Node::new(size)
     }
 
-    /// Draws the axis, including ticks, grid lines, labels, and the interactive cursor.
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn draw<Renderer>(
+    pub(crate) fn draw_grid(
         &self,
-        renderer: &mut Renderer,
+        layout: Layout<'_>,
+        plot_bounds: &Rectangle,
+        mesh_buffer: &mut MeshBuffer,
+    ) {
+        if !self.render_grid || (self.invisible && !self.render_grid) {
+            return;
+        }
+
+        let bounds = layout.bounds();
+        let orientation = Orientation::from(self.position());
+        let (&d_min, &d_max) = self.scale.domain();
+
+        for tick in self.ticks().into_iter() {
+            let pos_norm = self.normalize(&tick.value);
+
+            let tick_result = self.tick_renderer.as_ref().map(|renderer| {
+                renderer.borrow_mut()(TickContext {
+                    tick,
+                    normalized_position: pos_norm,
+                    axis_bounds: bounds,
+                    scale_domain: (d_max, d_min),
+                    orientation,
+                })
+            });
+
+            if let Some(TickResult {
+                grid_line: Some(line),
+                ..
+            }) = tick_result
+            {
+                self.draw_grid_line(plot_bounds, line, mesh_buffer, pos_norm);
+            }
+        }
+    }
+
+    pub(crate) fn draw_ticks(
+        &self,
         style: &Style,
         layout: Layout<'_>,
         cursor: Cursor,
         plot_bounds: &Rectangle,
         mesh_buffer: &mut MeshBuffer,
-        viewport: &Rectangle,
-    ) where
-        Renderer: plot::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
-    {
-        if self.invisible && !self.render_grid {
-            return;
+    ) -> AxisOverlay<D> {
+        let bounds = layout.bounds();
+        let orientation = Orientation::from(self.position());
+
+        if self.invisible {
+            return AxisOverlay {
+                label_candidates: Vec::new(),
+                cursor_state: None,
+                bounds,
+                orientation,
+            };
         }
 
-        let bounds = layout.bounds();
-        let full_bounds = plot_bounds.union(&bounds);
-        let orientation = Orientation::from(self.position());
         let (&d_min, &d_max) = self.scale.domain();
+        let full_bounds = plot_bounds.union(&bounds);
 
-        // 1. Calculate Cursor State (if active)
-        // We prepare the cursor overlay state here but render it last.
         let cursor_state = if self.render_cursor
             && let Some(cursor_pos) = cursor.position_over(full_bounds)
             && let Some(cursor_renderer) = &self.cursor_renderer
@@ -331,28 +424,13 @@ impl<D: Float> Axis<D> {
 
             self.denormalize_opt(value_to_render)
                 .and_then(|val| cursor_renderer.borrow_mut()(val))
-                .map(|content| {
-                    let paragraph = Plain::<Renderer::Paragraph>::new(Text {
-                        content,
-                        bounds: bounds.size(),
-                        size: style.cursor.axis.badge.text.size,
-                        line_height: style.cursor.axis.badge.text.line_height,
-                        font: style.cursor.axis.badge.text.font,
-                        align_x: Alignment::Left,
-                        align_y: Vertical::Top,
-                        shaping: style.cursor.axis.badge.text.shaping,
-                        wrapping: Wrapping::None,
-                    });
-
-                    (cursor_pos, paragraph)
-                })
+                .map(|result| (cursor_pos, result))
         } else {
             None
         };
 
         let mut label_candidates = Vec::new();
 
-        // 2. Iterate through ticks to collect renderables
         for tick in self.ticks().into_iter() {
             let pos_norm = self.normalize(&tick.value);
 
@@ -367,28 +445,16 @@ impl<D: Float> Axis<D> {
             });
 
             let Some(TickResult {
-                label_style,
                 tick_line,
-                grid_line,
                 label,
+                label_style,
                 label_priority,
+                ..
             }) = tick_result
             else {
                 continue;
             };
 
-            // Draw Grid Lines (Global style + local config)
-            if self.render_grid
-                && let Some(line) = grid_line
-            {
-                self.draw_grid_line(plot_bounds, line, mesh_buffer, pos_norm);
-            }
-
-            if self.invisible {
-                continue;
-            }
-
-            // Collect labels for collision resolution
             if let Some(label) = label {
                 label_candidates.push(LabelCandidate {
                     tick,
@@ -399,58 +465,27 @@ impl<D: Float> Axis<D> {
                 });
             }
 
-            // Draw Tick Marks (Axis style + local config)
             if let Some(line) = tick_line {
                 self.draw_tick_line(line, &bounds, mesh_buffer, pos_norm);
             }
         }
 
-        if self.invisible {
-            return;
-        }
-
-        // 3. Draw Axis Spine (New Logic)
-        // We draw this AFTER ticks and grids so it renders ON TOP of them (meaning ticks look "underneath").
-        // We use the `line` style from AxisStyle.
         self.draw_axis_spine(&style.axis.line, &bounds, mesh_buffer);
 
-        // 4. Resolve and Render Labels
-        // Sort by priority so important labels (level 0) are processed first
-        label_candidates.sort_by_key(|candidate| candidate.priority);
-
-        self.layout_labels(
-            renderer,
-            &style,
-            &bounds,
-            orientation,
+        AxisOverlay {
             label_candidates,
-            viewport,
-        );
-
-        // 5. Draw Cursor Overlay
-        if let Some((cursor_pos, paragraph)) = cursor_state {
-            self.draw_cursor_overlay(
-                renderer,
-                cursor_pos,
-                paragraph,
-                bounds,
-                viewport,
-                orientation,
-                &style,
-            );
+            cursor_state,
+            bounds,
+            orientation,
         }
     }
 
-    /// Draws the interactive cursor badge and line.
-    ///
-    /// This method ensures the badge stays within the viewport even if the mouse
-    /// is at the extreme edges of the axis, preventing clipping.
-    #[allow(clippy::too_many_arguments)]
     fn draw_cursor_overlay<Renderer>(
         &self,
         renderer: &mut Renderer,
         cursor_pos: Point,
         paragraph: Plain<Renderer::Paragraph>,
+        cursor_result: CursorResult, // NEW PARAM
         bounds: Rectangle,
         viewport: &Rectangle,
         orientation: Orientation,
@@ -460,11 +495,12 @@ impl<D: Float> Axis<D> {
     {
         let rail_pos = self.calculate_rail_position(&bounds, orientation, style.axis.text_offset);
         let min_bounds = paragraph.min_bounds();
-        let padding = style.cursor.axis.badge.padding;
+
+        let padding = cursor_result.badge.padding;
+
         let badge_width = min_bounds.width + padding.left + padding.right;
         let badge_height = min_bounds.height + padding.top + padding.bottom;
 
-        // Calculate initial badge position
         let mut badge_rect = match orientation {
             Orientation::Horizontal => {
                 let x = cursor_pos.x - (badge_width / 2.0);
@@ -478,13 +514,12 @@ impl<D: Float> Axis<D> {
                 let y = cursor_pos.y - (badge_height / 2.0);
                 let x = match self.position {
                     Position::Right => rail_pos,
-                    _ => rail_pos - badge_width, // badge_width already includes all padding
+                    _ => rail_pos - badge_width,
                 };
                 Rectangle::new(Point::new(x, y), Size::new(badge_width, badge_height))
             }
         };
 
-        // Clamp badge position to viewport (the fix for extremes)
         match orientation {
             Orientation::Horizontal => {
                 if badge_rect.x < viewport.x {
@@ -504,11 +539,10 @@ impl<D: Float> Axis<D> {
             }
         }
 
-        let gap = style.cursor.axis.line_gap.0;
-        let cursor_line_width = style.cursor.axis.line.width.0;
-        let cursor_line_color = style.cursor.axis.line.color;
+        let gap = cursor_result.line.gap.0;
+        let cursor_line_width = cursor_result.line.width.0;
+        let cursor_line_color = cursor_result.line.color;
 
-        // Calculate cursor line position (respecting the gap)
         let cursor_line_rect = match orientation {
             Orientation::Horizontal => {
                 let (y_start, y_end) = match self.position {
@@ -554,31 +588,29 @@ impl<D: Float> Axis<D> {
             }
         };
 
-        let border = if let Some(border) = style.cursor.axis.badge.container.border {
+        let border = if let Some(border) = cursor_result.badge.border {
             border
         } else {
             Border::default()
         };
 
-        let background = if let Some(background) = style.cursor.axis.badge.container.background {
+        let background = if let Some(background) = cursor_result.badge.background {
             background
         } else {
             Background::Color(Color::TRANSPARENT)
         };
 
-        let shadow = if let Some(shadow) = style.cursor.axis.badge.container.shadow {
+        let shadow = if let Some(shadow) = cursor_result.badge.shadow {
             shadow
         } else {
             Shadow::default()
         };
 
-        // Render using the full viewport clip to allow the badge to "bleed" out of the axis bounds
         renderer.start_layer(*viewport);
 
         renderer.fill_quad(
             Quad {
                 bounds: cursor_line_rect,
-
                 ..Default::default()
             },
             cursor_line_color,
@@ -601,14 +633,13 @@ impl<D: Float> Axis<D> {
                 .as_text()
                 .with_content(paragraph.content().to_string()),
             text_pos,
-            style.cursor.axis.badge.text.color,
+            cursor_result.badge.text_style.color,
             *viewport,
         );
 
         renderer.end_layer();
     }
 
-    /// Calculates the base line position (the "rail") for text and decorations.
     fn calculate_rail_position(
         &self,
         bounds: &Rectangle,
@@ -623,7 +654,6 @@ impl<D: Float> Axis<D> {
         }
     }
 
-    /// Lays out and renders axis labels, resolving overlaps if the policy requires it.
     fn layout_labels<Renderer>(
         &self,
         renderer: &mut Renderer,
@@ -648,12 +678,12 @@ impl<D: Float> Axis<D> {
             };
 
             let ResolvedLabelCandidate {
-                color,
                 tick,
                 normalized_position,
                 bounds: label_bounds,
                 paragraph,
                 position,
+                color,
             }: ResolvedLabelCandidate<Renderer, _> = resolved;
 
             let context = LabelDecisionContext {
@@ -683,7 +713,6 @@ impl<D: Float> Axis<D> {
         }
     }
 
-    /// Measures a label candidate and calculates its screen bounds.
     fn resolve_label_candidate<Renderer>(
         &self,
         candidate: LabelCandidate<D>,
@@ -771,16 +800,15 @@ impl<D: Float> Axis<D> {
         };
 
         Some(ResolvedLabelCandidate {
-            color: text_style.color,
             tick: candidate.tick,
             normalized_position: candidate.normalized_position,
             bounds: LabelBounds::new(start, end),
             paragraph,
             position,
+            color: text_style.color,
         })
     }
 
-    /// Renders a single tick mark into the mesh buffer.
     fn draw_tick_line(
         &self,
         line: TickLine,
@@ -841,7 +869,6 @@ impl<D: Float> Axis<D> {
         );
     }
 
-    /// Renders a single grid line into the mesh buffer.
     fn draw_grid_line(
         &self,
         plot_bounds: &Rectangle,
@@ -851,7 +878,6 @@ impl<D: Float> Axis<D> {
     ) {
         let orientation = self.orientation();
 
-        // Calculate start and end points based on plot bounds
         let (start, end) = match orientation {
             Orientation::Horizontal => {
                 let x = plot_bounds.width.mul_add(pos_norm, plot_bounds.x);
@@ -892,28 +918,24 @@ impl<D: Float> Axis<D> {
         let thickness = style.width.0;
 
         let (x0, y0, x1, y1) = match self.position {
-            // Bottom axis: Boundary is at top (y), grow down
             Position::Bottom => (
                 bounds.x,
                 bounds.y,
                 bounds.x + bounds.width,
                 bounds.y + thickness,
             ),
-            // Top axis: Boundary is at bottom (y+h), grow up
             Position::Top => (
                 bounds.x,
                 bounds.y + bounds.height - thickness,
                 bounds.x + bounds.width,
                 bounds.y + bounds.height,
             ),
-            // Left axis: Boundary is at right (x+w), grow left
             Position::Left => (
                 bounds.x + bounds.width - thickness,
                 bounds.y,
                 bounds.x + bounds.width,
                 bounds.y + bounds.height,
             ),
-            // Right axis: Boundary is at left (x), grow right
             Position::Right => (
                 bounds.x,
                 bounds.y,

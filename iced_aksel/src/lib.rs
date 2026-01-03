@@ -973,24 +973,13 @@ where
             height: plot_bounds.height,
         };
 
-        // 2. Render axes and grids
+        // Pass 1: Render Grid Lines (Background)
         for (i, (_, axis)) in self.state.axes().iter().enumerate() {
             let axis_layout = layout.children().nth(i).unwrap();
-            axis.draw::<Renderer>(
-                renderer,
-                &style,
-                axis_layout,
-                cursor,
-                &plot_bounds,
-                &mut mesh_buffer,
-                &bounds,
-            );
+            axis.draw_grid(axis_layout, &plot_bounds, &mut mesh_buffer);
         }
 
-        // Flush the mesh buffer (draws all the lines/ticks aggregated so far)
-        mesh_buffer.render(renderer, &bounds);
-
-        // 3. Render data layers
+        // Pass 2: Render Data Layers (Middle)
         for layer in &self.layers {
             // These axes are guaranteed to exist because of `verify_layer` check
             let x_axis = self.state.axis(&layer.horizontal_axis_id);
@@ -1009,7 +998,26 @@ where
             layer.items.draw(&mut plot, theme);
         }
 
-        // 4. Draw Debug Overlay (if enabled)
+        // Pass 3: Render Axis Ticks & Spines (Foreground Geometry)
+        // We collect the overlays here to render them AFTER flushing the mesh buffer.
+        let mut axis_overlays = Vec::with_capacity(self.state.axes().len());
+
+        for (i, (_, axis)) in self.state.axes().iter().enumerate() {
+            let axis_layout = layout.children().nth(i).unwrap();
+            let overlay =
+                axis.draw_ticks(&style, axis_layout, cursor, &plot_bounds, &mut mesh_buffer);
+            axis_overlays.push((axis, overlay));
+        }
+
+        // Pass 4: Flush Geometry (Draws Grids -> Data -> Spines)
+        mesh_buffer.render(renderer, &bounds);
+
+        // Pass 5: Render Overlays (Labels & Cursor) on top of everything
+        for (axis, overlay) in axis_overlays {
+            overlay.draw(axis, renderer, &style, &bounds);
+        }
+
+        // 6. Draw Debug Overlay (if enabled)
         if self.debug {
             renderer.start_layer(bounds);
 

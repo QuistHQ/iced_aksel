@@ -3,6 +3,7 @@ use iced::{
     Color, Element, Font, Length, Padding, Theme,
     widget::{column, container, row, text},
 };
+use iced_aksel::axis::{CursorBadge, CursorLine, CursorResult};
 use iced_aksel::{
     Axis, Chart, Measure, PlotPoint, State, Stroke,
     axis::{self, GridLine, TickLine, TickResult},
@@ -121,15 +122,41 @@ fn setup_minimal_axes() -> State<&'static str, f64> {
 
                 result
             })
-            .with_cursor_formatter(|v| Some(format!("{:.0}", v))),
+            .with_cursor_renderer(|val| {
+                // Logic: Determine color based on value
+                let is_high = val > 5.0;
+                let color = if is_high {
+                    Color::from_rgb(0.8, 0.0, 0.0) // Red for high values
+                } else {
+                    Color::from_rgb(0.0, 0.6, 0.0) // Green for safe values
+                };
+
+                Some(
+                    CursorResult::new(format!("{:.2}", val))
+                        // Custom Line Style
+                        .line(CursorLine {
+                            color,
+                            width: 2.0.into(),
+                            gap: 2.0.into(),
+                        })
+                        // Custom Badge Style
+                        .badge(CursorBadge {
+                            background: Some(iced::Background::Color(Color::WHITE)),
+                            border: Some(iced::Border {
+                                color,
+                                width: 2.0.into(),
+                                radius: 4.0.into(),
+                            }),
+                            ..CursorBadge::default()
+                        }),
+                )
+            }),
     );
 
     // Y-Axis: Invisible but active for scaling
     state.set_axis(
         AxesShowcase::Y,
-        Axis::new(Linear::new(-1.2, 1.2), axis::Position::Left)
-            .with_thickness(45.0)
-            .with_cursor_formatter(|v| Some(format!("{:.0}", v))),
+        Axis::new(Linear::new(-1.2, 1.2), axis::Position::Left).with_thickness(45.0), // .with_cursor_formatter(|v| Some(format!("{:.0}", v))),
     );
 
     state
