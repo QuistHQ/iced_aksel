@@ -9,7 +9,7 @@ use iced::{
     Element, Pixels, Subscription, Task, Theme,
     theme::{Base, Mode},
     time::Instant,
-    widget::{column, pick_list, row, text},
+    widget::{column, pick_list, row, slider, space, text},
     window,
 };
 use iced_aksel::{
@@ -55,6 +55,7 @@ enum Message {
     Tick(Instant),
     DeviceSelected(String),
     SwitchTheme(iced::Theme),
+    ChangeTilt(f64),
 }
 
 struct AnalyzerApp {
@@ -69,6 +70,7 @@ struct AnalyzerApp {
     selected_device: Option<DeviceDescription>,
     last_frame_time: Option<Instant>,
     fps: f32,
+    tilt: f64,
 }
 
 impl AnalyzerApp {
@@ -95,6 +97,7 @@ impl AnalyzerApp {
                 selected_device,
                 last_frame_time: None,
                 fps: 0.0,
+                tilt: 4.5,
             },
             Task::none(),
         )
@@ -127,6 +130,9 @@ impl AnalyzerApp {
             Message::SwitchTheme(theme) => {
                 self.current_theme = theme;
             }
+            Message::ChangeTilt(tilt) => {
+                self.tilt = tilt;
+            }
         }
     }
 
@@ -137,6 +143,7 @@ impl AnalyzerApp {
 
         let magnitudes = &self.magnitudes;
         let sample_rate = self.sample_rate as f64;
+        let tilt = self.tilt;
 
         let log_min = MIN_FREQ.log10();
         let log_max = MAX_FREQ.log10();
@@ -148,7 +155,7 @@ impl AnalyzerApp {
         for i in 0..num_points {
             let freq = 10_f64.powf(log_min + step * i as f64);
             let width = math::fractional_width(freq);
-            let db = math::sample_fractional_octave(magnitudes, freq, sample_rate, width);
+            let db = math::sample_fractional_octave(magnitudes, freq, sample_rate, width, tilt);
             curve.push(PlotPoint::new(freq, db));
         }
 
@@ -170,12 +177,15 @@ impl AnalyzerApp {
             pick_list(iced::Theme::ALL, Some(&self.current_theme), |t| {
                 Message::SwitchTheme(t)
             }),
+            space::horizontal(),
+            text!("tilt: {:.1} db/oct", self.tilt),
+            slider(0.0..=6.0, self.tilt, Message::ChangeTilt).step(0.1)
         ]
         .spacing(12);
 
         let info = row![
-            text(format!("SR: {:.0} Hz", self.sample_rate)).size(16),
-            text(format!("FPS: {:.1}", self.fps)).size(16),
+            text!("SR: {:.0} Hz", self.sample_rate).size(16),
+            text!("FPS: {:.1}", self.fps).size(16),
         ]
         .spacing(24);
 
