@@ -93,6 +93,34 @@ fn setup_minimal_axes() -> State<&'static str, f64> {
         AxesShowcase::X,
         Axis::new(Linear::new(0.0, 100.0), axis::Position::Bottom)
             .with_thickness(45.0)
+            .with_tick_renderer(|ctx| {
+                // Start with a standard result
+                let mut result = TickResult::with_label(format!("{:.0}", ctx.tick.value));
+
+                // Customize: Major ticks (integers) are thick RED lines.
+                if ctx.tick.level == 0 {
+                    result = result
+                        .tick_line(TickLine {
+                            thickness: 1.0.into(),
+                            length: 8.0.into(),
+                            color: Color::from_rgb(0.8, 0.0, 0.0), // RED
+                        })
+                        .grid_line(GridLine {
+                            thickness: 1.0.into(),
+                            dashed: true,
+                            color: Color::from_rgb(0.0, 0.0, 0.8), // BLUE
+                        });
+                } else {
+                    // Minor ticks are small grey lines with NO grid
+                    result = result.tick_line(TickLine {
+                        thickness: 1.0.into(),
+                        length: 4.0.into(),
+                        color: Color::from_rgb(0.5, 0.5, 0.5), // GREY
+                    });
+                }
+
+                result
+            })
             .with_cursor_formatter(|v| Some(format!("{:.0}", v))),
     );
 

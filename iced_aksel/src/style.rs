@@ -1,23 +1,19 @@
 mod axis;
-mod cursor;
-mod grid;
 
 use crate::style::axis::AxisStyle;
-use crate::style::cursor::{AxisCursorStyle, BadgeStyle, CursorStyle};
-use crate::style::grid::GridStyle;
 use iced_core::text::LineHeight;
 use iced_core::widget::text::Shaping;
-use iced_core::{Background, Border, Color, Font, Padding, Pixels, Shadow, Theme};
+use iced_core::{Background, Border, Color, Font, Pixels, Shadow, Theme};
+
+pub mod grid;
+
+use self::axis::AxisLineStyle;
 
 /// Global style of a `Chart`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Style {
-    /// Style of the crosshair cursor on the plot area.
-    pub cursor: CursorStyle,
     /// Style of the axes.
     pub axis: AxisStyle,
-    /// Style of the grid lines.
-    pub grid: GridStyle,
 }
 
 /// Style of the axis container.
@@ -93,41 +89,6 @@ pub fn default(theme: &Theme) -> Style {
     let palette = theme.extended_palette();
 
     Style {
-        cursor: CursorStyle {
-            axis: AxisCursorStyle {
-                badge: BadgeStyle {
-                    text: TextStyle {
-                        color: theme.palette().text,
-                        line_height: LineHeight::default(),
-                        size: 12.0.into(),
-                        shaping: Shaping::Auto,
-
-                        // TODO: Where should we get font from?
-                        font: Font::default(),
-                    },
-                    container: ContainerStyle {
-                        border: Some(Border {
-                            width: 1.0.into(),
-                            color: theme.palette().text,
-                            radius: 2.0.into(),
-                        }),
-                        background: Some(theme.palette().background.into()),
-                        shadow: Default::default(),
-                    },
-                    padding: 4.0.into(),
-                },
-                line: LineStyle {
-                    color: theme.palette().text,
-                    width: 1.0.into(),
-                },
-                line_gap: 4.0.into(),
-            },
-        },
-        grid: GridStyle {
-            color: palette.background.strong.color,
-            width: 1.0.into(),
-            dashed: false,
-        },
         axis: AxisStyle {
             container: ContainerStyle {
                 background: Some(theme.palette().background.into()),
@@ -139,14 +100,6 @@ pub fn default(theme: &Theme) -> Style {
                 width: 1.0.into(),
             },
             text_offset: 12.0.into(),
-            text: TextStyle {
-                color: palette.background.strong.text,
-                ..Default::default()
-            },
-            ticks: LineStyle {
-                color: palette.background.strong.color,
-                width: 1.0.into(),
-            },
         },
     }
 }

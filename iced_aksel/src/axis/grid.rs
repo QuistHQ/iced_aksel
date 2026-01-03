@@ -1,14 +1,16 @@
-use iced_core::Pixels;
+use iced_core::{Color, Pixels};
 
-/// Configuration for a single grid line on the chart.
-///
-/// Grid lines are drawn perpendicular to the axis at each tick position.
-#[derive(Debug, Clone, Copy)]
+/// Defines the visual styling of a grid line.
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GridLine {
-    /// The thickness of the grid line in pixels.
+    /// The visual thickness (stroke width) of the grid line.
     pub thickness: Pixels,
-    /// Whether the grid line should be dashed.
+
+    /// Whether the line should be dashed.
     pub dashed: bool,
+
+    /// The color of the grid line.
+    pub color: Color,
 }
 
 impl Default for GridLine {
@@ -16,22 +18,7 @@ impl Default for GridLine {
         Self {
             thickness: Pixels(1.0),
             dashed: false,
+            color: Color::from_rgb(0.8, 0.8, 0.8),
         }
-    }
-}
-
-impl GridLine {
-    /// Creates a new solid grid line with the specified thickness.
-    pub fn new<I: Into<Pixels>>(thickness: I) -> Self {
-        Self {
-            thickness: thickness.into(),
-            dashed: false,
-        }
-    }
-
-    /// Sets whether the grid line should be dashed.
-    pub fn with_dashed(mut self, dashed: bool) -> Self {
-        self.dashed = dashed;
-        self
     }
 }

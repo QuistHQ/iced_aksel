@@ -1,5 +1,5 @@
-use crate::style::{ContainerStyle, LineStyle, TextStyle};
-use iced_core::{Color, Pixels};
+use crate::style::{ContainerStyle, LineStyle};
+use iced_core::Pixels;
 
 /// Style of a `Chart`'s axis.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -8,19 +8,15 @@ pub struct AxisStyle {
     pub container: ContainerStyle,
     /// Style of the axis line (the spine).
     pub line: LineStyle,
-    /// Style of the text labels.
-    pub text: TextStyle,
     /// Distance from the Axis Line to the text baseline (The "Rail").
     pub text_offset: Pixels,
-    /// Style of the ticks (lines).
-    pub ticks: LineStyle,
 }
 
 /// Style of the axis line (spine).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AxisLineStyle {
     /// The color of the axis line.
-    pub color: Color,
+    pub color: iced_core::Color,
     /// The thickness of the axis line.
     pub width: Pixels,
 }

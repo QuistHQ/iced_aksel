@@ -29,11 +29,13 @@ use crate::{
     style::{Style, TextStyle},
 };
 
+mod cursor;
 mod grid;
 mod label;
 mod position;
 mod tick;
 
+use crate::axis::cursor::CursorResult;
 use crate::render::manual::linear::{draw_dashed_line, draw_line_segment};
 use crate::style::LineStyle;
 pub use grid::*;
@@ -42,7 +44,7 @@ pub use position::*;
 pub use tick::*;
 
 type TickRendererFn<D> = Rc<RefCell<dyn FnMut(TickContext<D>) -> TickResult>>;
-type CursorRendererFn<D> = Rc<RefCell<dyn FnMut(D) -> Option<String>>>;
+type CursorRendererFn<D> = Rc<RefCell<dyn FnMut(D) -> Option<CursorResult>>>;
 
 /// An axis that maps data values to screen coordinates.
 ///
@@ -74,7 +76,7 @@ pub struct Axis<D> {
     #[derivative(Debug = "ignore")]
     pub(crate) tick_renderer: Option<TickRendererFn<D>>,
     #[derivative(Debug = "ignore")]
-    pub(crate) cursor_formatter: Option<CursorRendererFn<D>>,
+    pub(crate) cursor_renderer: Option<CursorRendererFn<D>>,
     #[derivative(Debug = "ignore")]
     label_policy: LabelPolicy<D>,
 }
@@ -90,7 +92,6 @@ impl<D: Float> Axis<D> {
         scale: impl Scale<Domain = D, Normalized = f32> + 'static,
         position: Position,
     ) -> Self {
-        // Default tick renderer: major ticks get grid lines and long marks; minor ticks get short marks.
         let tick_renderer = Rc::new(RefCell::new(|ctx: TickContext<D>| {
             let mut result = TickResult::with_tick_line(TickLine {
                 length: match ctx.tick.level {
@@ -98,6 +99,7 @@ impl<D: Float> Axis<D> {
                     _ => 5.0,
                 }
                 .into(),
+                color: Color::from_rgb(0.4, 0.4, 0.4),
                 ..Default::default()
             });
 
@@ -105,11 +107,15 @@ impl<D: Float> Axis<D> {
                 result = result.grid_line(GridLine {
                     thickness: 1.0.into(),
                     dashed: false,
+                    color: Color::from_rgb(0.2, 0.2, 0.2),
                 });
             }
 
             result
         }));
+
+        // Default Cursor Renderer
+        let cursor_renderer = Rc::new(RefCell::new(|_val| None));
 
         Self {
             position,
@@ -120,7 +126,7 @@ impl<D: Float> Axis<D> {
 
             scale: Box::new(scale),
             tick_renderer: Some(tick_renderer),
-            cursor_formatter: None,
+            cursor_renderer: Some(cursor_renderer),
             label_policy: LabelPolicy::default(),
         }
     }
@@ -185,11 +191,11 @@ impl<D: Float> Axis<D> {
     ///
     /// If not set, the cursor badge will not be rendered.
     /// The closure receives the data value at the cursor position and returns the string to display.
-    pub fn with_cursor_formatter<F>(mut self, renderer: F) -> Self
+    pub fn with_cursor_renderer<F>(mut self, renderer: F) -> Self
     where
-        F: FnMut(D) -> Option<String> + 'static,
+        F: FnMut(D) -> Option<CursorResult> + 'static,
     {
-        self.cursor_formatter = Some(Rc::new(RefCell::new(renderer)));
+        self.cursor_renderer = Some(Rc::new(RefCell::new(renderer)));
         self
     }
 
@@ -314,7 +320,7 @@ impl<D: Float> Axis<D> {
         // We prepare the cursor overlay state here but render it last.
         let cursor_state = if self.render_cursor
             && let Some(cursor_pos) = cursor.position_over(full_bounds)
-            && let Some(cursor_renderer) = &self.cursor_formatter
+            && let Some(cursor_renderer) = &self.cursor_renderer
         {
             let value_to_render = match orientation {
                 Orientation::Horizontal => (cursor_pos.x - plot_bounds.x) / plot_bounds.width,
@@ -361,6 +367,7 @@ impl<D: Float> Axis<D> {
             });
 
             let Some(TickResult {
+                label_style,
                 tick_line,
                 grid_line,
                 label,
@@ -374,7 +381,7 @@ impl<D: Float> Axis<D> {
             if self.render_grid
                 && let Some(line) = grid_line
             {
-                self.draw_grid_line(&style, plot_bounds, line, mesh_buffer, pos_norm);
+                self.draw_grid_line(plot_bounds, line, mesh_buffer, pos_norm);
             }
 
             if self.invisible {
@@ -387,13 +394,14 @@ impl<D: Float> Axis<D> {
                     tick,
                     normalized_position: pos_norm,
                     label,
+                    style: label_style.unwrap_or(TextStyle::default()),
                     priority: label_priority.unwrap_or(tick.level),
                 });
             }
 
             // Draw Tick Marks (Axis style + local config)
             if let Some(line) = tick_line {
-                self.draw_tick_line(&style.axis.ticks, line, &bounds, mesh_buffer, pos_norm);
+                self.draw_tick_line(line, &bounds, mesh_buffer, pos_norm);
             }
         }
 
@@ -634,13 +642,13 @@ impl<D: Float> Axis<D> {
                 candidate,
                 bounds,
                 orientation,
-                &style.axis.text,
                 style.axis.text_offset,
             ) else {
                 continue;
             };
 
             let ResolvedLabelCandidate {
+                color,
                 tick,
                 normalized_position,
                 bounds: label_bounds,
@@ -662,7 +670,7 @@ impl<D: Float> Axis<D> {
                         .as_text()
                         .with_content(paragraph.content().to_string()),
                     position,
-                    style.axis.text.color,
+                    color,
                     *viewport,
                 );
 
@@ -681,7 +689,6 @@ impl<D: Float> Axis<D> {
         candidate: LabelCandidate<D>,
         bounds: &Rectangle,
         orientation: Orientation,
-        text_style: &TextStyle,
         offset: Pixels,
     ) -> Option<ResolvedLabelCandidate<Renderer, D>>
     where
@@ -695,6 +702,8 @@ impl<D: Float> Axis<D> {
         if candidate.normalized_position.is_sign_negative() {
             return None;
         }
+
+        let text_style = candidate.style;
 
         let paragraph = Plain::new(Text {
             content: label_content,
@@ -762,6 +771,7 @@ impl<D: Float> Axis<D> {
         };
 
         Some(ResolvedLabelCandidate {
+            color: text_style.color,
             tick: candidate.tick,
             normalized_position: candidate.normalized_position,
             bounds: LabelBounds::new(start, end),
@@ -773,7 +783,6 @@ impl<D: Float> Axis<D> {
     /// Renders a single tick mark into the mesh buffer.
     fn draw_tick_line(
         &self,
-        style: &LineStyle,
         line: TickLine,
         bounds: &Rectangle,
         mesh_buffer: &mut MeshBuffer,
@@ -808,7 +817,7 @@ impl<D: Float> Axis<D> {
             }
         };
 
-        let color = color::pack(style.color);
+        let color = color::pack(line.color);
         mesh_buffer.add(
             &[0, 1, 2, 2, 1, 3],
             &[
@@ -835,7 +844,6 @@ impl<D: Float> Axis<D> {
     /// Renders a single grid line into the mesh buffer.
     fn draw_grid_line(
         &self,
-        style: &Style,
         plot_bounds: &Rectangle,
         line: GridLine,
         mesh_buffer: &mut MeshBuffer,
@@ -867,12 +875,12 @@ impl<D: Float> Axis<D> {
                 start,
                 end,
                 line.thickness.0,
-                style.grid.color,
+                line.color,
                 5.0,
                 5.0,
             );
         } else {
-            draw_line_segment(mesh_buffer, start, end, line.thickness.0, style.grid.color);
+            draw_line_segment(mesh_buffer, start, end, line.thickness.0, line.color);
         }
     }
 
