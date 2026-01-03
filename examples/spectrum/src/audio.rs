@@ -217,7 +217,6 @@ where
                     .process_with_scratch(&mut block, &mut spectrum, &mut scratch)
                     .is_ok()
                 {
-                    magnitudes.fill(0.0);
                     for (i, value) in spectrum.iter().enumerate().take(magnitudes.len()) {
                         let mut amplitude = value.norm() * FFT_GAIN_CORRECTION / FFT_SIZE as f32;
                         if i == 0 || i == magnitudes.len() - 1 {

@@ -68,8 +68,8 @@ pub fn sample_fractional_octave(
         0.0
     };
 
-    let tilt = (freq.log2() - 20f64.log2()) * tilt;
-    (amplitude_to_db(amplitude) + tilt).clamp(MIN_DB, MAX_DB)
+    let tilt_db = (freq.log2() - 20f64.log2()) * tilt;
+    (amplitude_to_db(amplitude) + tilt_db).clamp(MIN_DB, MAX_DB)
 }
 
 pub fn amplitude_to_db(value: f64) -> f64 {
