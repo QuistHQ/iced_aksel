@@ -30,9 +30,10 @@ nursery = { level = "deny", priority = -1 }
 [workspace.dependencies]
 aksel = "0.2"
 chrono = "0.4"
-cpal = "0.16.0"
+cpal = "0.17.0"
 derive_more = { version = "2.0", features = ["from", "error", "display", "into"]}
 derivative = "2.2"
+earcutr = "0.4"
 iced = "0.14.0"
 iced_core = "0.14.0"
 iced_graphics = "0.14.0"
@@ -45,4 +46,4 @@ rand = "0.9"
 realfft = "3.5.0"
 strum = "0.27"
 strum_macros = "0.27"
-earcutr = "0.4"
+triple_buffer = "8.1.1"

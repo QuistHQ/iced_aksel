@@ -4,6 +4,7 @@
 //! modern mastering tools (FabFilter Pro-Q, Izotope). Real-time audio is captured
 //! through `cpal`, transformed with an FFT and rendered on a logarithmic axis.
 
+use cpal::DeviceDescription;
 use iced::{
     Element, Pixels, Subscription, Task, Theme,
     theme::{Base, Mode},
@@ -13,7 +14,7 @@ use iced::{
 };
 use iced_aksel::{
     Axis, Chart, Measure, Plot, PlotData, PlotPoint, State, Stroke,
-    axis::{GridLine, Label, Position, TickContext, TickLine, TickResult},
+    axis::{GridLine, Position, TickContext, TickLine, TickResult},
     scale, shape,
 };
 
@@ -60,10 +61,12 @@ struct AnalyzerApp {
     current_theme: iced::Theme,
     state: State<AxisId, f64>,
     spectrum_layer: SpectrumLayer,
-    audio_data: audio::Data,
+    output: triple_buffer::Output<Box<[f32]>>,
+    magnitudes: Box<[f32]>,
+    sample_rate: u32,
     _stream: Option<cpal::Stream>,
-    available_devices: Vec<audio::DeviceInfo>,
-    selected_device: Option<audio::DeviceInfo>,
+    available_devices: Vec<DeviceDescription>,
+    selected_device: Option<DeviceDescription>,
     last_frame_time: Option<Instant>,
     fps: f32,
 }
@@ -75,17 +78,18 @@ impl AnalyzerApp {
         state.set_axis(FREQ_AXIS_ID, create_frequency_axis());
         state.set_axis(DB_AXIS_ID, create_db_axis());
 
-        let audio_data = audio::Data::default();
         let host = cpal::default_host();
         let available_devices = audio::enumerate_devices(&host);
-        let (stream, selected_device) = audio::setup_capture_with_device(audio_data.clone(), None);
+        let (stream, selected_device, config, output) = audio::setup_capture_with_device(None);
 
         (
             Self {
                 current_theme: iced::Theme::Dark,
                 state,
                 spectrum_layer: SpectrumLayer::default(),
-                audio_data,
+                output,
+                magnitudes: vec![0.0; FFT_SIZE / 2 + 1].into_boxed_slice(),
+                sample_rate: config.map_or(48000, |config| config.sample_rate),
                 _stream: stream,
                 available_devices,
                 selected_device,
@@ -112,11 +116,13 @@ impl AnalyzerApp {
             }
             Message::DeviceSelected(device_name) => {
                 println!("Switching to device: {}", device_name);
-                let (stream, selected_device) =
-                    audio::setup_capture_with_device(self.audio_data.clone(), Some(device_name));
+                let (stream, selected_device, config, output) =
+                    audio::setup_capture_with_device(Some(device_name));
 
                 self._stream = stream;
                 self.selected_device = selected_device;
+                self.output = output;
+                self.sample_rate = config.map_or(48000, |config| config.sample_rate);
             }
             Message::SwitchTheme(theme) => {
                 self.current_theme = theme;
@@ -125,8 +131,12 @@ impl AnalyzerApp {
     }
 
     fn rebuild_curve(&mut self) {
-        let magnitudes = self.audio_data.spectrum.lock().unwrap().clone();
-        let sample_rate = *self.audio_data.sample_rate.lock().unwrap() as f64;
+        for (slot, mag) in self.magnitudes.iter_mut().zip(self.output.read()) {
+            *slot = TEMPORAL_SMOOTHING.mul_add(*slot, (1.0 - TEMPORAL_SMOOTHING) * *mag);
+        }
+
+        let magnitudes = &self.magnitudes;
+        let sample_rate = self.sample_rate as f64;
 
         let log_min = MIN_FREQ.log10();
         let log_max = MAX_FREQ.log10();
@@ -138,7 +148,7 @@ impl AnalyzerApp {
         for i in 0..num_points {
             let freq = 10_f64.powf(log_min + step * i as f64);
             let width = math::fractional_width(freq);
-            let db = math::sample_fractional_octave(&magnitudes, freq, sample_rate, width);
+            let db = math::sample_fractional_octave(magnitudes, freq, sample_rate, width);
             curve.push(PlotPoint::new(freq, db));
         }
 
@@ -154,7 +164,7 @@ impl AnalyzerApp {
             pick_list(
                 self.available_devices.as_slice(),
                 self.selected_device.as_ref(),
-                |device| Message::DeviceSelected(device.name)
+                |device| Message::DeviceSelected(device.name().to_owned())
             ),
             text("Theme: "),
             pick_list(iced::Theme::ALL, Some(&self.current_theme), |t| {
@@ -163,9 +173,8 @@ impl AnalyzerApp {
         ]
         .spacing(12);
 
-        let sample_rate = *self.audio_data.sample_rate.lock().unwrap();
         let info = row![
-            text(format!("SR: {:.0} Hz", sample_rate)).size(16),
+            text(format!("SR: {:.0} Hz", self.sample_rate)).size(16),
             text(format!("FPS: {:.1}", self.fps)).size(16),
         ]
         .spacing(24);
