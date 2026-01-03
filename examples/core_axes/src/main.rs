@@ -156,7 +156,36 @@ fn setup_minimal_axes() -> State<&'static str, f64> {
     // Y-Axis: Invisible but active for scaling
     state.set_axis(
         AxesShowcase::Y,
-        Axis::new(Linear::new(-1.2, 1.2), axis::Position::Left).with_thickness(45.0), // .with_cursor_formatter(|v| Some(format!("{:.0}", v))),
+        Axis::new(Linear::new(-1.2, 1.2), axis::Position::Left)
+            .with_thickness(45.0)
+            .with_tick_renderer(|ctx| {
+                // Start with a standard result
+                let mut result = TickResult::with_label(format!("{:.0}", ctx.tick.value));
+
+                // Customize: Major ticks (integers) are thick RED lines.
+                if ctx.tick.level == 0 {
+                    result = result
+                        .tick_line(TickLine {
+                            thickness: 1.0.into(),
+                            length: 8.0.into(),
+                            color: Color::WHITE,
+                        })
+                        .grid_line(GridLine {
+                            thickness: 1.0.into(),
+                            dashed: true,
+                            color: Color::WHITE,
+                        });
+                } else {
+                    // Minor ticks are small grey lines with NO grid
+                    result = result.tick_line(TickLine {
+                        thickness: 1.0.into(),
+                        length: 4.0.into(),
+                        color: Color::WHITE,
+                    });
+                }
+
+                result
+            }),
     );
 
     state
