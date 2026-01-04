@@ -242,8 +242,11 @@ fn core_axes_engineering_axes_snapshot() {
     let (app, _) = App::new(view_fn);
     let mut ui = simulator(&app);
 
-    assert_snapshot_matches(&mut ui, "tests/snapshots/core_axes_engineering_axes_snapshot")
-        .expect("Snapshot comparison failed for engineering axes");
+    assert_snapshot_matches(
+        &mut ui,
+        "tests/snapshots/core_axes_engineering_axes_snapshot",
+    )
+    .expect("Snapshot comparison failed for engineering axes");
 }
 
 #[test]
@@ -261,8 +264,11 @@ fn core_axes_custom_placement_axes_snapshot() {
     let (app, _) = App::new(view_fn);
     let mut ui = simulator(&app);
 
-    assert_snapshot_matches(&mut ui, "tests/snapshots/core_axes_custom_placement_axes_snapshot")
-        .expect("Snapshot comparison failed for custom placement axes");
+    assert_snapshot_matches(
+        &mut ui,
+        "tests/snapshots/core_axes_custom_placement_axes_snapshot",
+    )
+    .expect("Snapshot comparison failed for custom placement axes");
 }
 
 // -----------------------------------------------------------------------------
