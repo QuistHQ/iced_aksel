@@ -111,7 +111,6 @@ impl ManualTessellator {
     // =========================================================================
     //  Linear Primitives (Lines & Arrows)
     // =========================================================================
-
     #[inline]
     pub fn draw_line_segment(
         &mut self,
@@ -125,11 +124,93 @@ impl ManualTessellator {
     }
 
     #[inline]
+    pub fn draw_horizontal_line(
+        &mut self,
+        buffer: &mut MeshBuffer,
+        x_start: f32,
+        x_end: f32,
+        y: f32,
+        width: f32,
+        color: Color,
+        snap: bool,
+    ) {
+        linear::draw_horizontal_line(buffer, x_start, x_end, y, width, color, snap);
+    }
+
+    #[inline]
+    pub fn draw_vertical_line(
+        &mut self,
+        buffer: &mut MeshBuffer,
+        x: f32,
+        y_start: f32,
+        y_end: f32,
+        width: f32,
+        color: Color,
+        snap: bool,
+    ) {
+        linear::draw_vertical_line(buffer, x, y_start, y_end, width, color, snap);
+    }
+
+    #[inline]
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_horizontal_dashed_line(
+        &mut self,
+        buffer: &mut MeshBuffer,
+        x_start: f32,
+        x_end: f32,
+        y: f32,
+        width: f32,
+        color: Color,
+        dash_length: f32,
+        gap_length: f32,
+        snap: bool,
+    ) {
+        linear::draw_horizontal_dashed_line(
+            buffer,
+            x_start,
+            x_end,
+            y,
+            width,
+            color,
+            dash_length,
+            gap_length,
+            snap,
+        );
+    }
+
+    #[inline]
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_vertical_dashed_line(
+        &mut self,
+        buffer: &mut MeshBuffer,
+        x: f32,
+        y_start: f32,
+        y_end: f32,
+        width: f32,
+        color: Color,
+        dash_length: f32,
+        gap_length: f32,
+        snap: bool,
+    ) {
+        linear::draw_vertical_dashed_line(
+            buffer,
+            x,
+            y_start,
+            y_end,
+            width,
+            color,
+            dash_length,
+            gap_length,
+            snap,
+        );
+    }
+
+    #[inline]
     pub fn draw_arrowhead(
         &mut self,
         buffer: &mut MeshBuffer,
         tip: Point,
-        direction: Vector, // CHANGED: Point -> Vector
+        direction: Vector,
         line_width: f32,
         arrow_size_multiplier: f32,
         color: Color,

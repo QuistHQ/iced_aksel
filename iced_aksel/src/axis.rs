@@ -35,7 +35,11 @@ mod label;
 mod position;
 mod tick;
 
-use crate::render::manual::linear::{draw_dashed_line, draw_line_segment};
+// UPDATED: Import specific optimized functions
+use crate::render::manual::linear::{
+    draw_dashed_line, draw_horizontal_dashed_line, draw_horizontal_line, draw_line_segment,
+    draw_vertical_dashed_line, draw_vertical_line,
+};
 use crate::style::LineStyle;
 pub use cursor::*;
 pub use grid::*;
@@ -816,57 +820,57 @@ impl<D: Float> Axis<D> {
         mesh_buffer: &mut MeshBuffer,
         pos_norm: f32,
     ) {
-        let (x0, y0, x1, y1) = match self.position {
+        // UPDATED: Use optimized primitives with snap=true for sharp rendering
+        match self.position {
             Position::Bottom => {
-                let x = bounds.width.mul_add(pos_norm, bounds.x).round();
-                (x, bounds.y, x + line.thickness.0, bounds.y + line.length.0)
+                let x = bounds.width.mul_add(pos_norm, bounds.x);
+                draw_vertical_line(
+                    mesh_buffer,
+                    x,
+                    bounds.y,
+                    bounds.y + line.length.0,
+                    line.thickness.0,
+                    line.color,
+                    true,
+                );
             }
             Position::Top => {
-                let x = bounds.width.mul_add(pos_norm, bounds.x).round();
-                (
+                let x = bounds.width.mul_add(pos_norm, bounds.x);
+                draw_vertical_line(
+                    mesh_buffer,
                     x,
                     bounds.y + bounds.height - line.length.0,
-                    x + line.thickness.0,
                     bounds.y + bounds.height,
-                )
+                    line.thickness.0,
+                    line.color,
+                    true,
+                );
             }
             Position::Right => {
-                let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y).round();
-                (bounds.x, y, bounds.x + line.length.0, y + line.thickness.0)
+                let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y);
+                draw_horizontal_line(
+                    mesh_buffer,
+                    bounds.x,
+                    bounds.x + line.length.0,
+                    y,
+                    line.thickness.0,
+                    line.color,
+                    true,
+                );
             }
             Position::Left => {
-                let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y).round();
-                (
+                let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y);
+                draw_horizontal_line(
+                    mesh_buffer,
                     bounds.x + bounds.width - line.length.0,
-                    y,
                     bounds.x + bounds.width,
-                    y + line.thickness.0,
-                )
+                    y,
+                    line.thickness.0,
+                    line.color,
+                    true,
+                );
             }
         };
-
-        let color = color::pack(line.color);
-        mesh_buffer.add(
-            &[0, 1, 2, 2, 1, 3],
-            &[
-                SolidVertex2D {
-                    position: [x0, y0],
-                    color,
-                },
-                SolidVertex2D {
-                    position: [x1, y0],
-                    color,
-                },
-                SolidVertex2D {
-                    position: [x0, y1],
-                    color,
-                },
-                SolidVertex2D {
-                    position: [x1, y1],
-                    color,
-                },
-            ],
-        );
     }
 
     fn draw_grid_line(
@@ -878,41 +882,59 @@ impl<D: Float> Axis<D> {
         pos_norm: f32,
     ) {
         let orientation = self.orientation();
+        let width = line.thickness.0;
+        let color = line.color;
 
-        let (start, end) = match orientation {
+        // Note: Dash parameters are hardcoded for now, mimicking original behavior.
+        // These could be exposed in GridLine later.
+        let dash_len = 5.0;
+        let gap_len = 5.0;
+
+        match orientation {
             Orientation::Horizontal => {
-                let x = axis_bounds.width.mul_add(pos_norm, axis_bounds.x).round();
-                (
-                    Point::new(x, plot_bounds.y),
-                    Point::new(x, plot_bounds.y + plot_bounds.height),
-                )
+                // If axis is horizontal, grid lines are vertical.
+                let x = axis_bounds.width.mul_add(pos_norm, axis_bounds.x);
+                let y_start = plot_bounds.y;
+                let y_end = plot_bounds.y + plot_bounds.height;
+
+                if line.dashed {
+                    draw_vertical_dashed_line(
+                        mesh_buffer,
+                        x,
+                        y_start,
+                        y_end,
+                        width,
+                        color,
+                        dash_len,
+                        gap_len,
+                        true,
+                    );
+                } else {
+                    draw_vertical_line(mesh_buffer, x, y_start, y_end, width, color, true);
+                }
             }
             Orientation::Vertical => {
-                let y = axis_bounds
-                    .height
-                    .mul_add(1.0 - pos_norm, axis_bounds.y)
-                    .round();
-                (
-                    Point::new(plot_bounds.x, y),
-                    Point::new(plot_bounds.x + plot_bounds.width, y),
-                )
-            }
-        };
+                // If axis is vertical, grid lines are horizontal.
+                let y = axis_bounds.height.mul_add(1.0 - pos_norm, axis_bounds.y);
+                let x_start = plot_bounds.x;
+                let x_end = plot_bounds.x + plot_bounds.width;
 
-        // TODO: Change this rendering functionality to be horizontal/vertical specific
-        // allowing us to use the same for tick/grid rendering, aligning them properly
-        if line.dashed {
-            draw_dashed_line(
-                mesh_buffer,
-                start,
-                end,
-                line.thickness.0,
-                line.color,
-                5.0,
-                5.0,
-            );
-        } else {
-            draw_line_segment(mesh_buffer, start, end, line.thickness.0, line.color);
+                if line.dashed {
+                    draw_horizontal_dashed_line(
+                        mesh_buffer,
+                        x_start,
+                        x_end,
+                        y,
+                        width,
+                        color,
+                        dash_len,
+                        gap_len,
+                        true,
+                    );
+                } else {
+                    draw_horizontal_line(mesh_buffer, x_start, x_end, y, width, color, true);
+                }
+            }
         }
     }
 
@@ -922,56 +944,64 @@ impl<D: Float> Axis<D> {
     /// does not overlap with the plot area.
     fn draw_axis_spine(&self, style: &LineStyle, bounds: &Rectangle, mesh_buffer: &mut MeshBuffer) {
         let thickness = style.width.0;
+        let color = style.color;
+        // We use half-width offset because draw_*_line centers the line on the coordinate.
+        let offset = thickness / 2.0;
 
-        let (x0, y0, x1, y1) = match self.position {
-            Position::Bottom => (
-                bounds.x,
-                bounds.y,
-                bounds.x + bounds.width,
-                bounds.y + thickness,
-            ),
-            Position::Top => (
-                bounds.x,
-                bounds.y + bounds.height - thickness,
-                bounds.x + bounds.width,
-                bounds.y + bounds.height,
-            ),
-            Position::Left => (
-                bounds.x + bounds.width - thickness,
-                bounds.y,
-                bounds.x + bounds.width,
-                bounds.y + bounds.height,
-            ),
-            Position::Right => (
-                bounds.x,
-                bounds.y,
-                bounds.x + thickness,
-                bounds.y + bounds.height,
-            ),
+        match self.position {
+            Position::Bottom => {
+                // Spine is at the top edge of the Bottom axis area (y)
+                // Growing downwards into the area (y + thickness)
+                draw_horizontal_line(
+                    mesh_buffer,
+                    bounds.x,
+                    bounds.x + bounds.width,
+                    bounds.y + offset,
+                    thickness,
+                    color,
+                    true,
+                );
+            }
+            Position::Top => {
+                // Spine is at the bottom edge of the Top axis area (y + height)
+                // Growing upwards
+                draw_horizontal_line(
+                    mesh_buffer,
+                    bounds.x,
+                    bounds.x + bounds.width,
+                    bounds.y + bounds.height - offset,
+                    thickness,
+                    color,
+                    true,
+                );
+            }
+            Position::Left => {
+                // Spine is at the right edge of the Left axis area (x + width)
+                // Growing leftwards
+                draw_vertical_line(
+                    mesh_buffer,
+                    bounds.x + bounds.width - offset,
+                    bounds.y,
+                    bounds.y + bounds.height,
+                    thickness,
+                    color,
+                    true,
+                );
+            }
+            Position::Right => {
+                // Spine is at the left edge of the Right axis area (x)
+                // Growing rightwards
+                draw_vertical_line(
+                    mesh_buffer,
+                    bounds.x + offset,
+                    bounds.y,
+                    bounds.y + bounds.height,
+                    thickness,
+                    color,
+                    true,
+                );
+            }
         };
-
-        let color = color::pack(style.color);
-        mesh_buffer.add(
-            &[0, 1, 2, 2, 1, 3],
-            &[
-                SolidVertex2D {
-                    position: [x0, y0],
-                    color,
-                },
-                SolidVertex2D {
-                    position: [x1, y0],
-                    color,
-                },
-                SolidVertex2D {
-                    position: [x0, y1],
-                    color,
-                },
-                SolidVertex2D {
-                    position: [x1, y1],
-                    color,
-                },
-            ],
-        );
     }
 }
 
