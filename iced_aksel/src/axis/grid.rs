@@ -12,13 +12,3 @@ pub struct GridLine {
     /// The color of the grid line.
     pub color: Color,
 }
-
-impl Default for GridLine {
-    fn default() -> Self {
-        Self {
-            thickness: Pixels(1.0),
-            dashed: false,
-            color: Color::from_rgb(0.8, 0.8, 0.8),
-        }
-    }
-}

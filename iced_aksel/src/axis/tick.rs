@@ -24,18 +24,6 @@ pub struct TickResult {
     pub label_priority: Option<u8>,
 }
 
-impl Default for TickResult {
-    fn default() -> Self {
-        Self {
-            tick_line: Some(TickLine::default()),
-            grid_line: Some(GridLine::default()),
-            label: None,
-            label_style: None,
-            label_priority: None,
-        }
-    }
-}
-
 impl TickResult {
     /// Creates a new empty `TickResult` (no lines, no label).
     pub const fn new() -> Self {
@@ -70,8 +58,13 @@ impl TickResult {
         }
     }
 
-    pub fn style(mut self, style: TextStyle) -> Self {
+    pub fn text_style(mut self, style: TextStyle) -> Self {
         self.label_style = Some(style);
+        self
+    }
+
+    pub fn label(mut self, label: String) -> Self {
+        self.label = Some(label);
         self
     }
 
@@ -95,17 +88,6 @@ pub struct TickLine {
     pub length: Pixels,
     /// The color of the tick line.
     pub color: Color,
-}
-
-impl Default for TickLine {
-    #[inline(always)]
-    fn default() -> Self {
-        Self {
-            thickness: Pixels(1.0),
-            length: Pixels(5.0),
-            color: Color::BLACK,
-        }
-    }
 }
 
 /// Context provided to tick renderer functions.

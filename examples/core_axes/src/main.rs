@@ -1,44 +1,53 @@
-use iced::widget::Column;
+use iced::widget::container;
+use iced::widget::text::{LineHeight, Shaping};
 use iced::{
     Color, Element, Font, Length, Theme,
-    widget::{column, container, row, text},
+    widget::{column, text},
 };
 use iced_aksel::axis::{CursorBadge, CursorLine, CursorResult};
+use iced_aksel::style::TextStyle;
 use iced_aksel::{
-    Axis, Chart, Measure, PlotPoint, State, Stroke,
+    Axis, Chart, State,
     axis::{self, GridLine, TickLine, TickResult},
     plot::{Plot, PlotData},
     scale::Linear,
-    shape::Polyline,
-    style::Style,
+    style::{self, Style},
 };
 
+// --- CONFIGURATION ---
+const ACCENT_COLOR: Color = Color::from_rgb(0.0, 0.9, 0.9); // Cyan/Teal
+const GRID_COLOR: Color = Color::from_rgba(1.0, 1.0, 1.0, 0.05); // Very faint
+const TEXT_COLOR: Color = Color::from_rgb(0.7, 0.7, 0.7); // Soft gray
+
 pub fn main() -> iced::Result {
-    iced::application(AxesShowcase::new, AxesShowcase::update, AxesShowcase::view)
-        .title("Axes Styling Showcase")
-        .theme(Theme::Dark)
-        .antialiasing(true)
-        .run()
+    iced::application(
+        MinimalShowcase::new,
+        MinimalShowcase::update,
+        MinimalShowcase::view,
+    )
+    .title("Polished Axes")
+    .theme(Theme::Dark)
+    .antialiasing(true)
+    .run()
 }
 
-struct AxesShowcase {
-    // State
-    minimal_state: State<&'static str, f64>,
-    minimal_data: SineWave,
+struct MinimalShowcase {
+    state: State<&'static str, f64>,
+    empty_data: EmptyData,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {}
 
-impl AxesShowcase {
+impl MinimalShowcase {
     const X: &'static str = "x";
     const Y: &'static str = "y";
 
     fn new() -> (Self, iced::Task<Message>) {
         (
             Self {
-                minimal_state: setup_minimal_axes(),
-                minimal_data: SineWave::new(1.0, 0.8, 50),
+                state: setup_axes(),
+                empty_data: EmptyData,
             },
             iced::Task::none(),
         )
@@ -49,191 +58,155 @@ impl AxesShowcase {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        // 1. Prepare the content "Atoms"
-        // These are self-contained. They don't know they are in a row yet.
+        let chart = Chart::new(&self.state)
+            .plot_data(&self.empty_data, Self::X, Self::Y)
+            .style(Box::new(style_base));
 
-        let minimal_chart_panel = self.panel(
-            "1. Minimal Layout",
-            "Hidden Y-axis. No Grid.",
-            Chart::new(&self.minimal_state)
-                .plot_data(&self.minimal_data, Self::X, Self::Y)
-                .style(Box::new(style_base)),
-        );
-
-        // 3. The Layout Structure
-        row![minimal_chart_panel.width(Length::Fill),]
-            .padding(20)
-            .into()
-    }
-
-    fn panel<'a>(
-        &self,
-        title: &'a str,
-        subtitle: &'a str,
-        chart: Chart<'a, &'static str, f64, Message>,
-    ) -> Column<'a, Message> {
-        column![
-            text(title).size(16).font(Font::MONOSPACE),
-            text(subtitle).size(12),
-            container(chart).width(Length::Fill).height(Length::Fill)
-        ]
-        .spacing(10)
+        container(
+            column![
+                text("Interactive Axis Playground")
+                    .size(14)
+                    .font(Font::MONOSPACE)
+                    .style(text::secondary),
+                container(chart)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .style(container::bordered_box)
+            ]
+            .spacing(10),
+        )
+        .padding(40)
         .width(Length::Fill)
+        .height(Length::Fill)
+        .into()
     }
 }
 
 // -----------------------------------------------------------------------------
-// 1. MINIMAL CONFIGURATION
+// AXIS SETUP
 // -----------------------------------------------------------------------------
 
-fn setup_minimal_axes() -> State<&'static str, f64> {
+fn setup_axes() -> State<&'static str, f64> {
     let mut state = State::new();
 
-    // X-Axis: Standard look, no grid
+    // X-Axis: Clean, with subtle vertical grids
     state.set_axis(
-        AxesShowcase::X,
+        MinimalShowcase::X,
         Axis::new(Linear::new(0.0, 100.0), axis::Position::Bottom)
-            .with_thickness(45.0)
+            .with_thickness(40.0)
             .with_tick_renderer(|ctx| {
-                // Start with a standard result
-                let mut result = TickResult::with_label(format!("{:.0}", ctx.tick.value));
-
-                // Customize: Major ticks (integers) are thick RED lines.
+                let mut result = TickResult::new();
+                // Styling logic
                 if ctx.tick.level == 0 {
                     result = result
+                        .label(format!("{:.0}", ctx.tick.value))
+                        .text_style(TextStyle)
                         .tick_line(TickLine {
                             thickness: 1.0.into(),
-                            length: 8.0.into(),
-                            color: Color::from_rgb(0.8, 0.0, 0.0), // RED
+                            length: 6.0.into(),
+                            color: TEXT_COLOR,
                         })
                         .grid_line(GridLine {
                             thickness: 1.0.into(),
                             dashed: false,
-                            color: Color::from_rgb(0.0, 0.0, 0.8), // BLUE
+                            color: GRID_COLOR,
                         });
                 } else {
-                    // Minor ticks are small gray lines with NO grid
-                    result = result.tick_line(TickLine {
-                        thickness: 1.0.into(),
-                        length: 4.0.into(),
-                        color: Color::from_rgb(0.5, 0.5, 0.5), // GREY
-                    });
+                    result = TickResult::new();
                 }
 
                 result
             })
+            // Interactive Cursor
             .with_cursor_renderer(|val| {
-                // Logic: Determine color based on value
-                let is_high = val > 5.0;
-                let color = if is_high {
-                    Color::from_rgb(0.8, 0.0, 0.0) // Red for high values
-                } else {
-                    Color::from_rgb(0.0, 0.6, 0.0) // Green for safe values
-                };
-
                 Some(
-                    CursorResult::new(format!("{:.2}", val))
-                        // Custom Line Style
+                    CursorResult::new(format!("{:.1}", val))
                         .line(CursorLine {
-                            color,
-                            width: 2.0.into(),
+                            color: ACCENT_COLOR,
+                            width: 1.0.into(),
                             gap: 2.0.into(),
                         })
-                        // Custom Badge Style
                         .badge(CursorBadge {
-                            background: Some(iced::Background::Color(Color::WHITE)),
+                            background: Some(iced::Background::Color(Color::BLACK)),
                             border: Some(iced::Border {
-                                color,
-                                width: 2.0.into(),
+                                color: ACCENT_COLOR,
+                                width: 1.0.into(),
                                 radius: 4.0.into(),
                             }),
-                            ..CursorBadge::default()
+                            text_style: style::TextStyle {
+                                color: ACCENT_COLOR,
+                                font: Font::MONOSPACE,
+                                shaping: Shaping::Auto,
+                                line_height: LineHeight::Relative(1.2),
+                                size: 12.into(),
+                            },
+                            ..Default::default()
                         }),
                 )
             }),
     );
 
-    // Y-Axis: Invisible but active for scaling
+    // Y-Axis: Right-aligned for a modern dashboard look
     state.set_axis(
-        AxesShowcase::Y,
-        Axis::new(Linear::new(-1.2, 1.2), axis::Position::Left)
-            .with_thickness(45.0)
+        MinimalShowcase::Y,
+        Axis::new(Linear::new(0.0, 100.0), axis::Position::Right)
+            .with_thickness(50.0)
             .with_tick_renderer(|ctx| {
-                // Start with a standard result
-                let mut result = TickResult::with_label(format!("{:.0}", ctx.tick.value));
-
-                // Customize: Major ticks (integers) are thick RED lines.
                 if ctx.tick.level == 0 {
-                    result = result
-                        .tick_line(TickLine {
-                            thickness: 1.0.into(),
-                            length: 8.0.into(),
-                            color: Color::WHITE,
-                        })
+                    TickResult::with_label(format!("{:.0}%", ctx.tick.value))
                         .grid_line(GridLine {
                             thickness: 1.0.into(),
                             dashed: true,
-                            color: Color::WHITE,
-                        });
+                            color: GRID_COLOR,
+                        })
+                        .tick_line() // Hide ticks on Y, just grid & labels
                 } else {
-                    // Minor ticks are small gray lines with NO grid
-                    result = result.tick_line(TickLine {
-                        thickness: 1.0.into(),
-                        length: 4.0.into(),
-                        color: Color::WHITE,
-                    });
+                    TickResult::new()
                 }
-
-                result
             })
-            .with_cursor_renderer(|_ctx| {
-                let mut res = CursorResult::default();
-                res.label = "100000".to_string();
-                Some(res)
+            .with_cursor_renderer(|val| {
+                Some(
+                    CursorResult::new(format!("{:.2}%", val))
+                        .line(CursorLine {
+                            color: ACCENT_COLOR,
+                            width: 1.0.into(),
+                            gap: 0.0.into(),
+                        })
+                        .badge(CursorBadge {
+                            background: Some(iced::Background::Color(ACCENT_COLOR)),
+                            text_style: style::TextStyle {
+                                color: Color::WHITE,
+                                font: Font::MONOSPACE,
+                                shaping: Shaping::Auto,
+                                line_height: LineHeight::Relative(1.2),
+                                size: 12.into(),
+                            },
+                            border: None,
+                            ..Default::default()
+                        }),
+                )
             }),
     );
 
     state
 }
+
 // -----------------------------------------------------------------------------
-// STYLES
+// HELPERS
 // -----------------------------------------------------------------------------
 
-/// Base style that strictly adheres to the current Theme
+struct EmptyData;
+
+// We implement this trait but leave 'draw' empty to render nothing.
+impl PlotData<f64> for EmptyData {
+    fn draw(&self, _plot: &mut Plot<f64>, _theme: &Theme) {
+        // Intentionally empty: The "Zen" of data visualization.
+    }
+}
+
 fn style_base(theme: &Theme) -> Style {
-    let style = iced_aksel::style::default(theme);
-
+    let mut style = iced_aksel::style::default(theme);
+    // Remove the outer frame for a cleaner look
+    style.axis.line.width = 0.0.into();
     style
-}
-// -----------------------------------------------------------------------------
-// DATA GENERATION
-// -----------------------------------------------------------------------------
-
-struct SineWave {
-    points: Vec<PlotPoint<f64>>,
-}
-
-impl SineWave {
-    fn new(frequency: f64, amplitude: f64, count: usize) -> Self {
-        let points = (0..=count)
-            .map(|i| {
-                let x = (i as f64 / count as f64) * 100.0;
-                let y = (x * 0.1 * frequency).sin() * amplitude;
-                PlotPoint::new(x, y)
-            })
-            .collect();
-
-        Self { points }
-    }
-}
-
-impl PlotData<f64> for SineWave {
-    fn draw(&self, plot: &mut Plot<f64>, theme: &Theme) {
-        let palette = theme.extended_palette();
-
-        plot.add_shape(Polyline::new(self.points.clone()).stroke(Stroke::new(
-            palette.primary.base.color,
-            Measure::Screen(2.0),
-        )));
-    }
 }

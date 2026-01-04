@@ -51,18 +51,6 @@ pub struct TextStyle {
     pub shaping: Shaping,
 }
 
-impl Default for TextStyle {
-    fn default() -> Self {
-        Self {
-            size: Pixels(12.0),
-            font: Font::default(),
-            color: Color::BLACK,
-            line_height: LineHeight::Relative(1.2),
-            shaping: Shaping::Basic,
-        }
-    }
-}
-
 /// A trait for theming the appearance of a [`Chart`](crate::Chart).
 pub trait Catalog {
     type Class<'a>;

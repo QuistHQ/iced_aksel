@@ -464,7 +464,7 @@ impl<D: Float> Axis<D> {
                     tick,
                     normalized_position: pos_norm,
                     label,
-                    style: label_style.unwrap_or(TextStyle::default()),
+                    style: label_style.unwrap_or(TextStyle::new(12., Color::WHITE)),
                     priority: label_priority.unwrap_or(tick.level),
                 });
             }
