@@ -489,7 +489,7 @@ impl<D: Float> Axis<D> {
         renderer: &mut Renderer,
         cursor_pos: Point,
         paragraph: Plain<Renderer::Paragraph>,
-        cursor_result: CursorResult, // NEW PARAM
+        cursor_result: CursorResult,
         bounds: Rectangle,
         viewport: &Rectangle,
         orientation: Orientation,
@@ -497,52 +497,75 @@ impl<D: Float> Axis<D> {
     ) where
         Renderer: plot::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
     {
+        // 1. Calculate the fixed "Rail" position (same as tick labels)
         let rail_pos = self.calculate_rail_position(&bounds, orientation, style.axis.text_offset);
         let min_bounds = paragraph.min_bounds();
-
         let padding = cursor_result.badge.padding;
 
-        let badge_width = min_bounds.width + padding.left + padding.right;
-        let badge_height = min_bounds.height + padding.top + padding.bottom;
-
-        let mut badge_rect = match orientation {
+        // 2. Determine Text Origin (independent of padding!)
+        // This ensures the text baseline aligns perfectly with tick labels.
+        let text_origin = match orientation {
             Orientation::Horizontal => {
-                let x = cursor_pos.x - (badge_width / 2.0);
+                let x = cursor_pos.x - (min_bounds.width / 2.0);
                 let y = match self.position {
-                    Position::Top => rail_pos - padding.bottom - min_bounds.height - padding.top,
+                    // Top: Text sits ON TOP of the rail (bottom of text at rail)
+                    Position::Top => rail_pos - min_bounds.height,
+                    // Bottom: Text hangs BELOW the rail (top of text at rail)
                     _ => rail_pos,
                 };
-                Rectangle::new(Point::new(x, y), Size::new(badge_width, badge_height))
+                Point::new(x, y)
             }
             Orientation::Vertical => {
-                let y = cursor_pos.y - (badge_height / 2.0);
+                let y = cursor_pos.y - (min_bounds.height / 2.0);
                 let x = match self.position {
+                    // Right: Text sits to the RIGHT of rail (left of text at rail)
                     Position::Right => rail_pos,
-                    _ => rail_pos - badge_width,
+                    // Left: Text sits to the LEFT of rail (right of text at rail)
+                    _ => rail_pos - min_bounds.width,
                 };
-                Rectangle::new(Point::new(x, y), Size::new(badge_width, badge_height))
+                Point::new(x, y)
             }
         };
 
+        // 3. Calculate Badge Rect relative to the fixed Text Origin
+        // Padding simply expands the box outwards, without shifting the text.
+        let mut badge_rect = Rectangle {
+            x: text_origin.x - padding.left,
+            y: text_origin.y - padding.top,
+            width: min_bounds.width + padding.left + padding.right,
+            height: min_bounds.height + padding.top + padding.bottom,
+        };
+
+        // 4. Clamp to Viewport (optional, keeps badge on screen)
         match orientation {
             Orientation::Horizontal => {
                 if badge_rect.x < viewport.x {
-                    badge_rect.x = viewport.x;
-                }
-                if badge_rect.x + badge_rect.width > viewport.x + viewport.width {
-                    badge_rect.x = viewport.x + viewport.width - badge_rect.width;
+                    // Shift both badge AND text if we hit screen edge
+                    let shift = viewport.x - badge_rect.x;
+                    badge_rect.x += shift;
+                    // Note: We only shift text if we are clamping to screen edges
+                    // text_origin.x += shift;
+                } else if badge_rect.x + badge_rect.width > viewport.x + viewport.width {
+                    let shift = (badge_rect.x + badge_rect.width) - (viewport.x + viewport.width);
+                    badge_rect.x -= shift;
                 }
             }
             Orientation::Vertical => {
                 if badge_rect.y < viewport.y {
-                    badge_rect.y = viewport.y;
-                }
-                if badge_rect.y + badge_rect.height > viewport.y + viewport.height {
-                    badge_rect.y = viewport.y + viewport.height - badge_rect.height;
+                    let shift = viewport.y - badge_rect.y;
+                    badge_rect.y += shift;
+                } else if badge_rect.y + badge_rect.height > viewport.y + viewport.height {
+                    let shift = (badge_rect.y + badge_rect.height) - (viewport.y + viewport.height);
+                    badge_rect.y -= shift;
                 }
             }
         }
 
+        // Re-calculate text position based on potentially clamped badge rect
+        let text_pos = Point::new(badge_rect.x + padding.left, badge_rect.y + padding.top);
+
+        // 5. Draw Cursor Line
+        // The line connects the axis to the badge. The gap is applied here.
         let gap = cursor_result.line.gap.0;
         let cursor_line_width = cursor_result.line.width.0;
         let cursor_line_color = cursor_result.line.color;
@@ -552,11 +575,13 @@ impl<D: Float> Axis<D> {
                 let (y_start, y_end) = match self.position {
                     Position::Top => {
                         let line_start = bounds.y + bounds.height;
+                        // Line goes from axis up to (badge_bottom + gap)
                         let line_end = (badge_rect.y + badge_rect.height + gap).min(line_start);
                         (line_end, line_start)
                     }
                     _ => {
                         let line_start = bounds.y;
+                        // Line goes from axis down to (badge_top - gap)
                         let line_end = (badge_rect.y - gap).max(line_start);
                         (line_start, line_end)
                     }
@@ -592,23 +617,13 @@ impl<D: Float> Axis<D> {
             }
         };
 
-        let border = if let Some(border) = cursor_result.badge.border {
-            border
-        } else {
-            Border::default()
-        };
-
-        let background = if let Some(background) = cursor_result.badge.background {
-            background
-        } else {
-            Background::Color(Color::TRANSPARENT)
-        };
-
-        let shadow = if let Some(shadow) = cursor_result.badge.shadow {
-            shadow
-        } else {
-            Shadow::default()
-        };
+        // ... Standard Rendering Code (same as before) ...
+        let border = cursor_result.badge.border.unwrap_or_default();
+        let background = cursor_result
+            .badge
+            .background
+            .unwrap_or(Background::Color(Color::TRANSPARENT));
+        let shadow = cursor_result.badge.shadow.unwrap_or_default();
 
         renderer.start_layer(*viewport);
 
@@ -629,8 +644,6 @@ impl<D: Float> Axis<D> {
             },
             background,
         );
-
-        let text_pos = Point::new(badge_rect.x + padding.left, badge_rect.y + padding.top);
 
         renderer.fill_text(
             paragraph

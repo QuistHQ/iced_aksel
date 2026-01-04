@@ -1,6 +1,6 @@
 use iced::widget::Column;
 use iced::{
-    Color, Element, Font, Length, Padding, Theme,
+    Color, Element, Font, Length, Theme,
     widget::{column, container, row, text},
 };
 use iced_aksel::axis::{CursorBadge, CursorLine, CursorResult};
@@ -112,7 +112,7 @@ fn setup_minimal_axes() -> State<&'static str, f64> {
                             color: Color::from_rgb(0.0, 0.0, 0.8), // BLUE
                         });
                 } else {
-                    // Minor ticks are small grey lines with NO grid
+                    // Minor ticks are small gray lines with NO grid
                     result = result.tick_line(TickLine {
                         thickness: 1.0.into(),
                         length: 4.0.into(),
@@ -176,7 +176,7 @@ fn setup_minimal_axes() -> State<&'static str, f64> {
                             color: Color::WHITE,
                         });
                 } else {
-                    // Minor ticks are small grey lines with NO grid
+                    // Minor ticks are small gray lines with NO grid
                     result = result.tick_line(TickLine {
                         thickness: 1.0.into(),
                         length: 4.0.into(),
@@ -185,6 +185,11 @@ fn setup_minimal_axes() -> State<&'static str, f64> {
                 }
 
                 result
+            })
+            .with_cursor_renderer(|_ctx| {
+                let mut res = CursorResult::default();
+                res.label = "100000".to_string();
+                Some(res)
             }),
     );
 
