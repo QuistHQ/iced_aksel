@@ -37,6 +37,7 @@ iced = "0.14.0"
 iced_core = "0.14.0"
 iced_graphics = "0.14.0"
 iced_renderer = { version = "0.14.0", features = ["wgpu", "wgpu-bare"] }
+iced_test = "0.14.0"
 indexmap = "2.12"
 lyon_tessellation = "1.0"
 lyon_path = "1.0"
