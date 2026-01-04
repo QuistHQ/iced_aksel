@@ -3,13 +3,11 @@ use iced_core::{
     Color, Pixels, Point,
     alignment::{Horizontal, Vertical},
 };
+use iced_graphics::text::cosmic_text::fontdb::ID;
 use std::fmt;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use ttf_parser::Face;
 
-use crate::Quality;
-
-static NEXT_FONT_ID: AtomicUsize = AtomicUsize::new(0);
+use crate::{Quality, memory::CachedFont};
 
 /// A container for parsed font data, optimized for geometric rendering.
 #[derive(Clone)]
@@ -19,19 +17,18 @@ pub struct GeometricFont<'a> {
     /// The low-level geometry interface (used for extracting Bezier curves).
     pub(crate) geometry: Face<'a>,
     /// Unique identifier for caching purposes.
-    pub id: usize,
+    pub id: &'a ID,
 }
 
 impl<'a> GeometricFont<'a> {
     /// Parses raw font bytes (TTF/OTF) into a `GeometricFont`.
-    pub fn new(layout: &'a FontVec) -> Option<Self> {
-        let geometry = Face::parse(layout.as_slice(), 0).ok()?;
-        let id = NEXT_FONT_ID.fetch_add(1, Ordering::Relaxed);
+    pub fn new(font: &'a CachedFont) -> Option<Self> {
+        let geometry = Face::parse(font.bytes.as_slice(), 0).ok()?;
 
         Some(Self {
-            layout,
+            layout: &font.bytes,
             geometry,
-            id,
+            id: &font.id,
         })
     }
 

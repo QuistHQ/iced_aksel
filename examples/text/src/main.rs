@@ -1,8 +1,9 @@
 use iced::{
-    Color, Element, Point, Subscription, Task, Theme,
+    Color, Element, Font, Point, Task, Theme,
+    advanced::graphics::text::font_system,
     mouse::ScrollDelta,
     time::Instant,
-    widget::{column, row, slider, text},
+    widget::{column, pick_list, row, slider, text},
 };
 use iced_aksel::{
     Axis, Chart, Measure, Plot, PlotData, PlotPoint, Quality, State, axis::Position,
@@ -40,6 +41,9 @@ struct TextExample {
     fps: f32,
     last_frame: Option<Instant>,
     global_quality: f32,
+    font: Font,
+    selected_family: String,
+    families: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -48,11 +52,22 @@ enum Message {
     ChartDragged(DragDelta),
     ChartScrolled(Point, ScrollDelta),
     QualityChanged(f32),
+    FontSelected(String),
 }
 
 impl TextExample {
     fn new() -> (Self, Task<Message>) {
         let mut state = State::new();
+
+        let mut system = font_system().write().unwrap();
+        let families = system
+            .raw()
+            .db()
+            .faces()
+            .map(|f| f.families[0].0.clone())
+            .collect();
+        drop(system);
+
         // Setup a nice coordinate system
         state.set_axis(
             AXIS_X,
@@ -66,6 +81,9 @@ impl TextExample {
             fps: 0.0,
             last_frame: None,
             global_quality: 1.0, // Default Standard Quality
+            font: iced::Font::DEFAULT,
+            selected_family: "Default".to_string(),
+            families,
         };
 
         app.generate_showcase();
@@ -133,28 +151,31 @@ impl TextExample {
                     let delta = now.duration_since(last).as_secs_f32();
                     if delta > 0.0 {
                         let instant_fps = 1.0 / delta;
-                        self.fps = self.fps * 0.9 + instant_fps * 0.1;
+                        self.fps = self.fps.mul_add(0.9, instant_fps * 0.1);
                     }
                 }
                 self.last_frame = Some(now);
-                Task::none()
             }
             Message::ChartDragged(delta) => {
                 self.state.pan_axes(AXIS_X, AXIS_Y, delta.x, delta.y);
-                Task::none()
             }
             Message::ChartScrolled(pt, delta) => {
                 if let ScrollDelta::Lines { y, .. } = delta {
                     let factor = if y > 0.0 { 1.1 } else { 0.9 };
                     self.state.zoom_axes(AXIS_X, AXIS_Y, pt.x, pt.y, factor);
                 }
-                Task::none()
             }
             Message::QualityChanged(q) => {
                 self.global_quality = q;
-                Task::none()
+            }
+            Message::FontSelected(family) => {
+                self.selected_family = family.clone();
+                // Hack to get a static ref to the family - This isn't great, but good enough to
+                // showcase the fonts
+                self.font = Font::with_name(Box::leak(family.into_boxed_str()));
             }
         }
+        Task::none()
     }
 
     fn view(&self) -> Element<'_, Message> {
@@ -162,8 +183,15 @@ impl TextExample {
             .debug(true) // Shows the tile boundaries
             .quality(self.global_quality)
             .plot_data(&self.layer, AXIS_X, AXIS_Y)
+            .plot_font(self.font)
             .on_drag(Message::ChartDragged)
             .on_scroll(Message::ChartScrolled);
+
+        let font_selector = pick_list(
+            self.families.clone(),
+            Some(self.selected_family.clone()),
+            Message::FontSelected,
+        );
 
         let sidebar = column![
             text("Text Engine").size(24),
@@ -173,6 +201,7 @@ impl TextExample {
                 .color(Color::from_rgb(0.0, 0.8, 0.0)),
             text("Global Quality").size(16),
             text(format!("Multiplier: {:.2}x", self.global_quality)).size(12),
+            font_selector,
             // Quality Control Slider
             slider(0.1..=3.0, self.global_quality, Message::QualityChanged).step(0.1),
             text("Lower (0.1) = Fast / Blocky")
@@ -184,8 +213,7 @@ impl TextExample {
             text("Instructions:").size(14),
             text("• Drag to Pan").size(12),
             text("• Scroll to Zoom").size(12),
-            text("• Observe 'Zoom In To Read Me'").size(12),
-            text("  as it sharpens on zoom.").size(12),
+            text("• Observe 'Zoom In To Read Me' as it sharpens on zoom.").size(12),
         ]
         .spacing(15)
         .padding(20)

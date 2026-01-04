@@ -83,11 +83,11 @@ use std::{fmt::Debug, hash::Hash, ops::Deref};
 use aksel::ScreenRect;
 use derive_more::{Display, Error};
 use iced_core::{
-    Clipboard, Color, Element, Event, Layout, Length, Padding, Point, Rectangle, Shell, Size,
+    Clipboard, Color, Element, Event, Font, Layout, Length, Padding, Point, Rectangle, Shell, Size,
     Widget,
     layout::{self, Limits, Node},
     mouse::{self, ScrollDelta},
-    renderer::{Quad, Style},
+    renderer::Style,
     text::{LineHeight, Shaping, Wrapping},
     touch,
     widget::{Tree, tree},
@@ -223,6 +223,11 @@ pub struct Chart<
     drag_deadband: f32,
     padding: Padding,
     quality: f32,
+
+    // Fonts
+    plot_font: Option<Font>,
+    axis_font: Option<Font>,
+
     // Interaction Handlers
     on_error: Option<ErrorHandler<AxisId, Message>>,
 
@@ -267,7 +272,10 @@ where
             drag_deadband: DEFAULT_DRAG_DEADBAND,
             padding: Padding::new(0.),
             quality: 1.0,
-            // Handlers default to None
+
+            // Handlers and fonts default to None
+            plot_font: None,
+            axis_font: None,
             on_error: None,
             on_click: None,
             on_double_click: None,
@@ -310,11 +318,22 @@ where
         self
     }
 
+    /// Sets the font used to render the Axes labels and cursor
+    pub const fn axes_font(mut self, font: Font) -> Self {
+        self.axis_font = Some(font);
+        self
+    }
+
+    /// Sets the font used to render the plot labels
+    pub const fn plot_font(mut self, font: Font) -> Self {
+        self.plot_font = Some(font);
+        self
+    }
+
     /// Adds a data layer to the chart.
     ///
     /// The data will be plotted using the coordinate system defined by the two specified axes.
     /// Multiple layers can be added to a single chart, potentially using different axes.
-
     pub fn plot_data<T: plot::PlotData<Domain, Renderer, Theme>>(
         mut self,
         items: &'a T,
@@ -842,7 +861,7 @@ where
         event: &Event,
         layout: layout::Layout<'_>,
         cursor: mouse::Cursor,
-        _renderer: &Renderer,
+        renderer: &Renderer,
         _clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
@@ -857,6 +876,10 @@ where
             }
             return;
         }
+
+        let plot_font = self.plot_font.unwrap_or_else(|| renderer.default_font());
+        let axis_font = self.axis_font.unwrap_or_else(|| renderer.default_font());
+        memory.update_fonts(axis_font, plot_font);
 
         // Only handle events if the cursor is near the chart
         let bounds = layout.bounds();
@@ -990,7 +1013,7 @@ where
                 &plot_bounds,
                 &mut mesh_buffer,
                 &transform,
-                GeometricFont::new(&memory.plot_font_bytes).expect("Failed to create font"),
+                GeometricFont::new(&memory.plot_font).expect("Failed to create font"),
             );
 
             // User code draws shapes into the plot here

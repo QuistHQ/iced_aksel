@@ -5,7 +5,7 @@ edition.workspace = true
 publish = false
 
 [dependencies]
-iced.workspace = true
+iced = { workspace = true, features = ["advanced"] }
 rand.workspace = true
 
 iced_aksel = { path = "../../iced_aksel/" }

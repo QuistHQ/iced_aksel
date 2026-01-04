@@ -16,8 +16,8 @@ use iced_core::{
     Color, Point,
     alignment::{Horizontal, Vertical},
 };
-use iced_graphics::color::pack;
 use iced_graphics::mesh::SolidVertex2D;
+use iced_graphics::{color::pack, text::cosmic_text::fontdb::ID};
 use lru::LruCache;
 use lyon::math::point;
 use lyon::path::Path;
@@ -92,7 +92,7 @@ pub struct CachedGlyph {
 /// Uniquely identifies a specific glyph's geometry across different fonts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct CacheKey {
-    pub font_id: usize,
+    pub font_id: ID,
     pub glyph_id: u16,
 }
 
@@ -315,7 +315,7 @@ pub fn draw_geometric_text(ctx: &mut TextRenderContext, req: TextRequest) {
             let glyph_index = glyph_id.0;
 
             let cache_key = CacheKey {
-                font_id,
+                font_id: *font_id,
                 glyph_id: glyph_index,
             };
 
