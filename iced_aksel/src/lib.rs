@@ -304,8 +304,11 @@ where
     }
 
     /// Sets the style of the chart.
-    pub fn style(mut self, style: <Theme as Catalog>::Class<'a>) -> Self {
-        self.class = style;
+    pub fn style(mut self, style: impl Fn(&Theme) -> Style + 'a) -> Self
+    where
+        Theme::Class<'a>: From<style::StyleFn<'a, Theme>>,
+    {
+        self.class = (Box::new(style) as style::StyleFn<'a, Theme>).into();
         self
     }
 

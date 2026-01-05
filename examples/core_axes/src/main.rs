@@ -41,31 +41,33 @@ impl MinimalShowcase {
     fn theme(&self) -> Theme {
         self.theme.clone()
     }
+
     fn update(&mut self, _message: Message) -> iced::Task<Message> {
         iced::Task::none()
     }
 
     fn view(&self) -> Element<'_, Message> {
         let chart = Chart::new(&self.state)
-            // TODO: Dont know why i cant make this style function work
-            .style(Box::new(|theme: &Theme| {
-                // 1. Get the library's standard default for the current theme
-                let mut style = iced_aksel::style::default(theme);
-
-                // 2. Modify it globally
-                // Example: Make ALL text larger and ALL spines thick
-                style.axis.ticks.text.size = 16.0.into();
-                style.axis.spine.width = 3.0.into();
-
-                // Example: Make the grid faint red globally
-                style.axis.grid.line.color = iced::Color::from_rgb(1.0, 0.0, 0.0);
-
-                style
-            }))
+            .style(style_chart)
             .width(Length::Fill)
             .height(Length::Fill);
         container(chart).padding(40).into()
     }
+}
+
+fn style_chart(theme: &Theme) -> iced_aksel::Style {
+    // 1. Get the library's standard default for the current theme
+    let mut style = iced_aksel::style::default(theme);
+
+    // 2. Modify it globally
+    // Example: Make ALL text larger and ALL spines thick
+    style.axis.ticks.text.size = 16.0.into();
+    style.axis.spine.width = 3.0.into();
+
+    // Example: Make the grid faint red globally
+    style.axis.grid.line.color = iced::Color::from_rgb(1.0, 0.0, 0.0);
+
+    style
 }
 
 fn setup_axes(theme: &Theme) -> State<&'static str, f64> {
