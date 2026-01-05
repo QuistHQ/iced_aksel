@@ -5,7 +5,7 @@ use iced::{
     widget::{column, text},
 };
 use iced_aksel::axis::{CursorResult, Position, TickResult};
-use iced_aksel::{Axis, Catalog, Chart, State, scale::Linear};
+use iced_aksel::{Axis, Chart, State, scale::Linear};
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -47,20 +47,20 @@ impl MinimalShowcase {
     fn view(&self) -> Element<'_, Message> {
         let chart = Chart::new(&self.state)
             // TODO: Dont know why i cant make this style function work
-            // .style(Box::new(|theme| {
-            //     // 1. Get the library's standard default for the current theme
-            //     let mut style = iced_aksel::style::default(theme);
-            // 
-            //     // 2. Modify it globally
-            //     // Example: Make ALL text larger and ALL spines thick
-            //     style.axis.ticks.text.size = 16.0.into();
-            //     style.axis.spine.width = 3.0.into();
-            // 
-            //     // Example: Make the grid faint red globally
-            //     style.axis.grid.line.color = iced::Color::from_rgb(1.0, 0.0, 0.0);
-            // 
-            //     style
-            // }))
+            .style(Box::new(|theme: &Theme| {
+                // 1. Get the library's standard default for the current theme
+                let mut style = iced_aksel::style::default(theme);
+
+                // 2. Modify it globally
+                // Example: Make ALL text larger and ALL spines thick
+                style.axis.ticks.text.size = 16.0.into();
+                style.axis.spine.width = 3.0.into();
+
+                // Example: Make the grid faint red globally
+                style.axis.grid.line.color = iced::Color::from_rgb(1.0, 0.0, 0.0);
+
+                style
+            }))
             .width(Length::Fill)
             .height(Length::Fill);
         container(chart).padding(40).into()

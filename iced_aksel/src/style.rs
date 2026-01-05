@@ -93,73 +93,75 @@ impl Catalog for Theme {
     type Class<'a> = StyleFn<'a, Self>;
 
     fn default<'a>() -> StyleFn<'a, Self> {
-        Box::new(|theme| {
-            let palette = theme.extended_palette();
-
-            // Extract Theme Colors
-            let text_color = palette.background.weak.text;
-            let axis_color = palette.background.strong.color;
-            let grid_color = palette.background.weakest.color;
-            let primary_color = palette.primary.base.color;
-            let on_primary_text = palette.primary.base.text;
-
-            // Define "Smart Defaults" using Theme Colors
-            let default_text = TextStyle {
-                color: text_color,
-                size: 12.0.into(),
-                font: Font::default(),
-                line_height: LineHeight::Relative(1.2),
-                shaping: Shaping::Auto,
-            };
-
-            let default_spine = LineStyle {
-                color: axis_color,
-                width: 1.0.into(),
-            };
-
-            let default_grid = LineStyle {
-                color: grid_color,
-                width: 1.0.into(),
-            };
-
-            Style {
-                axis: AxisStyle {
-                    spine: default_spine,
-                    ticks: TickStyle {
-                        line: default_spine,
-                        length: 2.0.into(),
-                        text: default_text,
-                    },
-                    grid: GridStyle {
-                        line: default_grid,
-                        dashed: false,
-                    },
-                },
-                cursor: CursorStyle {
-                    line: LineStyle {
-                        color: primary_color,
-                        width: 1.0.into(),
-                    },
-                    line_gap: 2.0.into(),
-                    badge: ContainerStyle {
-                        background: Some(primary_color.into()),
-                        border: Border {
-                            radius: 4.0.into(),
-                            ..Border::default()
-                        },
-                        shadow: Shadow::default(),
-                        padding: 4.0.into(),
-                    },
-                    text: TextStyle {
-                        color: on_primary_text,
-                        ..default_text
-                    },
-                },
-            }
-        })
+        Box::new(default)
     }
 
     fn style(&self, class: &StyleFn<'_, Self>) -> Style {
         class(self)
+    }
+}
+
+pub fn default(theme: &Theme) -> Style {
+    let palette = theme.extended_palette();
+
+    // Extract Theme Colors
+    let text_color = palette.background.weak.text;
+    let axis_color = palette.background.strong.color;
+    let grid_color = palette.background.weakest.color;
+    let primary_color = palette.primary.base.color;
+    let on_primary_text = palette.primary.base.text;
+
+    // Define "Smart Defaults" using Theme Colors
+    let default_text = TextStyle {
+        color: text_color,
+        size: 12.0.into(),
+        font: Font::default(),
+        line_height: LineHeight::Relative(1.2),
+        shaping: Shaping::Auto,
+    };
+
+    let default_spine = LineStyle {
+        color: axis_color,
+        width: 1.0.into(),
+    };
+
+    let default_grid = LineStyle {
+        color: grid_color,
+        width: 1.0.into(),
+    };
+
+    Style {
+        axis: AxisStyle {
+            spine: default_spine,
+            ticks: TickStyle {
+                line: default_spine,
+                length: 2.0.into(),
+                text: default_text,
+            },
+            grid: GridStyle {
+                line: default_grid,
+                dashed: false,
+            },
+        },
+        cursor: CursorStyle {
+            line: LineStyle {
+                color: primary_color,
+                width: 1.0.into(),
+            },
+            line_gap: 2.0.into(),
+            badge: ContainerStyle {
+                background: Some(primary_color.into()),
+                border: Border {
+                    radius: 4.0.into(),
+                    ..Border::default()
+                },
+                shadow: Shadow::default(),
+                padding: 4.0.into(),
+            },
+            text: TextStyle {
+                color: on_primary_text,
+                ..default_text
+            },
+        },
     }
 }
