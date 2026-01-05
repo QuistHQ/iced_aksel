@@ -237,7 +237,6 @@ pub struct Chart<
     layers: Vec<Layer<'a, AxisId, Domain, Renderer, Theme>>,
     width: Length,
     height: Length,
-    // FIX 1: Use the associated type directly to be generic-compatible
     class: <Theme as Catalog>::Class<'a>,
     errors: Vec<Error<AxisId>>,
     drag_deadband: f32,
@@ -306,9 +305,6 @@ where
     }
 
     /// Sets the style of the chart.
-    ///
-    /// If you are using `iced::Theme`, you can pass a `Box::new(|theme| ...)` closure.
-    // FIX 2: Accept the associated type directly
     pub fn style(mut self, style: <Theme as Catalog>::Class<'a>) -> Self {
         self.class = style;
         self
