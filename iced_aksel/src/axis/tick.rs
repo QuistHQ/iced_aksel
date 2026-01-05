@@ -1,44 +1,26 @@
-use super::{Orientation, label::LabelBounds};
-use crate::axis::GridLine;
-use crate::style::TextStyle;
-
+use super::Orientation;
+use super::label::LabelBounds;
+use crate::style::{GridStyle, TextStyle, TickStyle};
 use aksel::{Float, Tick};
 use derivative::Derivative;
-use iced_core::{
-    Color, Pixels, Point, Rectangle,
-    text::{self, paragraph::Plain},
-};
+use iced_core::{Color, Point, Rectangle, text, text::paragraph::Plain};
 
-/// The result returned from a tick renderer function.
+#[derive(Debug, Clone)]
 pub struct TickResult {
-    /// Optional tick line mark on the axis.
-    pub(crate) tick_line: Option<TickLine>,
-    /// Optional grid line extending into the plot area.
-    pub(crate) grid_line: Option<GridLine>,
-    /// Optional text label for this tick.
+    pub(crate) tick_style: TickStyle,
+    pub(crate) grid_style: Option<GridStyle>,
     pub(crate) label: Option<String>,
-    /// Style for the label text (font, color, size).
-    /// If None, a default style is used.
-    pub(crate) label_style: Option<TextStyle>,
-    /// Optional label rendering-priority (lower is higher priority).
     pub(crate) label_priority: Option<u8>,
 }
 
 impl TickResult {
-    /// Creates a new empty `TickResult` (no lines, no label).
-    pub const fn empty() -> Self {
+    pub fn from_tick_style(tick_style: TickStyle) -> Self {
         Self {
-            tick_line: None,
-            grid_line: None,
+            tick_style,
+            grid_style: None,
             label: None,
-            label_style: None,
             label_priority: None,
         }
-    }
-
-    pub fn text_style(mut self, style: TextStyle) -> Self {
-        self.label_style = Some(style);
-        self
     }
 
     pub fn label(mut self, label: String) -> Self {
@@ -46,39 +28,26 @@ impl TickResult {
         self
     }
 
-    pub const fn tick_line(mut self, line: TickLine) -> Self {
-        self.tick_line = Some(line);
-        self
-    }
-
-    pub const fn grid_line(mut self, line: GridLine) -> Self {
-        self.grid_line = Some(line);
+    pub fn grid_style(mut self, style: GridStyle) -> Self {
+        self.grid_style = Some(style);
         self
     }
 }
 
-/// Defines the visual styling of a single tick mark on an Axis.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct TickLine {
-    /// The visual thickness (stroke width) of the tick line.
-    pub thickness: Pixels,
-    /// The length of the tick line perpendicular to the axis.
-    pub length: Pixels,
-    /// The color of the tick line.
-    pub color: Color,
-}
-
-/// Context provided to tick renderer functions.
 #[derive(Debug, Clone, Copy)]
-pub struct TickContext<D> {
+pub struct TickContext<'a, D> {
     pub tick: Tick<D>,
+    // The "Perfect Default" passed from the Theme
+    pub tick_style: &'a TickStyle,
+    pub grid_style: &'a GridStyle,
+
     pub normalized_position: f32,
     pub axis_bounds: Rectangle,
     pub scale_domain: (D, D),
     pub orientation: Orientation,
 }
 
-impl<D: Float> TickContext<D> {
+impl<D: Float> TickContext<'_, D> {
     pub const fn axis_span(&self) -> f32 {
         match self.orientation {
             Orientation::Horizontal => self.axis_bounds.width,
@@ -92,6 +61,8 @@ impl<D: Float> TickContext<D> {
     }
 }
 
+// ... (Keep Label Logic structs: PlacedLabelInfo, LabelCandidate, etc. - unchanged) ...
+// (I am omitting them here for brevity, but they must remain in the file)
 #[derive(Debug, Clone)]
 pub struct PlacedLabelInfo<D> {
     pub tick: Tick<D>,

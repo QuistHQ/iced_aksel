@@ -976,7 +976,7 @@ where
         // Pass 1: Render Grid Lines (Background)
         for (i, (_, axis)) in self.state.axes().iter().enumerate() {
             let axis_layout = layout.children().nth(i).unwrap();
-            axis.draw_grid(axis_layout, &plot_bounds, &mut mesh_buffer);
+            axis.draw_grid(&style, axis_layout, &plot_bounds, &mut mesh_buffer);
         }
 
         // Pass 2: Render Data Layers (Middle)

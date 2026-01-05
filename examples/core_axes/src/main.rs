@@ -1,16 +1,11 @@
+use iced::theme::Base;
 use iced::widget::container;
-use iced::widget::text::{LineHeight, Shaping};
 use iced::{
-    Color, Element, Font, Length, Shadow, Theme,
+    Color, Element, Font, Length, Theme,
     widget::{column, text},
 };
-use iced_aksel::axis::{CursorBadge, CursorLine, CursorResult};
-use iced_aksel::style::{Style, TextStyle};
-use iced_aksel::{
-    Axis, Chart, State,
-    axis::{self, GridLine, TickLine, TickResult},
-    scale::Linear,
-};
+use iced_aksel::axis::{CursorResult, Position, TickResult};
+use iced_aksel::{Axis, Chart, State, scale::Linear};
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -18,9 +13,7 @@ pub fn main() -> iced::Result {
         MinimalShowcase::update,
         MinimalShowcase::view,
     )
-    .title("Axes Showcase")
     .theme(MinimalShowcase::theme)
-    .antialiasing(true)
     .run()
 }
 
@@ -33,12 +26,8 @@ struct MinimalShowcase {
 pub enum Message {}
 
 impl MinimalShowcase {
-    const X: &'static str = "x";
-    const Y: &'static str = "y";
-
     fn new() -> (Self, iced::Task<Message>) {
         let theme = Theme::Dark;
-
         (
             Self {
                 state: setup_axes(&theme),
@@ -51,112 +40,65 @@ impl MinimalShowcase {
     fn theme(&self) -> Theme {
         self.theme.clone()
     }
-
     fn update(&mut self, _message: Message) -> iced::Task<Message> {
         iced::Task::none()
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let chart = Chart::new(&self.state);
-
-        container(
-            column![
-                text("Interactive Axis Playground")
-                    .size(14)
-                    .font(Font::MONOSPACE)
-                    .style(text::secondary),
-                container(chart)
-                    .width(Length::Fill)
-                    .height(Length::Fill)
-                    .style(container::bordered_box)
-            ]
-            .spacing(10),
-        )
-        .padding(40)
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .into()
+        let chart = Chart::new(&self.state)
+            .width(Length::Fill)
+            .height(Length::Fill);
+        container(chart).padding(40).into()
     }
 }
 
-// -----------------------------------------------------------------------------
-// AXIS SETUP
-// -----------------------------------------------------------------------------
-
 fn setup_axes(theme: &Theme) -> State<&'static str, f64> {
     let mut state = State::new();
+    let danger_color = theme.palette().danger;
 
-    // X-Axis: Clean, with subtle vertical grids
-
-    // ----- General Settings -----
-    let text_style = TextStyle {
-        color: theme.palette().text,
-        font: Font::MONOSPACE,
-        shaping: Shaping::Auto,
-        line_height: LineHeight::Relative(1.2),
-        size: 12.into(),
-    };
-
-    // ----- Tick Settings -----
-    let tick_line_style = TickLine {
-        thickness: 1.0.into(),
-        length: 6.0.into(),
-        color: theme.palette().text,
-    };
-
-    let grid_line_style = GridLine {
-        thickness: 1.0.into(),
-        dashed: false,
-        color: theme.palette().background,
-    };
-
-    // ----- Cursor Settings -----
-    let cursor_line = CursorLine {
-        color: theme.palette().primary,
-        width: 1.0.into(),
-        gap: 2.0.into(),
-    };
-
-    let cursor_badge = CursorBadge {
-        background: Some(theme.palette().primary),
-        border: Some(iced::Border {
-            color: theme.palette().primary,
-            width: 1.0.into(),
-            radius: 4.0.into(),
-        }),
-        text_style,
-        shadow: Some(Shadow::default()),
-        padding: 4.into(),
-    };
+    // 1. SIMPLE CUSTOMIZATION
+    // "I just want longer ticks, but keep the theme color"
     state.set_axis(
-        MinimalShowcase::X,
-        Axis::new(Linear::new(0.0, 100.0), axis::Position::Bottom)
-            .with_thickness(40.0)
-            .with_text_offset(16.0.into())
-            .with_tick_renderer(move |ctx| {
-                let mut result = TickResult::empty();
+        "y",
+        Axis::new(Linear::new(0.0, 100.0), Position::Left).with_tick_renderer(|ctx| {
+            // Take the theme defaults
+            let mut tick_style = *ctx.tick_style;
+            let grid_style = *ctx.grid_style;
 
-                // Styling logic
+            // Change values to fit the look you want
+            // tick_style.length = 10.0.into();
+
+            TickResult::from_tick_style(tick_style)
+                .label(format!("{:.0}", ctx.tick.value))
+                .grid_style(grid_style)
+        }),
+    );
+
+    // 2. ADVANCED LOGIC
+    state.set_axis(
+        "x",
+        Axis::new(Linear::new(0.0, 100.0), Position::Bottom)
+            .with_tick_renderer(move |ctx| {
+                // Take the theme defaults
+                let mut tick_style = *ctx.tick_style;
+                let grid_style = *ctx.grid_style;
+
+                // Modify based on data
+                // This will make the major tick-lines stand out from the minor
                 if ctx.tick.level == 0 {
-                    result = result
-                        .label(format!("{:.0}", ctx.tick.value))
-                        .text_style(text_style)
-                        .tick_line(tick_line_style)
-                        .grid_line(grid_line_style);
+                    tick_style.length = 6.0.into();
+                    tick_style.line.color = danger_color; // Red
                 } else {
-                    result = TickResult::empty();
+                    tick_style.length = 4.0.into();
                 }
 
-                result
+                TickResult::from_tick_style(tick_style)
+                    .label(format!("{:.0}", ctx.tick.value))
+                    .grid_style(grid_style)
             })
-            // Interactive Cursor
-            .with_cursor_renderer(move |val| {
-                Some(
-                    CursorResult::empty()
-                        .cursor_badge(cursor_badge)
-                        .cursor_line(cursor_line)
-                        .label(format!("{:.0}", val)),
-                )
+            .with_cursor_renderer(|val, style| {
+                // Receive the 'style' which is correctly colored for the current Theme
+                Some(CursorResult::from_style(*style).label(format!("{:.1}", val)))
             }),
     );
 
