@@ -3,8 +3,9 @@ use super::label::LabelBounds;
 use crate::style::{GridStyle, TextStyle, TickStyle};
 use aksel::{Float, Tick};
 use derivative::Derivative;
-use iced_core::{Color, Point, Rectangle, text, text::paragraph::Plain};
+use iced_core::{Color, Font, Pixels, Point, Rectangle, text, text::paragraph::Plain};
 
+/// The result returned from a tick renderer function.
 #[derive(Debug, Clone)]
 pub struct TickResult {
     pub(crate) tick_style: TickStyle,
@@ -14,22 +15,123 @@ pub struct TickResult {
 }
 
 impl TickResult {
-    pub fn from_tick_style(tick_style: TickStyle) -> Self {
+    /// Start with a base style (usually `*ctx.style`).
+    pub fn from_style(style: TickStyle) -> Self {
         Self {
-            tick_style,
+            tick_style: style,
             grid_style: None,
             label: None,
             label_priority: None,
         }
     }
 
+    /// Set the label text.
     pub fn label(mut self, label: String) -> Self {
         self.label = Some(label);
         self
     }
 
-    pub fn grid_style(mut self, style: GridStyle) -> Self {
-        self.grid_style = Some(style);
+    /// set the label priority
+    pub fn label_priority(mut self, priority: u8) -> Self {
+        self.label_priority = Some(priority);
+        self
+    }
+
+    /// Explicitly set the grid style (or disable it with None).
+    pub fn grid_style(mut self, style: Option<GridStyle>) -> Self {
+        self.grid_style = style;
+        self
+    }
+
+    // --- Tick Mark Helpers ---
+
+    /// Set the color of the tick mark.
+    pub fn line_color(mut self, color: Color) -> Self {
+        self.tick_style.line.color = color;
+        self
+    }
+
+    /// Set the width of the tick mark.
+    pub fn line_width(mut self, width: impl Into<Pixels>) -> Self {
+        self.tick_style.line.width = width.into();
+        self
+    }
+
+    /// Set the length of the tick mark.
+    pub fn length(mut self, length: impl Into<Pixels>) -> Self {
+        self.tick_style.length = length.into();
+        self
+    }
+
+    // --- Text Helpers ---
+
+    /// Set the color of the label text.
+    pub fn text_color(mut self, color: Color) -> Self {
+        self.tick_style.text.color = color;
+        self
+    }
+
+    /// Set the size of the label text.
+    pub fn text_size(mut self, size: impl Into<Pixels>) -> Self {
+        self.tick_style.text.size = size.into();
+        self
+    }
+
+    /// Set the font of the label text.
+    pub fn font(mut self, font: Font) -> Self {
+        self.tick_style.text.font = font;
+        self
+    }
+
+    // --- Grid Helpers (Convenience) ---
+
+    /// Enable the grid (if not already) and set its color.
+    pub fn grid_color(mut self, color: Color) -> Self {
+        if let Some(grid) = &mut self.grid_style {
+            grid.line.color = color;
+        } else {
+            // Create a default grid if one doesn't exist, just to set the color
+            self.grid_style = Some(GridStyle {
+                line: crate::style::LineStyle {
+                    color,
+                    width: 1.0.into(),
+                },
+                dashed: false,
+            });
+        }
+        self
+    }
+
+    /// Enable the grid (if not already) and set its width.
+    pub fn grid_width(mut self, width: impl Into<Pixels>) -> Self {
+        let w = width.into();
+        if let Some(grid) = &mut self.grid_style {
+            grid.line.width = w;
+        } else {
+            self.grid_style = Some(GridStyle {
+                line: crate::style::LineStyle {
+                    color: Color::from_rgb(0.8, 0.8, 0.8), // Placeholder default
+                    width: w,
+                },
+                dashed: false,
+            });
+        }
+        self
+    }
+
+    /// Enable the grid (if not already) and set whether it is dashed.
+    pub fn grid_dashed(mut self, dashed: bool) -> Self {
+        if let Some(grid) = &mut self.grid_style {
+            grid.dashed = dashed;
+        } else {
+            self.grid_style = Some(GridStyle {
+                line: crate::style::LineStyle {
+                    color: Color::from_rgb(0.8, 0.8, 0.8),
+                    width: 1.0.into(),
+                },
+                dashed,
+            });
+        }
         self
     }
 }
@@ -37,10 +139,8 @@ impl TickResult {
 #[derive(Debug, Clone, Copy)]
 pub struct TickContext<'a, D> {
     pub tick: Tick<D>,
-    // The "Perfect Default" passed from the Theme
     pub tick_style: &'a TickStyle,
     pub grid_style: &'a GridStyle,
-
     pub normalized_position: f32,
     pub axis_bounds: Rectangle,
     pub scale_domain: (D, D),
@@ -61,8 +161,6 @@ impl<D: Float> TickContext<'_, D> {
     }
 }
 
-// ... (Keep Label Logic structs: PlacedLabelInfo, LabelCandidate, etc. - unchanged) ...
-// (I am omitting them here for brevity, but they must remain in the file)
 #[derive(Debug, Clone)]
 pub struct PlacedLabelInfo<D> {
     pub tick: Tick<D>,
@@ -122,11 +220,9 @@ impl<D> LabelPolicy<D> {
     pub const fn all() -> Self {
         Self::All
     }
-
     pub const fn skip_overlapping(min_gap: f32) -> Self {
         Self::SkipOverlapping { min_gap }
     }
-
     pub fn custom<F>(policy: F) -> Self
     where
         F: for<'a> Fn(LabelDecisionContext<'a, D>) -> LabelDecision + 'static,

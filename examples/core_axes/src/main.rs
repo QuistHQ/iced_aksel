@@ -5,7 +5,7 @@ use iced::{
     widget::{column, text},
 };
 use iced_aksel::axis::{CursorResult, Position, TickResult};
-use iced_aksel::{Axis, Chart, State, scale::Linear};
+use iced_aksel::{Axis, Catalog, Chart, State, scale::Linear};
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -61,9 +61,9 @@ fn setup_axes(theme: &Theme) -> State<&'static str, f64> {
     state.set_axis(
         "y",
         Axis::new(Linear::new(0.0, 100.0), Position::Left).with_tick_renderer(|ctx| {
-            TickResult::from_tick_style(*ctx.tick_style)
+            TickResult::from_style(*ctx.tick_style)
                 .label(format!("{:.0}", ctx.tick.value))
-                .grid_style(*ctx.grid_style)
+                .grid_style(Some(*ctx.grid_style))
         }),
     );
 
@@ -72,7 +72,8 @@ fn setup_axes(theme: &Theme) -> State<&'static str, f64> {
     state.set_axis(
         "x",
         Axis::new(Linear::new(0.0, 100.0), Position::Bottom)
-            .with_text_offset(32)
+            .with_text_offset(16)
+            .skip_overlapping_labels(6.)
             .with_tick_renderer(move |ctx| {
                 // Take the theme defaults
                 let mut tick_style = *ctx.tick_style;
@@ -87,9 +88,9 @@ fn setup_axes(theme: &Theme) -> State<&'static str, f64> {
                     tick_style.length = 4.0.into();
                 }
 
-                TickResult::from_tick_style(tick_style)
+                TickResult::from_style(tick_style)
                     .label(format!("{:.0}", ctx.tick.value))
-                    .grid_style(grid_style)
+                    .grid_style(Some(grid_style))
             })
             .with_cursor_renderer(|val, style| {
                 // Receive the 'style' which is correctly colored for the current Theme

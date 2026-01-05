@@ -142,7 +142,6 @@ impl<D: Float> Axis<D> {
     }
 
     // --- Configuration ---
-
     pub fn with_thickness<P: Into<Pixels>>(mut self, thickness: P) -> Self {
         self.thickness = thickness.into();
         self
@@ -166,6 +165,25 @@ impl<D: Float> Axis<D> {
         F: FnMut(D, &CursorStyle) -> Option<CursorResult> + 'static,
     {
         self.cursor_renderer = Some(Rc::new(RefCell::new(renderer)));
+        self
+    }
+
+    /// Configures the axis to skip labels that would overlap.
+    ///
+    /// `min_gap_px` specifies the minimum distance in pixels required between labels.
+    pub fn skip_overlapping_labels(mut self, min_gap_px: f32) -> Self {
+        self.label_policy = LabelPolicy::skip_overlapping(min_gap_px);
+        self
+    }
+
+    /// Sets a custom policy for determining which labels to render.
+    ///
+    /// Useful for advanced collision detection or custom filtering logic.
+    pub fn with_custom_label_policy<F>(mut self, policy: F) -> Self
+    where
+        F: for<'a> Fn(LabelDecisionContext<'a, D>) -> LabelDecision + 'static,
+    {
+        self.label_policy = LabelPolicy::custom(policy);
         self
     }
 
@@ -272,7 +290,7 @@ impl<D: Float> Axis<D> {
                 })
             } else {
                 // Use Theme Styles directly
-                TickResult::from_tick_style(theme_axis.ticks).grid_style(theme_axis.grid)
+                TickResult::from_style(theme_axis.ticks).grid_style(Some(theme_axis.grid))
             };
 
             if let Some(final_grid_style) = tick_result.grid_style {
@@ -352,7 +370,7 @@ impl<D: Float> Axis<D> {
             let tick_result = if let Some(renderer) = &self.tick_renderer {
                 renderer.borrow_mut()(context)
             } else {
-                let mut result = TickResult::from_tick_style(theme_axis.ticks);
+                let mut result = TickResult::from_style(theme_axis.ticks);
                 if tick.level == 0 {
                     result = result.label(format!("{:.0}", tick.value.to_f32().unwrap_or(0.0)));
                 }
@@ -417,17 +435,21 @@ impl<D: Float> Axis<D> {
         let (badge_x, badge_y) = match orientation {
             Orientation::Horizontal => {
                 let x = cursor_pos.x - (content_width / 2.0) - padding.left;
+
                 let y = match self.position {
-                    Position::Top => rail_pos - badge_size.height,
-                    _ => rail_pos,
+                    Position::Top => (rail_pos - badge_size.height) + padding.bottom,
+
+                    _ => rail_pos - padding.top,
                 };
                 (x, y)
             }
             Orientation::Vertical => {
                 let y = cursor_pos.y - (content_height / 2.0) - padding.top;
+
                 let x = match self.position {
-                    Position::Left => rail_pos - badge_size.width,
-                    _ => rail_pos,
+                    Position::Left => (rail_pos - badge_size.width) + padding.right,
+
+                    _ => rail_pos - padding.left,
                 };
                 (x, y)
             }
