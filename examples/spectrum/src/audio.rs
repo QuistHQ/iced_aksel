@@ -1,66 +1,32 @@
-use std::{
-    collections::VecDeque,
-    sync::{Arc, Mutex},
-};
+use std::{collections::VecDeque, sync::Arc};
 
 use cpal::{
-    Sample,
+    DeviceDescription, DeviceType, Sample, StreamConfig,
     traits::{DeviceTrait, HostTrait, StreamTrait},
 };
 use realfft::RealFftPlanner;
+use triple_buffer::triple_buffer;
 
-use crate::{FFT_GAIN_CORRECTION, FFT_SIZE, HOP_SIZE, MAX_BUFFER_SIZE, TEMPORAL_SMOOTHING, math};
+use crate::{FFT_GAIN_CORRECTION, FFT_SIZE, HOP_SIZE, MAX_BUFFER_SIZE, math};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DeviceInfo {
-    pub name: String,
+pub fn enumerate_devices(host: &cpal::Host) -> Vec<DeviceDescription> {
+    host.devices()
+        .ok()
+        .into_iter()
+        .flatten()
+        .filter_map(|device| device.description().ok())
+        .collect()
 }
 
-impl DeviceInfo {
-    const fn new(name: String) -> Self {
-        Self { name }
-    }
-}
-
-impl std::fmt::Display for DeviceInfo {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.name)
-    }
-}
-
-#[derive(Clone)]
-pub struct Data {
-    pub spectrum: Arc<Mutex<Vec<f32>>>,
-    pub sample_rate: Arc<Mutex<f32>>,
-}
-
-impl Default for Data {
-    fn default() -> Self {
-        Self {
-            spectrum: Arc::new(Mutex::new(vec![0.0; FFT_SIZE / 2 + 1])),
-            sample_rate: Arc::new(Mutex::new(48_000.0)),
-        }
-    }
-}
-
-pub fn enumerate_devices(host: &cpal::Host) -> Vec<DeviceInfo> {
-    let mut found = Vec::new();
-
-    if let Ok(devices) = host.devices() {
-        for device in devices {
-            if let Ok(name) = device.name() {
-                found.push(DeviceInfo::new(name));
-            }
-        }
-    }
-
-    found
-}
-
+#[expect(clippy::type_complexity)]
 pub fn setup_capture_with_device(
-    audio_data: Data,
     device_name: Option<String>,
-) -> (Option<cpal::Stream>, Option<DeviceInfo>) {
+) -> (
+    Option<cpal::Stream>,
+    Option<DeviceDescription>,
+    Option<StreamConfig>,
+    triple_buffer::Output<Box<[f32]>>,
+) {
     let host = cpal::default_host();
 
     let device = device_name.map_or_else(
@@ -68,33 +34,30 @@ pub fn setup_capture_with_device(
         |name| find_device_by_name(&host, &name),
     );
 
+    let (input, output) = triple_buffer(&vec![0.0; FFT_SIZE / 2 + 1].into_boxed_slice());
+
     let device = match device {
         Some(d) => d,
         None => {
             eprintln!("No audio device available");
-            return (None, None);
+            return (None, None, None, output);
         }
     };
 
-    let device_info = device.name().ok().map(DeviceInfo::new);
+    let device_info = device.description().ok();
     println!("Using device: {:?}", device_info);
 
-    let stream = setup_audio_capture_for_device(audio_data, &device);
+    let (stream, config) = setup_audio_capture_for_device(input, &device);
 
-    (stream, device_info)
+    (stream, device_info, config, output)
 }
 
 fn find_device_by_name(host: &cpal::Host, target_name: &str) -> Option<cpal::Device> {
-    if let Ok(devices) = host.devices() {
-        for device in devices {
-            if let Ok(name) = device.name()
-                && name == target_name
-            {
-                return Some(device);
-            }
-        }
-    }
-    None
+    host.devices().ok().into_iter().flatten().find(|device| {
+        device
+            .description()
+            .is_ok_and(|description| description.name() == target_name)
+    })
 }
 
 fn find_monitor_device(host: &cpal::Host) -> Option<cpal::Device> {
@@ -102,7 +65,8 @@ fn find_monitor_device(host: &cpal::Host) -> Option<cpal::Device> {
         println!("Looking for AUDIO_DEVICE override: {}", device_name);
         if let Ok(devices) = host.devices() {
             for device in devices {
-                if let Ok(name) = device.name()
+                if let Ok(description) = device.description()
+                    && let name = description.name()
                     && name.contains(&device_name)
                 {
                     println!("Found override device: {}", name);
@@ -124,23 +88,20 @@ fn find_monitor_device(host: &cpal::Host) -> Option<cpal::Device> {
 
     let mut pipewire_device = None;
     let mut monitor_device = None;
-    let mut default_device = None;
+    let default_device = host.default_input_device();
 
     for (i, device) in devices.enumerate() {
-        if let Ok(name) = device.name() {
-            println!("  [{}] INPUT: {}", i, name);
+        if let Ok(description) = device.description() {
+            println!("  [{}] INPUT: {}", i, description.name());
 
-            let name_lower = name.to_lowercase();
-            if name_lower.contains("monitor") {
+            if description.device_type() == DeviceType::Virtual && monitor_device.is_none() {
                 monitor_device = Some(device);
                 continue;
             }
-            if name_lower == "pipewire" && pipewire_device.is_none() {
+
+            if description.driver() == Some("pipewire") && pipewire_device.is_none() {
                 pipewire_device = Some(device);
                 continue;
-            }
-            if name_lower == "default" && default_device.is_none() {
-                default_device = Some(device);
             }
         }
     }
@@ -148,7 +109,8 @@ fn find_monitor_device(host: &cpal::Host) -> Option<cpal::Device> {
     println!("\n=== Available OUTPUT devices ===");
     if let Ok(devices) = host.output_devices() {
         for (i, device) in devices.enumerate() {
-            if let Ok(name) = device.name() {
+            if let Ok(description) = device.description() {
+                let name = description.name();
                 println!("  [{}] OUTPUT: {}", i, name);
             }
         }
@@ -160,40 +122,40 @@ fn find_monitor_device(host: &cpal::Host) -> Option<cpal::Device> {
     monitor_device.or(pipewire_device).or(default_device)
 }
 
-fn setup_audio_capture_for_device(audio_data: Data, device: &cpal::Device) -> Option<cpal::Stream> {
+fn setup_audio_capture_for_device(
+    input: triple_buffer::Input<Box<[f32]>>,
+    device: &cpal::Device,
+) -> (Option<cpal::Stream>, Option<StreamConfig>) {
     println!(
         "Setting up audio capture for device: {}",
-        device.name().unwrap_or_default()
+        device
+            .description()
+            .map(|description| description.name().to_owned())
+            .unwrap_or_default()
     );
 
-    let config = match device.default_input_config() {
+    let supported_config = match device.default_input_config() {
         Ok(config) => config,
         Err(e) => {
             eprintln!("Failed to get default input config: {}", e);
-            return None;
+            return (None, None);
         }
     };
+    let config = StreamConfig::from(supported_config.clone());
 
-    let sample_rate = config.sample_rate().0 as f32;
-    *audio_data.sample_rate.lock().unwrap() = sample_rate;
-
-    let audio_buffer = Arc::new(Mutex::new(VecDeque::<f32>::with_capacity(MAX_BUFFER_SIZE)));
     let mut planner = RealFftPlanner::<f32>::new();
     let fft = planner.plan_fft_forward(FFT_SIZE);
 
-    let stream = match config.sample_format() {
-        cpal::SampleFormat::F32 => {
-            build_input_stream::<f32>(device, &config.into(), audio_buffer, audio_data, fft)
-        }
-        cpal::SampleFormat::I16 => {
-            build_input_stream::<i16>(device, &config.into(), audio_buffer, audio_data, fft)
-        }
-        cpal::SampleFormat::U16 => {
-            build_input_stream::<u16>(device, &config.into(), audio_buffer, audio_data, fft)
-        }
+    let stream = match supported_config.sample_format() {
+        cpal::SampleFormat::F32 => build_input_stream::<f32>(device, &config, input, fft),
+        cpal::SampleFormat::I16 => build_input_stream::<i16>(device, &config, input, fft),
+        cpal::SampleFormat::U16 => build_input_stream::<u16>(device, &config, input, fft),
         _ => {
-            eprintln!("Unsupported sample format: {:?}", config.sample_format());
-            return None;
+            eprintln!(
+                "Unsupported sample format: {:?}",
+                supported_config.sample_format()
+            );
+            return (None, None);
         }
     };
 
@@ -201,15 +163,15 @@ fn setup_audio_capture_for_device(audio_data: Data, device: &cpal::Device) -> Op
         Ok(stream) => {
             if let Err(e) = stream.play() {
                 eprintln!("Failed to start stream: {}", e);
-                None
+                (None, None)
             } else {
-                println!("Audio capture running at {} Hz", sample_rate);
-                Some(stream)
+                println!("Audio capture running at {} Hz", config.sample_rate);
+                (Some(stream), Some(config))
             }
         }
         Err(e) => {
             eprintln!("Failed to build input stream: {}", e);
-            None
+            (None, None)
         }
     }
 }
@@ -217,73 +179,63 @@ fn setup_audio_capture_for_device(audio_data: Data, device: &cpal::Device) -> Op
 fn build_input_stream<T>(
     device: &cpal::Device,
     config: &cpal::StreamConfig,
-    audio_buffer: Arc<Mutex<VecDeque<f32>>>,
-    audio_data: Data,
+    mut input: triple_buffer::Input<Box<[f32]>>,
     fft: Arc<dyn realfft::RealToComplex<f32>>,
 ) -> Result<cpal::Stream, cpal::BuildStreamError>
 where
     T: cpal::Sample + cpal::SizedSample,
     f32: cpal::FromSample<T>,
 {
+    let mut buffer = VecDeque::with_capacity(MAX_BUFFER_SIZE);
+    let mut block = vec![0.0f32; FFT_SIZE].into_boxed_slice();
+    let mut magnitudes = vec![0.0f32; FFT_SIZE / 2 + 1].into_boxed_slice();
+
+    let mut scratch = fft.make_scratch_vec().into_boxed_slice();
+    let mut spectrum = fft.make_output_vec().into_boxed_slice();
+
     let channels = config.channels as usize;
-    let err_fn = |err| eprintln!("Error on audio stream: {}", err);
 
     device.build_input_stream(
         config,
         move |data: &[T], _: &cpal::InputCallbackInfo| {
-            process_audio_block(data, channels, &audio_buffer, &audio_data, &fft);
+            let len_after = buffer.len() + data.len() / channels;
+            buffer.drain(..len_after.saturating_sub(MAX_BUFFER_SIZE));
+
+            for frame in data.chunks_exact(channels) {
+                let mono =
+                    frame.iter().copied().map(f32::from_sample).sum::<f32>() / channels as f32;
+                buffer.push_back(mono);
+            }
+
+            while buffer.len() >= FFT_SIZE {
+                for (block, buffer) in block.iter_mut().zip(&buffer) {
+                    *block = *buffer;
+                }
+                math::apply_blackman_harris(&mut block);
+
+                if fft
+                    .process_with_scratch(&mut block, &mut spectrum, &mut scratch)
+                    .is_ok()
+                {
+                    for (i, value) in spectrum.iter().enumerate().take(magnitudes.len()) {
+                        let mut amplitude = value.norm() * FFT_GAIN_CORRECTION / FFT_SIZE as f32;
+                        if i == 0 || i == magnitudes.len() - 1 {
+                            amplitude *= 0.5;
+                        }
+                        magnitudes[i] = amplitude;
+                    }
+
+                    let shared = input.input_buffer_mut();
+                    for (slot, mag) in shared.iter_mut().zip(magnitudes.iter()) {
+                        *slot = *mag;
+                    }
+                    input.publish();
+                }
+
+                buffer.drain(..HOP_SIZE.min(buffer.len()));
+            }
         },
-        err_fn,
+        |err| eprintln!("Error on audio stream: {}", err),
         None,
     )
-}
-
-#[allow(clippy::significant_drop_tightening)]
-fn process_audio_block<T>(
-    data: &[T],
-    channels: usize,
-    audio_buffer: &Arc<Mutex<VecDeque<f32>>>,
-    audio_data: &Data,
-    fft: &Arc<dyn realfft::RealToComplex<f32>>,
-) where
-    T: Sample,
-    f32: cpal::FromSample<T>,
-{
-    let mut buffer = audio_buffer.lock().unwrap();
-
-    for frame in data.chunks(channels) {
-        let mono = frame.iter().map(|&s| f32::from_sample(s)).sum::<f32>() / channels as f32;
-        buffer.push_back(mono);
-    }
-
-    while buffer.len() > MAX_BUFFER_SIZE {
-        buffer.pop_front();
-    }
-
-    while buffer.len() >= FFT_SIZE {
-        let mut block: Vec<f32> = buffer.iter().take(FFT_SIZE).copied().collect();
-        math::apply_blackman_harris(&mut block);
-
-        let mut spectrum = fft.make_output_vec();
-        if fft.process(&mut block, &mut spectrum).is_ok() {
-            let mut magnitudes = vec![0.0f32; FFT_SIZE / 2 + 1];
-            for (i, value) in spectrum.iter().enumerate().take(magnitudes.len()) {
-                let mut amplitude = value.norm() * FFT_GAIN_CORRECTION / FFT_SIZE as f32;
-                if i == 0 || i == magnitudes.len() - 1 {
-                    amplitude *= 0.5;
-                }
-                magnitudes[i] = amplitude;
-            }
-
-            let mut shared = audio_data.spectrum.lock().unwrap();
-            for (slot, mag) in shared.iter_mut().zip(magnitudes.iter()) {
-                *slot = TEMPORAL_SMOOTHING.mul_add(*slot, (1.0 - TEMPORAL_SMOOTHING) * *mag);
-            }
-        }
-
-        let drain = HOP_SIZE.min(buffer.len());
-        for _ in 0..drain {
-            buffer.pop_front();
-        }
-    }
 }
