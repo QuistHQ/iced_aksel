@@ -87,7 +87,7 @@ use iced_core::{
     Widget,
     layout::{self, Limits, Node},
     mouse::{self, ScrollDelta},
-    renderer::{Quad, Style},
+    renderer::Quad,
     text::{LineHeight, Shaping, Wrapping},
     touch,
     widget::{Tree, tree},
@@ -115,8 +115,7 @@ pub use plot::{Plot, PlotData};
 pub use shape::Shape;
 pub use state::State;
 pub use stroke::Stroke;
-// Re-export Style for convenience so users don't have to import style::Style manually
-pub use style::{Catalog, Style as ChartStyle};
+pub use style::{Catalog, Style};
 
 use action::Action;
 use axis::{Orientation, Position};
@@ -881,7 +880,7 @@ where
         tree: &Tree,
         renderer: &mut Renderer,
         theme: &Theme,
-        _style: &Style,
+        _style: &iced_core::renderer::Style,
         layout: Layout<'_>,
         cursor: mouse::Cursor,
         _viewport: &Rectangle,

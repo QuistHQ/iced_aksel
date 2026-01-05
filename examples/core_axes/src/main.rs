@@ -1,11 +1,12 @@
 use iced::theme::Base;
 use iced::widget::container;
-use iced::{
-    Color, Element, Font, Length, Theme,
-    widget::{column, text},
-};
+use iced::{Element, Length, Theme};
 use iced_aksel::axis::{CursorResult, Position, TickResult};
-use iced_aksel::{Axis, Chart, State, scale::Linear};
+use iced_aksel::{
+    Axis, Chart, State,
+    scale::Linear,
+    style::{AxisStyle, Style},
+};
 
 pub fn main() -> iced::Result {
     iced::application(
