@@ -87,7 +87,7 @@ use iced_core::{
     Widget,
     layout::{self, Limits, Node},
     mouse::{self, ScrollDelta},
-    renderer::{Quad, Style},
+    renderer::Quad,
     text::{LineHeight, Shaping, Wrapping},
     touch,
     widget::{Tree, tree},
@@ -116,7 +116,7 @@ pub use shape::Shape;
 pub use state::State;
 pub use stroke::Stroke;
 // Re-export Style for convenience so users don't have to import style::Style manually
-pub use style::{Catalog, Style as ChartStyle};
+pub use style::{Catalog, Style};
 
 use action::Action;
 use axis::{Orientation, Position};
@@ -305,8 +305,11 @@ where
     }
 
     /// Sets the style of the chart.
-    pub fn style(mut self, style: <Theme as Catalog>::Class<'a>) -> Self {
-        self.class = style;
+    pub fn style(mut self, style: impl Fn(&Theme) -> Style + 'a) -> Self
+    where
+        Theme::Class<'a>: From<style::StyleFn<'a, Theme>>,
+    {
+        self.class = (Box::new(style) as style::StyleFn<'a, Theme>).into();
         self
     }
 
@@ -881,7 +884,7 @@ where
         tree: &Tree,
         renderer: &mut Renderer,
         theme: &Theme,
-        _style: &Style,
+        _style: &iced_core::renderer::Style,
         layout: Layout<'_>,
         cursor: mouse::Cursor,
         _viewport: &Rectangle,
