@@ -37,8 +37,8 @@ pub use label::*;
 pub use position::*;
 pub use tick::*;
 
-type TickRendererFn<D> = Rc<RefCell<dyn FnMut(TickContext<D>) -> TickResult>>;
-type CursorRendererFn<D> = Rc<RefCell<dyn FnMut(D, &CursorStyle) -> Option<CursorResult>>>;
+type TickRendererFn<D> = RefCell<Box<dyn FnMut(TickContext<D>) -> TickResult>>;
+type CursorRendererFn<D> = RefCell<Box<dyn FnMut(D, &CursorStyle) -> Option<CursorResult>>>;
 
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -156,7 +156,7 @@ impl<D: Float> Axis<D> {
     where
         F: FnMut(TickContext<D>) -> TickResult + 'static,
     {
-        self.tick_renderer = Some(Rc::new(RefCell::new(renderer)));
+        self.tick_renderer = Some(RefCell::new(Box::new(renderer)));
         self
     }
 
@@ -164,7 +164,7 @@ impl<D: Float> Axis<D> {
     where
         F: FnMut(D, &CursorStyle) -> Option<CursorResult> + 'static,
     {
-        self.cursor_renderer = Some(Rc::new(RefCell::new(renderer)));
+        self.cursor_renderer = Some(RefCell::new(Box::new(renderer)));
         self
     }
 
