@@ -148,8 +148,8 @@ impl<D: Float> Axis<D> {
         self
     }
 
-    pub fn with_text_offset(mut self, offset: Pixels) -> Self {
-        self.text_offset = offset;
+    pub fn with_text_offset<P: Into<Pixels>>(mut self, offset: P) -> Self {
+        self.text_offset = offset.into();
         self
     }
 

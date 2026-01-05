@@ -57,27 +57,22 @@ fn setup_axes(theme: &Theme) -> State<&'static str, f64> {
     let danger_color = theme.palette().danger;
 
     // 1. SIMPLE CUSTOMIZATION
-    // "I just want longer ticks, but keep the theme color"
+    // "I just want something to be shown on the screen"
     state.set_axis(
         "y",
         Axis::new(Linear::new(0.0, 100.0), Position::Left).with_tick_renderer(|ctx| {
-            // Take the theme defaults
-            let mut tick_style = *ctx.tick_style;
-            let grid_style = *ctx.grid_style;
-
-            // Change values to fit the look you want
-            // tick_style.length = 10.0.into();
-
-            TickResult::from_tick_style(tick_style)
+            TickResult::from_tick_style(*ctx.tick_style)
                 .label(format!("{:.0}", ctx.tick.value))
-                .grid_style(grid_style)
+                .grid_style(*ctx.grid_style)
         }),
     );
 
     // 2. ADVANCED LOGIC
+    // "I want the ticks to be shown differently based on tick.level"
     state.set_axis(
         "x",
         Axis::new(Linear::new(0.0, 100.0), Position::Bottom)
+            .with_text_offset(32)
             .with_tick_renderer(move |ctx| {
                 // Take the theme defaults
                 let mut tick_style = *ctx.tick_style;
