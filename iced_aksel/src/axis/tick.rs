@@ -8,7 +8,7 @@ use iced_core::{Color, Font, Pixels, Point, Rectangle, text, text::paragraph::Pl
 /// The result returned from a tick renderer function.
 #[derive(Debug, Clone)]
 pub struct TickResult {
-    pub(crate) tick_style: TickStyle,
+    pub(crate) tick_style: Option<TickStyle>,
     pub(crate) grid_style: Option<GridStyle>,
     pub(crate) label: Option<String>,
     pub(crate) label_priority: Option<u8>,
@@ -16,9 +16,9 @@ pub struct TickResult {
 
 impl TickResult {
     /// Start with a base style (usually `*ctx.style`).
-    pub fn from_style(style: TickStyle) -> Self {
+    pub fn empty() -> Self {
         Self {
-            tick_style: style,
+            tick_style: None,
             grid_style: None,
             label: None,
             label_priority: None,
@@ -38,48 +38,14 @@ impl TickResult {
     }
 
     /// Explicitly set the grid style (or disable it with None).
-    pub fn grid_style(mut self, style: Option<GridStyle>) -> Self {
-        self.grid_style = style;
+    pub fn grid_style(mut self, style: GridStyle) -> Self {
+        self.grid_style = Some(style);
         self
     }
 
-    // --- Tick Mark Helpers ---
-
-    /// Set the color of the tick mark.
-    pub fn line_color(mut self, color: Color) -> Self {
-        self.tick_style.line.color = color;
-        self
-    }
-
-    /// Set the width of the tick mark.
-    pub fn line_width(mut self, width: impl Into<Pixels>) -> Self {
-        self.tick_style.line.width = width.into();
-        self
-    }
-
-    /// Set the length of the tick mark.
-    pub fn length(mut self, length: impl Into<Pixels>) -> Self {
-        self.tick_style.length = length.into();
-        self
-    }
-
-    // --- Text Helpers ---
-
-    /// Set the color of the label text.
-    pub fn text_color(mut self, color: Color) -> Self {
-        self.tick_style.text.color = color;
-        self
-    }
-
-    /// Set the size of the label text.
-    pub fn text_size(mut self, size: impl Into<Pixels>) -> Self {
-        self.tick_style.text.size = size.into();
-        self
-    }
-
-    /// Set the font of the label text.
-    pub fn font(mut self, font: Font) -> Self {
-        self.tick_style.text.font = font;
+    /// Explicitly set the tick style (or disable it with None).
+    pub fn tick_style(mut self, style: TickStyle) -> Self {
+        self.tick_style = Some(style);
         self
     }
 

@@ -61,7 +61,7 @@ fn style_chart(theme: &Theme) -> iced_aksel::Style {
 
     // 2. Modify it globally
     // Example: Make ALL text larger and ALL spines thick
-    style.axis.ticks.text.size = 16.0.into();
+    style.axis.ticks.text_style.size = 12.0.into();
     style.axis.spine.width = 3.0.into();
 
     // Example: Make the grid faint red globally
@@ -79,9 +79,10 @@ fn setup_axes(theme: &Theme) -> State<&'static str, f64> {
     state.set_axis(
         "y",
         Axis::new(Linear::new(0.0, 100.0), Position::Left).with_tick_renderer(|ctx| {
-            TickResult::from_style(*ctx.tick_style)
+            TickResult::empty()
+                .tick_style(*ctx.tick_style)
                 .label(format!("{:.0}", ctx.tick.value))
-                .grid_style(Some(*ctx.grid_style))
+                .grid_style(*ctx.grid_style)
         }),
     );
 
@@ -101,18 +102,19 @@ fn setup_axes(theme: &Theme) -> State<&'static str, f64> {
                 // This will make the major tick-lines stand out from the minor
                 if ctx.tick.level == 0 {
                     tick_style.length = 6.0.into();
-                    tick_style.line.color = danger_color; // Red
+                    tick_style.line_style.color = danger_color; // Red
                 } else {
                     tick_style.length = 4.0.into();
                 }
 
-                TickResult::from_style(tick_style)
+                TickResult::empty()
+                    .tick_style(tick_style)
                     .label(format!("{:.0}", ctx.tick.value))
-                    .grid_style(Some(grid_style))
+                    .grid_style(grid_style)
             })
             .with_cursor_renderer(|val, style| {
                 // Receive the 'style' which is correctly colored for the current Theme
-                Some(CursorResult::from_style(*style).label(format!("{:.1}", val)))
+                Some(CursorResult::empty().style(*style).label(format!("{:.1}", val)))
             }),
     );
 

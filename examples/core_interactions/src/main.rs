@@ -4,14 +4,14 @@ use iced::{
     keyboard,
     widget::{column, container, row, text},
 };
+use iced_aksel::style::{LineStyle, TickStyle};
 use iced_aksel::{
     Axis, Chart, PlotPoint, State, Stroke,
-    axis::{self, TickLine, TickResult},
+    axis::{self, TickResult},
     plot::{self, Plot, PlotData},
     scale::Linear,
     shape::Polyline,
 };
-
 // -----------------------------------------------------------------------------
 // Application Entry
 // -----------------------------------------------------------------------------
@@ -69,10 +69,9 @@ impl Interactions {
         let axis_x = Axis::new(linear_x, axis::Position::Bottom).with_tick_renderer(|ctx| {
             // If it's a Major tick (Level 0), show it.
             if ctx.tick.level == 0 {
-                return TickResult {
-                    label: Some(format!("{:.1}s", ctx.tick.value).into()),
-                    ..Default::default()
-                };
+                return TickResult::empty()
+                    .tick_style(*ctx.tick_style)
+                    .label(format!("{:.1}s", ctx.tick.value).into());
             }
 
             // Otherwise, hide everything (Line and Label).
@@ -88,22 +87,19 @@ impl Interactions {
         let axis_y = Axis::new(linear_y, axis::Position::Left).with_tick_renderer(|ctx| {
             if ctx.tick.level == 0 {
                 // Major: Full visibility
-                return TickResult {
-                    tick_line: Some(TickLine::default()),
-                    label: Some(format!("{:.1}V", ctx.tick.value).into()),
-                    ..Default::default()
-                };
+                return TickResult::empty().tick_style(*ctx.tick_style);
             }
 
             // Minor and below: Small tick line, no text
-            TickResult {
-                tick_line: Some(TickLine {
-                    thickness: 0.5.into(),
-                    length: 2.5.into(),
-                }),
-                label: None, // Explicitly no label
-                ..Default::default()
-            }
+            let tick_style = TickStyle {
+                line_style: LineStyle {
+                    width: 0.5.into(),
+                    ..ctx.tick_style.line_style
+                },
+                length: 2.5.into(),
+                ..*ctx.tick_style
+            };
+            TickResult::empty().tick_style(tick_style)
         });
 
         // 3. Add the axes to the state

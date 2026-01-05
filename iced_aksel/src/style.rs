@@ -51,9 +51,9 @@ pub struct GridStyle {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TickStyle {
-    pub line: LineStyle,
+    pub line_style: LineStyle,
     pub length: Pixels,
-    pub text: TextStyle,
+    pub text_style: TextStyle,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -134,9 +134,9 @@ pub fn default(theme: &Theme) -> Style {
         axis: AxisStyle {
             spine: default_spine,
             ticks: TickStyle {
-                line: default_spine,
+                line_style: default_spine,
                 length: 2.0.into(),
-                text: default_text,
+                text_style: default_text,
             },
             grid: GridStyle {
                 line: default_grid,

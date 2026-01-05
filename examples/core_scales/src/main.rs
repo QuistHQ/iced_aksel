@@ -233,11 +233,11 @@ fn x_axis_tick_renderer(ctx: TickContext<f64>) -> TickResult {
     if ctx.tick.level != 0 {
         return TickResult::empty();
     }
-    TickResult::default().label(format!("{:.0}", ctx.tick.value))
+    TickResult::empty().label(format!("{:.0}", ctx.tick.value))
 }
 
 fn y_axis_tick_renderer(ctx: TickContext<f64>) -> TickResult {
-    let result = TickResult::default();
+    let result = TickResult::empty();
 
     // Only show tick-lines and labels on Major ticks
     if ctx.tick.level != 0 {

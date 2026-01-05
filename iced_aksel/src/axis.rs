@@ -90,27 +90,9 @@ impl<D: Float> AxisOverlay<D> {
         );
 
         if let Some((cursor_pos, result)) = self.cursor_state {
-            let paragraph = if let Some(label) = &result.label {
-                let text_style = &result.style.text;
-                Some(Plain::<Renderer::Paragraph>::new(Text {
-                    content: label.clone(),
-                    bounds: self.bounds.size(),
-                    size: text_style.size,
-                    line_height: text_style.line_height,
-                    font: text_style.font,
-                    align_x: Alignment::Left,
-                    align_y: Vertical::Top,
-                    shaping: text_style.shaping,
-                    wrapping: Wrapping::None,
-                }))
-            } else {
-                None
-            };
-
             axis.draw_cursor_overlay(
                 renderer,
                 cursor_pos,
-                paragraph,
                 result,
                 self.bounds,
                 viewport,
@@ -290,7 +272,9 @@ impl<D: Float> Axis<D> {
                 })
             } else {
                 // Use Theme Styles directly
-                TickResult::from_style(theme_axis.ticks).grid_style(Some(theme_axis.grid))
+                TickResult::empty()
+                    .tick_style(theme_axis.ticks)
+                    .grid_style(theme_axis.grid)
             };
 
             if let Some(final_grid_style) = tick_result.grid_style {
@@ -370,7 +354,7 @@ impl<D: Float> Axis<D> {
             let tick_result = if let Some(renderer) = &self.tick_renderer {
                 renderer.borrow_mut()(context)
             } else {
-                let mut result = TickResult::from_style(theme_axis.ticks);
+                let mut result = TickResult::empty().tick_style(theme_axis.ticks);
                 if tick.level == 0 {
                     result = result.label(format!("{:.0}", tick.value.to_f32().unwrap_or(0.0)));
                 }
@@ -378,15 +362,17 @@ impl<D: Float> Axis<D> {
             };
 
             // Draw Tick Line
-            self.draw_tick_line(&tick_result.tick_style, &bounds, mesh_buffer, pos_norm);
+            if let Some(tick_style) = &tick_result.tick_style {
+                self.draw_tick_line(tick_style, &bounds, mesh_buffer, pos_norm);
+            }
 
             // Collect Labels
-            if let Some(label_text) = tick_result.label {
+            if let Some((label_text, tick_style)) = tick_result.label.zip(tick_result.tick_style) {
                 label_candidates.push(LabelCandidate {
                     tick,
                     normalized_position: pos_norm,
                     text: label_text,
-                    style: tick_result.tick_style.text,
+                    style: tick_style.text_style,
                     priority: tick_result.label_priority.unwrap_or(tick.level),
                 });
             }
@@ -407,7 +393,6 @@ impl<D: Float> Axis<D> {
         &self,
         renderer: &mut Renderer,
         cursor_pos: Point,
-        paragraph: Option<Plain<Renderer::Paragraph>>,
         cursor_result: CursorResult,
         bounds: Rectangle,
         viewport: &Rectangle,
@@ -415,7 +400,27 @@ impl<D: Float> Axis<D> {
     ) where
         Renderer: plot::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
     {
-        let style = cursor_result.style;
+        let Some(style) = cursor_result.style else {
+            return;
+        };
+
+        let paragraph = if let Some(label) = &cursor_result.label {
+            let text_style = &style.text;
+            Some(Plain::<Renderer::Paragraph>::new(Text {
+                content: label.clone(),
+                bounds: bounds.size(),
+                size: text_style.size,
+                line_height: text_style.line_height,
+                font: text_style.font,
+                align_x: Alignment::Left,
+                align_y: Vertical::Top,
+                shaping: text_style.shaping,
+                wrapping: Wrapping::None,
+            }))
+        } else {
+            None
+        };
+
         let padding = style.badge.padding;
 
         let (content_width, content_height) = if let Some(p) = &paragraph {
@@ -695,8 +700,8 @@ impl<D: Float> Axis<D> {
         pos_norm: f32,
     ) {
         let length = style.length.0;
-        let width = style.line.width.0;
-        let color = style.line.color;
+        let width = style.line_style.width.0;
+        let color = style.line_style.color;
 
         match self.position {
             Position::Bottom => {
