@@ -83,6 +83,9 @@ pub struct Axis<D> {
     pub(crate) cursor_renderer: Option<CursorRendererFn<D>>,
     #[derivative(Debug = "ignore")]
     label_policy: LabelPolicy<D>,
+
+    pub(crate) spine_style: Option<LineStyle>,
+    pub(crate) text_offset: Pixels,
 }
 
 // Updated to hold the full result, not just string
@@ -115,29 +118,36 @@ impl<D: Float> AxisOverlay<D> {
             viewport,
         );
 
+        // Cursor Drawing Logic
         if let Some((cursor_pos, result)) = self.cursor_state {
-            // Reconstruct paragraph using style from result
-            let paragraph = Plain::<Renderer::Paragraph>::new(Text {
-                content: result.label.clone(),
-                bounds: self.bounds.size(),
-                size: result.badge.text_style.size,
-                line_height: result.badge.text_style.line_height,
-                font: result.badge.text_style.font,
-                align_x: Alignment::Left,
-                align_y: Vertical::Top,
-                shaping: result.badge.text_style.shaping,
-                wrapping: Wrapping::None,
-            });
+            // Only prepare text if we have a label and a badge style to render it with
+            let paragraph =
+                if let (Some(label), Some(badge)) = (&result.label, &result.cursor_badge) {
+                    Some(Plain::<Renderer::Paragraph>::new(Text {
+                        content: label.clone(),
+                        bounds: self.bounds.size(),
+                        size: badge.text_style.size,
+                        line_height: badge.text_style.line_height,
+                        font: badge.text_style.font,
+                        align_x: Alignment::Left,
+                        align_y: Vertical::Top,
+                        shaping: badge.text_style.shaping,
+                        wrapping: Wrapping::None,
+                    }))
+                } else {
+                    None
+                };
 
+            // We pass the whole result object to draw_cursor_overlay
+            // It will check for Some(line), Some(badge), etc. internally.
             axis.draw_cursor_overlay(
                 renderer,
                 cursor_pos,
                 paragraph,
-                result, // Pass the full result object
+                result,
                 self.bounds,
                 viewport,
                 self.orientation,
-                style,
             );
         }
     }
@@ -154,31 +164,6 @@ impl<D: Float> Axis<D> {
         scale: impl Scale<Domain = D, Normalized = f32> + 'static,
         position: Position,
     ) -> Self {
-        let tick_renderer = Rc::new(RefCell::new(|ctx: TickContext<D>| {
-            let mut result = TickResult::with_tick_line(TickLine {
-                length: match ctx.tick.level {
-                    0 => 10.0,
-                    _ => 5.0,
-                }
-                .into(),
-                color: Color::from_rgb(0.4, 0.4, 0.4),
-                ..Default::default()
-            });
-
-            if ctx.tick.level == 0 {
-                result = result.grid_line(GridLine {
-                    thickness: 1.0.into(),
-                    dashed: false,
-                    color: Color::from_rgb(0.2, 0.2, 0.2),
-                });
-            }
-
-            result
-        }));
-
-        // Default Cursor Renderer
-        let cursor_renderer = Rc::new(RefCell::new(|_val| None));
-
         Self {
             position,
             thickness: 50.0.into(),
@@ -187,10 +172,21 @@ impl<D: Float> Axis<D> {
             invisible: false,
 
             scale: Box::new(scale),
-            tick_renderer: Some(tick_renderer),
-            cursor_renderer: Some(cursor_renderer),
+            tick_renderer: None,
+            cursor_renderer: None,
             label_policy: LabelPolicy::default(),
+
+            spine_style: None,
+            text_offset: Pixels(6.0),
         }
+    }
+
+    /// Sets the `Spine` of the axis. This is the line between the `Axis` and the `Plot`.
+    ///
+    /// No line will be rendered if this is not set
+    pub fn with_spine_style(mut self, style: LineStyle) -> Self {
+        self.spine_style = Some(style);
+        self
     }
 
     /// Sets the reserved thickness of the axis in pixels.
@@ -199,6 +195,11 @@ impl<D: Float> Axis<D> {
     /// Increase this if your labels are being clipped or overlapping with the chart area.
     pub fn with_thickness<P: Into<Pixels>>(mut self, thickness: P) -> Self {
         self.thickness = thickness.into();
+        self
+    }
+
+    pub fn with_text_offset(mut self, offset: Pixels) -> Self {
+        self.text_offset = offset;
         self
     }
 
@@ -459,14 +460,18 @@ impl<D: Float> Axis<D> {
                 continue;
             };
 
-            if let Some(label) = label {
-                label_candidates.push(LabelCandidate {
-                    tick,
-                    normalized_position: pos_norm,
-                    label,
-                    style: label_style.unwrap_or(TextStyle::new(12., Color::WHITE)),
-                    priority: label_priority.unwrap_or(tick.level),
-                });
+            if let Some(label_text) = label {
+                if let Some(s) = label_style {
+                    label_candidates.push(LabelCandidate {
+                        tick,
+                        normalized_position: pos_norm,
+                        text: label_text,
+                        // TODO: Im not sure how to default this properly as we will need some styling to go through,
+                        // but we never want the styling to be static.
+                        style: s,
+                        priority: label_priority.unwrap_or(tick.level),
+                    });
+                }
             }
 
             if let Some(line) = tick_line {
@@ -474,7 +479,9 @@ impl<D: Float> Axis<D> {
             }
         }
 
-        self.draw_axis_spine(&style.axis.line, &bounds, mesh_buffer);
+        if let Some(spine_style) = self.spine_style {
+            self.draw_axis_spine(&spine_style, &bounds, mesh_buffer);
+        }
 
         AxisOverlay {
             label_candidates,
@@ -488,171 +495,143 @@ impl<D: Float> Axis<D> {
         &self,
         renderer: &mut Renderer,
         cursor_pos: Point,
-        paragraph: Plain<Renderer::Paragraph>,
+        paragraph: Option<Plain<Renderer::Paragraph>>,
         cursor_result: CursorResult,
         bounds: Rectangle,
         viewport: &Rectangle,
         orientation: Orientation,
-        style: &Style,
     ) where
         Renderer: plot::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
     {
-        // 1. Calculate the fixed "Rail" position (same as tick labels)
-        let rail_pos = self.calculate_rail_position(&bounds, orientation, style.axis.text_offset);
-        let min_bounds = paragraph.min_bounds();
-        let padding = cursor_result.badge.padding;
+        // 1. Calculate Geometry
+        // We calculate the badge bounds relative to the cursor.
+        // If there is no text (paragraph is None), size is just padding (or 0).
+        let padding = cursor_result
+            .cursor_badge
+            .as_ref()
+            .map(|b| b.padding)
+            .unwrap_or_default();
 
-        // 2. Determine Text Origin (independent of padding!)
-        // This ensures the text baseline aligns perfectly with tick labels.
-        let text_origin = match orientation {
+        let (content_width, content_height) = if let Some(p) = &paragraph {
+            let min = p.min_bounds();
+            (min.width, min.height)
+        } else {
+            (0.0, 0.0)
+        };
+
+        let badge_size = Size::new(
+            content_width + padding.left + padding.right,
+            content_height + padding.top + padding.bottom,
+        );
+
+        // Calculate the "Rail" position (where axis text sits).
+        // Since we don't have a default style stored on Axis anymore,
+        // we use a hardcoded reasonable offset (12.0) for positioning logic.
+        // This ensures the line stops at a consistent place.
+        let rail_pos = self.calculate_rail_position(&bounds, orientation, Pixels(12.0));
+
+        let (badge_x, badge_y) = match orientation {
             Orientation::Horizontal => {
-                let x = cursor_pos.x - (min_bounds.width / 2.0);
+                let x = cursor_pos.x - (content_width / 2.0) - padding.left;
                 let y = match self.position {
-                    // Top: Text sits ON TOP of the rail (bottom of text at rail)
-                    Position::Top => rail_pos - min_bounds.height,
-                    // Bottom: Text hangs BELOW the rail (top of text at rail)
+                    Position::Top => rail_pos - badge_size.height,
                     _ => rail_pos,
                 };
-                Point::new(x, y)
+                (x, y)
             }
             Orientation::Vertical => {
-                let y = cursor_pos.y - (min_bounds.height / 2.0);
+                let y = cursor_pos.y - (content_height / 2.0) - padding.top;
                 let x = match self.position {
-                    // Right: Text sits to the RIGHT of rail (left of text at rail)
-                    Position::Right => rail_pos,
-                    // Left: Text sits to the LEFT of rail (right of text at rail)
-                    _ => rail_pos - min_bounds.width,
+                    Position::Left => rail_pos - badge_size.width,
+                    _ => rail_pos,
                 };
-                Point::new(x, y)
+                (x, y)
             }
         };
 
-        // 3. Calculate Badge Rect relative to the fixed Text Origin
-        // Padding simply expands the box outwards, without shifting the text.
-        let mut badge_rect = Rectangle {
-            x: text_origin.x - padding.left,
-            y: text_origin.y - padding.top,
-            width: min_bounds.width + padding.left + padding.right,
-            height: min_bounds.height + padding.top + padding.bottom,
-        };
+        let mut badge_rect = Rectangle::new(Point::new(badge_x, badge_y), badge_size);
 
-        // 4. Clamp to Viewport (optional, keeps badge on screen)
-        match orientation {
-            Orientation::Horizontal => {
-                if badge_rect.x < viewport.x {
-                    // Shift both badge AND text if we hit screen edge
-                    let shift = viewport.x - badge_rect.x;
-                    badge_rect.x += shift;
-                    // Note: We only shift text if we are clamping to screen edges
-                    // text_origin.x += shift;
-                } else if badge_rect.x + badge_rect.width > viewport.x + viewport.width {
-                    let shift = (badge_rect.x + badge_rect.width) - (viewport.x + viewport.width);
-                    badge_rect.x -= shift;
-                }
-            }
-            Orientation::Vertical => {
-                if badge_rect.y < viewport.y {
-                    let shift = viewport.y - badge_rect.y;
-                    badge_rect.y += shift;
-                } else if badge_rect.y + badge_rect.height > viewport.y + viewport.height {
-                    let shift = (badge_rect.y + badge_rect.height) - (viewport.y + viewport.height);
-                    badge_rect.y -= shift;
-                }
-            }
+        // Clamp to viewport
+        if orientation == Orientation::Horizontal {
+            badge_rect.x = badge_rect
+                .x
+                .clamp(viewport.x, viewport.x + viewport.width - badge_rect.width);
+        } else {
+            badge_rect.y = badge_rect
+                .y
+                .clamp(viewport.y, viewport.y + viewport.height - badge_rect.height);
         }
-
-        // Re-calculate text position based on potentially clamped badge rect
-        let text_pos = Point::new(badge_rect.x + padding.left, badge_rect.y + padding.top);
-
-        // 5. Draw Cursor Line
-        // The line connects the axis to the badge. The gap is applied here.
-        let gap = cursor_result.line.gap.0;
-        let cursor_line_width = cursor_result.line.width.0;
-        let cursor_line_color = cursor_result.line.color;
-
-        let cursor_line_rect = match orientation {
-            Orientation::Horizontal => {
-                let (y_start, y_end) = match self.position {
-                    Position::Top => {
-                        let line_start = bounds.y + bounds.height;
-                        // Line goes from axis up to (badge_bottom + gap)
-                        let line_end = (badge_rect.y + badge_rect.height + gap).min(line_start);
-                        (line_end, line_start)
-                    }
-                    _ => {
-                        let line_start = bounds.y;
-                        // Line goes from axis down to (badge_top - gap)
-                        let line_end = (badge_rect.y - gap).max(line_start);
-                        (line_start, line_end)
-                    }
-                };
-
-                Rectangle {
-                    x: cursor_pos.x - (cursor_line_width / 2.0),
-                    y: y_start.min(y_end),
-                    width: cursor_line_width.into(),
-                    height: (y_end - y_start).abs(),
-                }
-            }
-            Orientation::Vertical => {
-                let (x_start, x_end) = match self.position {
-                    Position::Right => {
-                        let line_start = bounds.x;
-                        let line_end = (badge_rect.x - gap).max(line_start);
-                        (line_start, line_end)
-                    }
-                    _ => {
-                        let line_start = bounds.x + bounds.width;
-                        let line_end = (badge_rect.x + badge_rect.width + gap).min(line_start);
-                        (line_end, line_start)
-                    }
-                };
-
-                Rectangle {
-                    x: x_start.min(x_end),
-                    y: cursor_pos.y - (cursor_line_width / 2.0),
-                    width: (x_end - x_start).abs(),
-                    height: cursor_line_width.into(),
-                }
-            }
-        };
-
-        // ... Standard Rendering Code (same as before) ...
-        let border = cursor_result.badge.border.unwrap_or_default();
-        let background = cursor_result
-            .badge
-            .background
-            .unwrap_or(Background::Color(Color::TRANSPARENT));
-        let shadow = cursor_result.badge.shadow.unwrap_or_default();
 
         renderer.start_layer(*viewport);
 
-        renderer.fill_quad(
-            Quad {
-                bounds: cursor_line_rect,
-                ..Default::default()
-            },
-            cursor_line_color,
-        );
+        // 2. Draw Cursor Line (If present)
+        if let Some(line) = cursor_result.cursor_line {
+            let gap = line.gap.0;
+            let half_width = line.width.0 / 2.0;
 
-        renderer.fill_quad(
-            Quad {
-                bounds: badge_rect,
-                border,
-                shadow,
-                ..Default::default()
-            },
-            background,
-        );
+            let line_rect = match orientation {
+                Orientation::Horizontal => {
+                    let (y_min, y_max) = match self.position {
+                        Position::Top => (
+                            (badge_rect.y + badge_rect.height + gap).min(bounds.y + bounds.height),
+                            bounds.y + bounds.height,
+                        ),
+                        _ => (bounds.y, (badge_rect.y - gap).max(bounds.y)),
+                    };
+                    Rectangle::new(
+                        Point::new(cursor_pos.x - half_width, y_min),
+                        Size::new(line.width.0, y_max - y_min),
+                    )
+                }
+                Orientation::Vertical => {
+                    let (x_min, x_max) = match self.position {
+                        Position::Right => (bounds.x, (badge_rect.x - gap).max(bounds.x)),
+                        _ => (
+                            (badge_rect.x + badge_rect.width + gap).min(bounds.x + bounds.width),
+                            bounds.x + bounds.width,
+                        ),
+                    };
+                    Rectangle::new(
+                        Point::new(x_min, cursor_pos.y - half_width),
+                        Size::new(x_max - x_min, line.width.0),
+                    )
+                }
+            };
 
-        renderer.fill_text(
-            paragraph
-                .as_text()
-                .with_content(paragraph.content().to_string()),
-            text_pos,
-            cursor_result.badge.text_style.color,
-            *viewport,
-        );
+            renderer.fill_quad(
+                Quad {
+                    bounds: line_rect,
+                    ..Default::default()
+                },
+                line.color,
+            );
+        }
+
+        // 3. Draw Badge Background & Text
+        // Only proceed if we have text content (paragraph) AND badge settings.
+        // If settings are missing, we draw nothing (simple & strict).
+        if let (Some(p), Some(badge)) = (paragraph, cursor_result.cursor_badge) {
+            // Draw Background
+            renderer.fill_quad(
+                Quad {
+                    bounds: badge_rect,
+                    border: badge.border.unwrap_or_default(),
+                    shadow: badge.shadow.unwrap_or_default(),
+                    ..Default::default()
+                },
+                badge.background.unwrap_or(Color::TRANSPARENT),
+            );
+
+            // Draw Text using the color from the badge settings
+            let text_pos = Point::new(badge_rect.x + padding.left, badge_rect.y + padding.top);
+
+            renderer.fill_text(
+                p.as_text().with_content(p.content().to_string()),
+                text_pos,
+                badge.text_style.color,
+                *viewport,
+            );
+        }
 
         renderer.end_layer();
     }
@@ -685,12 +664,9 @@ impl<D: Float> Axis<D> {
         let mut accepted: Vec<PlacedLabelInfo<D>> = Vec::new();
 
         for candidate in label_candidates {
-            let Some(resolved) = self.resolve_label_candidate(
-                candidate,
-                bounds,
-                orientation,
-                style.axis.text_offset,
-            ) else {
+            let Some(resolved) =
+                self.resolve_label_candidate(candidate, bounds, orientation, self.text_offset)
+            else {
                 continue;
             };
 
@@ -740,7 +716,7 @@ impl<D: Float> Axis<D> {
     where
         Renderer: iced_core::text::Renderer<Font = iced_core::Font>,
     {
-        let label_content = candidate.label;
+        let label_content = candidate.text;
         if label_content.is_empty() {
             return None;
         }

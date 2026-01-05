@@ -76,7 +76,7 @@ impl Interactions {
             }
 
             // Otherwise, hide everything (Line and Label).
-            TickResult::new()
+            TickResult::empty()
         });
 
         // ---------------------------------------------------------------------

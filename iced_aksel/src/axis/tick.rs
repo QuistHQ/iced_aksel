@@ -12,49 +12,27 @@ use iced_core::{
 /// The result returned from a tick renderer function.
 pub struct TickResult {
     /// Optional tick line mark on the axis.
-    pub tick_line: Option<TickLine>,
+    pub(crate) tick_line: Option<TickLine>,
     /// Optional grid line extending into the plot area.
-    pub grid_line: Option<GridLine>,
+    pub(crate) grid_line: Option<GridLine>,
     /// Optional text label for this tick.
-    pub label: Option<String>,
+    pub(crate) label: Option<String>,
     /// Style for the label text (font, color, size).
     /// If None, a default style is used.
-    pub label_style: Option<TextStyle>,
+    pub(crate) label_style: Option<TextStyle>,
     /// Optional label rendering-priority (lower is higher priority).
-    pub label_priority: Option<u8>,
+    pub(crate) label_priority: Option<u8>,
 }
 
 impl TickResult {
     /// Creates a new empty `TickResult` (no lines, no label).
-    pub const fn new() -> Self {
+    pub const fn empty() -> Self {
         Self {
             tick_line: None,
             grid_line: None,
             label: None,
             label_style: None,
             label_priority: None,
-        }
-    }
-
-    /// Creates a new `TickResult` with a specific label.
-    pub fn with_label<L: Into<String>>(label: L) -> Self {
-        Self {
-            label: Some(label.into()),
-            ..Self::new()
-        }
-    }
-
-    pub fn with_tick_line(line: TickLine) -> Self {
-        Self {
-            tick_line: Some(line),
-            ..Self::new()
-        }
-    }
-
-    pub fn with_grid_line(line: GridLine) -> Self {
-        Self {
-            grid_line: Some(line),
-            ..Self::new()
         }
     }
 
@@ -130,7 +108,7 @@ pub enum LabelDecision {
 pub struct LabelCandidate<D> {
     pub tick: Tick<D>,
     pub normalized_position: f32,
-    pub label: String,
+    pub text: String,
     pub style: TextStyle,
     pub priority: u8,
 }

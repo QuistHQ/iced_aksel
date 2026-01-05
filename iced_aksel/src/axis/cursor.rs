@@ -5,11 +5,36 @@ use iced_core::{Background, Border, Color, Pixels, Shadow};
 #[derive(Debug, Clone)]
 pub struct CursorResult {
     /// The text to display in the cursor badge.
-    pub label: String,
+    pub(crate) label: Option<String>,
     /// Style of the cursor line.
-    pub line: CursorLine,
+    pub(crate) cursor_line: Option<CursorLine>,
     /// Style of the cursor badge (background, border, text).
-    pub badge: CursorBadge,
+    pub(crate) cursor_badge: Option<CursorBadge>,
+}
+
+impl CursorResult {
+    pub fn empty() -> Self {
+        Self {
+            label: None,
+            cursor_line: None,
+            cursor_badge: None,
+        }
+    }
+
+    pub fn label(mut self, label: String) -> Self {
+        self.label = Some(label);
+        self
+    }
+
+    pub fn cursor_line(mut self, cursor_line: CursorLine) -> Self {
+        self.cursor_line = Some(cursor_line);
+        self
+    }
+
+    pub fn cursor_badge(mut self, cursor_badge: CursorBadge) -> Self {
+        self.cursor_badge = Some(cursor_badge);
+        self
+    }
 }
 
 /// Visual style of the cursor line.
@@ -24,7 +49,7 @@ pub struct CursorLine {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CursorBadge {
     pub text_style: TextStyle,
-    pub background: Option<Background>,
+    pub background: Option<Color>,
     pub border: Option<Border>,
     pub shadow: Option<Shadow>,
     pub padding: iced_core::Padding,

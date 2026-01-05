@@ -216,7 +216,7 @@ impl BarChart {
             Axis::new(value_scale, value_pos)
                 .with_tick_renderer(|tlc| match tlc.tick.level {
                     0 => TickResult::default().label(format!("{:.2}", tlc.tick.value)),
-                    _ => TickResult::new(),
+                    _ => TickResult::empty(),
                 })
                 .skip_overlapping_labels(6.),
         );
@@ -234,7 +234,7 @@ impl BarChart {
             .axis_mut_opt(&Self::BAR_AXIS)
             .unwrap()
             .set_tick_renderer(move |ctx| {
-                let result = TickResult::new();
+                let result = TickResult::empty();
                 let idx = ctx.tick.value;
                 if idx <= 0. {
                     return result;

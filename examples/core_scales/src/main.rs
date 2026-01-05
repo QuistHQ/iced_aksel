@@ -231,7 +231,7 @@ impl PlotData<f64> for ExponentialData {
 fn x_axis_tick_renderer(ctx: TickContext<f64>) -> TickResult {
     // Only show Major ticks
     if ctx.tick.level != 0 {
-        return TickResult::new();
+        return TickResult::empty();
     }
     TickResult::default().label(format!("{:.0}", ctx.tick.value))
 }

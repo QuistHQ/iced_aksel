@@ -12,8 +12,7 @@ use self::axis::AxisLineStyle;
 /// Global style of a `Chart`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Style {
-    /// Style of the axes.
-    pub axis: AxisStyle,
+    // pub axis: AxisStyle,
 }
 
 /// Style of the axis container.
@@ -77,17 +76,17 @@ pub fn default(theme: &Theme) -> Style {
     let palette = theme.extended_palette();
 
     Style {
-        axis: AxisStyle {
-            container: ContainerStyle {
-                background: Some(theme.palette().background.into()),
-                border: None,
-                shadow: None,
-            },
-            line: LineStyle {
-                color: palette.background.strong.color,
-                width: 1.0.into(),
-            },
-            text_offset: 12.0.into(),
-        },
+        // axis: AxisStyle {
+        //     container: ContainerStyle {
+        //         background: Some(theme.palette().background.into()),
+        //         border: None,
+        //         shadow: None,
+        //     },
+        //     line: LineStyle {
+        //         color: palette.background.strong.color,
+        //         width: 1.0.into(),
+        //     },
+        //     text_offset: 12.0.into(),
+        // },
     }
 }

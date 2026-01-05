@@ -503,7 +503,7 @@ impl LineChart {
         let x_axis = self.state.axis_mut(&Self::X.to_string());
 
         x_axis.set_tick_renderer(move |ctx| {
-            let mut result = TickResult::new();
+            let mut result = TickResult::empty();
             let idx = ctx.tick.value.round();
             if (ctx.tick.value - idx).abs() > 0.001 {
                 return result;
@@ -668,7 +668,7 @@ fn y_axis(min_y: f64, max_y: f64) -> Axis<f64> {
     Axis::new(Linear::new(min_y, max_y), axis::Position::Left).with_tick_renderer(|ctx| {
         match ctx.tick.level {
             0 => TickResult::default().label(format!("{:.2}", ctx.tick.value)),
-            _ => TickResult::new(),
+            _ => TickResult::empty(),
         }
     })
 }
