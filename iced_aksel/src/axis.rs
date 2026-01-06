@@ -347,6 +347,7 @@ impl<D: Float> Axis<D> {
         let prioritized_ticks = self.collect_prioritized_ticks();
 
         let mut label_candidates = Vec::new();
+        let mut candidate_max_size = Size::ZERO;
 
         // Iterate through the PRE-SORTED ticks
         for wrapper in prioritized_ticks {
@@ -389,9 +390,30 @@ impl<D: Float> Axis<D> {
                 label_candidates.push(LabelCandidate {
                     tick,
                     normalized_position: pos_norm,
-                    label,
+                    label: label.clone(),
                     priority: label_priority.unwrap_or(tick.level),
                 });
+
+                // 3.1 Run all candidates, find the biggest label as source of truth for all label sizes
+                // Make a paragraph for sizing
+                let paragraph: Plain<Renderer::Paragraph> = Plain::new(Text {
+                    content: label,
+                    bounds: bounds.size(),
+                    size: style.axis.label.size,
+                    line_height: style.axis.label.line_height,
+                    font: style.axis.label.font,
+                    align_x: Alignment::Left,
+                    align_y: Vertical::Top,
+                    shaping: style.axis.label.shaping,
+                    wrapping: Wrapping::None,
+                });
+
+                if paragraph.min_bounds().width > candidate_max_size.width {
+                    candidate_max_size.width = paragraph.min_bounds().width;
+                }
+                if paragraph.min_bounds().height > candidate_max_size.height {
+                    candidate_max_size.height = paragraph.min_bounds().height;
+                }
             }
 
             // Draw Tick Marks (Axis style + local config)
@@ -413,6 +435,7 @@ impl<D: Float> Axis<D> {
             &bounds,
             orientation,
             label_candidates,
+            candidate_max_size,
             viewport,
         );
 
@@ -599,6 +622,7 @@ impl<D: Float> Axis<D> {
         bounds: &Rectangle,
         orientation: Orientation,
         label_candidates: Vec<LabelCandidate<D>>,
+        candidate_size: Size,
         viewport: &Rectangle,
     ) where
         Renderer: plot::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
@@ -608,6 +632,7 @@ impl<D: Float> Axis<D> {
         for candidate in label_candidates {
             let Some(resolved) = self.resolve_label_candidate(
                 candidate,
+                candidate_size,
                 bounds,
                 orientation,
                 &theme.label,
@@ -655,6 +680,7 @@ impl<D: Float> Axis<D> {
     fn resolve_label_candidate<Renderer>(
         &self,
         candidate: LabelCandidate<D>,
+        candidate_size: Size,
         bounds: &Rectangle,
         orientation: Orientation,
         text_style: &TextStyle,
@@ -684,7 +710,6 @@ impl<D: Float> Axis<D> {
             wrapping: Wrapping::None,
         });
 
-        let text_bounds = paragraph.min_bounds();
         let rail_pos = self.calculate_rail_position(bounds, orientation, offset);
 
         let position = match self.position {
@@ -693,30 +718,30 @@ impl<D: Float> Axis<D> {
                     .width
                     .mul_add(candidate.normalized_position, bounds.x);
                 Point::new(
-                    center_x - (text_bounds.width / 2.0),
-                    rail_pos - text_bounds.height,
+                    center_x - (candidate_size.width / 2.0),
+                    rail_pos - candidate_size.height,
                 )
             }
             Position::Bottom => {
                 let center_x = bounds
                     .width
                     .mul_add(candidate.normalized_position, bounds.x);
-                Point::new(center_x - (text_bounds.width / 2.0), rail_pos)
+                Point::new(center_x - (candidate_size.width / 2.0), rail_pos)
             }
             Position::Left => {
                 let center_y = bounds
                     .height
                     .mul_add(1.0 - candidate.normalized_position, bounds.y);
                 Point::new(
-                    rail_pos - text_bounds.width,
-                    center_y - (text_bounds.height / 2.0),
+                    rail_pos - candidate_size.width,
+                    center_y - (candidate_size.height / 2.0),
                 )
             }
             Position::Right => {
                 let center_y = bounds
                     .height
                     .mul_add(1.0 - candidate.normalized_position, bounds.y);
-                Point::new(rail_pos, center_y - (text_bounds.height / 2.0))
+                Point::new(rail_pos, center_y - (candidate_size.height / 2.0))
             }
         };
 
@@ -725,14 +750,14 @@ impl<D: Float> Axis<D> {
                 let center = bounds
                     .width
                     .mul_add(candidate.normalized_position, bounds.x);
-                let half = text_bounds.width / 2.0;
+                let half = candidate_size.width / 2.0;
                 (center - half, center + half)
             }
             Orientation::Vertical => {
                 let center = bounds
                     .height
                     .mul_add(1.0 - candidate.normalized_position, bounds.y);
-                let half = text_bounds.height / 2.0;
+                let half = candidate_size.height / 2.0;
                 (center - half, center + half)
             }
         };

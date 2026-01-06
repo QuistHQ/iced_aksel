@@ -1,6 +1,6 @@
-use iced_core::{Border, Color, Font, Padding, Pixels, Shadow, Theme};
 use iced_core::text::LineHeight;
 use iced_core::widget::text::Shaping;
+use iced_core::{Border, Color, Font, Padding, Pixels, Shadow, Theme};
 
 /// Global style of a `Chart`.
 #[derive(Debug, Clone, Copy, PartialEq)]
