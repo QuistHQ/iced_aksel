@@ -244,6 +244,10 @@ pub fn draw_geometric_text(ctx: &mut TextRenderContext, req: TextRequest) {
         return;
     }
 
+    if req.size <= 2.0 {
+        return;
+    }
+
     let font_layout = &req.font.layout;
     let font_geometry = &req.font.geometry;
     let font_id = req.font.id;
