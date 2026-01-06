@@ -341,7 +341,7 @@ impl<D: Float> Axis<D> {
             None
         };
 
-        // --- NEW LOGIC: Prioritize Ticks (Center-Out) ---
+        // --- Prioritize Ticks (Center-Out) ---
 
         let all_ticks = self.ticks();
         let prioritized_ticks = self.collect_prioritized_ticks();
