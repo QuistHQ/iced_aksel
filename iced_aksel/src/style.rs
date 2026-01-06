@@ -103,7 +103,7 @@ impl Default for TextStyle {
             size: Pixels(12.0),
             font: Font::default(),
             color: Color::BLACK,
-            line_height: LineHeight::Relative(1.0),
+            line_height: LineHeight::Relative(1.2),
             shaping: Shaping::Basic,
         }
     }
