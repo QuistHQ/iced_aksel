@@ -309,7 +309,6 @@ impl<D: Float> Axis<D> {
         let (&d_min, &d_max) = self.scale.domain();
 
         // 1. Calculate Cursor State (if active)
-        // We prepare the cursor overlay state here but render it last.
         let cursor_state = if self.render_cursor
             && let Some(cursor_pos) = cursor.position_over(full_bounds)
             && let Some(cursor_renderer) = &self.cursor_formatter
@@ -342,10 +341,16 @@ impl<D: Float> Axis<D> {
             None
         };
 
+        // --- NEW LOGIC: Prioritize Ticks (Center-Out) ---
+
+        let all_ticks = self.ticks();
+        let prioritized_ticks = self.collect_prioritized_ticks();
+
         let mut label_candidates = Vec::new();
 
-        // 2. Iterate through ticks to collect renderables
-        for tick in self.ticks().into_iter() {
+        // Iterate through the PRE-SORTED ticks
+        for wrapper in prioritized_ticks {
+            let tick = wrapper.tick;
             let pos_norm = self.normalize(&tick.value);
 
             let tick_result = self.tick_renderer.as_ref().map(|renderer| {
@@ -400,7 +405,6 @@ impl<D: Float> Axis<D> {
         }
 
         // 3. Resolve and Render Labels
-        // Sort by priority so important labels (level 0) are processed first
         label_candidates.sort_by_key(|candidate| candidate.priority);
 
         self.layout_labels(
@@ -425,7 +429,6 @@ impl<D: Float> Axis<D> {
             );
         }
     }
-
     /// Draws the interactive cursor badge and line.
     ///
     /// This method ensures the badge stays within the viewport even if the mouse
@@ -849,6 +852,74 @@ impl<D: Float> Axis<D> {
             ],
         );
     }
+    /// Collects ticks and sorts them so that "Center" ticks in minor intervals come before "Edge" ticks.
+    fn collect_prioritized_ticks(&self) -> Vec<PrioritizedTick<D>> {
+        let all_ticks = self.ticks();
+        let mut prioritized = Vec::with_capacity(all_ticks.len());
+
+        // 1. Identify Major Intervals
+        // (We only need the values for this, so we map to f32 immediately)
+        let mut major_tick_values: Vec<f32> = all_ticks
+            .iter()
+            .filter(|t| t.level == 0)
+            .filter_map(|t| t.value.to_f32())
+            .collect();
+
+        // Sort to ensure valid intervals
+        major_tick_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        // 2. Score every tick
+        for tick in all_ticks {
+            let val = tick.value.to_f32().unwrap_or(0.0);
+
+            let score = if tick.level == 0 {
+                0.0 // Priority 1: Major Ticks
+            } else {
+                // Find which interval this tick belongs to
+                // standard binary search or simple iteration is fine for <1000 ticks
+                let upper_idx = major_tick_values.partition_point(|&x| x <= val);
+
+                if upper_idx > 0 && upper_idx < major_tick_values.len() {
+                    let lower_val = major_tick_values[upper_idx - 1];
+                    let upper_val = major_tick_values[upper_idx];
+                    let interval = upper_val - lower_val;
+
+                    if interval.abs() < f32::EPSILON {
+                        0.0
+                    } else {
+                        // Distance from center of interval (0.0 is perfect center)
+                        let center = (lower_val + upper_val) / 2.0;
+                        let dist = (val - center).abs();
+
+                        // Priority 2: Middle Ticks (Score ~1.0)
+                        // Priority 3: Edge Ticks (Score ~1.5)
+                        1.0 + (dist / interval)
+                    }
+                } else {
+                    // Ticks outside valid major intervals (e.g. at the very edge of the domain)
+                    2.0
+                }
+            };
+
+            prioritized.push(PrioritizedTick { tick, score });
+        }
+
+        // 3. Sort (Stable sort to preserve any internal logic from the scale)
+        prioritized.sort_by(|a, b| {
+            a.score
+                .partial_cmp(&b.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        prioritized
+    }
+}
+struct PrioritizedTick<D> {
+    tick: aksel::Tick<D>,
+    /// 0.0 = Major Tick (Critical)
+    /// 1.0 = Center of Interval (High Priority)
+    /// 1.5 = Edge of Interval (Low Priority)
+    score: f32,
 }
 
 impl<D: Float> Deref for Axis<D> {
