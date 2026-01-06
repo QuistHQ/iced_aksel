@@ -1,6 +1,6 @@
-use iced_core::{Border, Color, Font, Padding, Pixels, Shadow, Theme};
 use iced_core::text::LineHeight;
 use iced_core::widget::text::Shaping;
+use iced_core::{Border, Color, Font, Padding, Pixels, Shadow, Theme};
 
 /// Global style of a `Chart`.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -103,7 +103,7 @@ impl Default for TextStyle {
             size: Pixels(12.0),
             font: Font::default(),
             color: Color::BLACK,
-            line_height: LineHeight::Relative(1.2),
+            line_height: LineHeight::Relative(1.0),
             shaping: Shaping::Basic,
         }
     }
