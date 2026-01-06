@@ -188,8 +188,8 @@ impl TextExample {
             .on_scroll(Message::ChartScrolled);
 
         let font_selector = pick_list(
-            self.families.clone(),
-            Some(self.selected_family.clone()),
+            self.families.as_slice(),
+            Some(&self.selected_family),
             Message::FontSelected,
         );
 

@@ -4,10 +4,7 @@ use super::{Action, render};
 use ab_glyph::FontVec;
 use iced_core::{Font, mouse};
 use iced_graphics::text::{
-    cosmic_text::{
-        FontSystem,
-        fontdb::{ID, Query},
-    },
+    cosmic_text::{FontSystem, fallback::FontFallbackIter, fontdb::ID},
     font_system,
 };
 
@@ -53,12 +50,16 @@ impl<AxisId> Memory<AxisId> {
         let mut lock = font_system().write().expect("Failed to read font_system");
         let system = lock.raw();
 
+        #[allow(clippy::useless_let_if_seq)]
+        let mut changed = false;
+
         if self.plot_font.font != plot_font {
             let Some(font) = update_font(system, plot_font) else {
                 panic!("Font not found in system: {plot_font:?}");
             };
 
             self.plot_font = font;
+            changed = true;
         }
 
         if self.axis_font.font != axis_font {
@@ -67,6 +68,11 @@ impl<AxisId> Memory<AxisId> {
             };
 
             self.axis_font = font;
+            changed = true;
+        }
+
+        if changed {
+            self.tessellators.borrow_mut().clear_glyph_cache();
         }
 
         drop(lock)
@@ -75,23 +81,16 @@ impl<AxisId> Memory<AxisId> {
 
 fn update_font(system: &mut FontSystem, font: Font) -> Option<CachedFont> {
     let attrs = iced_graphics::text::to_attributes(font);
-    let id = system
-        .db()
-        .query(&Query {
-            families: &[attrs.family],
-            weight: attrs.weight,
-            stretch: attrs.stretch,
-            style: attrs.style,
-        })
-        // TODO: Consider changing this - It shouldnt be necessary but fixes a crash for now
-        // Looks like it has some trouble finding the right font for Dennis'pc atleast
-        .or(Some(system.db().faces().next()?.id))
-        .expect("Font not found");
-    let bytes = system.get_font(id, attrs.weight).expect("Font not found");
+    let fonts = system.get_font_matches(&attrs);
+    let families = [&attrs.family];
+    let scripts = []; // We don't support scripts
+    let mut iter = FontFallbackIter::new(system, &fonts, &families, &scripts, "", attrs.weight);
+    let bytes = iter.next().expect("No default font found");
+    let id = bytes.id();
 
     Some(CachedFont {
         font,
-        id,
         bytes: FontVec::try_from_vec(bytes.data().to_vec()).ok()?,
+        id,
     })
 }
