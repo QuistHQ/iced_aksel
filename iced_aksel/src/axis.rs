@@ -389,6 +389,7 @@ impl<D: Float> Axis<D> {
                     priority: label_priority.unwrap_or(tick.level),
                 });
 
+                // 3.1 Run all candidates, find the biggest label as source of truth for all label sizes
                 // Make a paragraph for sizing
                 let paragraph: Plain<Renderer::Paragraph> = Plain::new(Text {
                     content: label,
@@ -423,9 +424,6 @@ impl<D: Float> Axis<D> {
         // 3. Resolve and Render Labels
         // Sort by priority so important labels (level 0) are processed first
         label_candidates.sort_by_key(|candidate| candidate.priority);
-
-        // 3.1 Run all candidates, find the biggest label as source of truth for all label sizes
-        for candidate in label_candidates.iter() {}
 
         self.layout_labels(
             renderer,
