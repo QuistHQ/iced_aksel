@@ -57,7 +57,7 @@ impl Interactions {
         let mut state = State::new();
 
         // 1. Create the scales for the axes
-        let linear_x = Linear::new(0.0, 100.0);
+        let linear_x = Linear::new(0.0, 10.0);
         let linear_y = Linear::new(-10.0, 10.0);
 
         // 2. Create the axes with the new `TickResult` paradigm

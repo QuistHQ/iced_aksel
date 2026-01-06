@@ -343,6 +343,7 @@ impl<D: Float> Axis<D> {
         };
 
         let mut label_candidates = Vec::new();
+        let mut candidate_max_size = Size::ZERO;
 
         // 2. Iterate through ticks to collect renderables
         for tick in self.ticks().into_iter() {
@@ -384,9 +385,29 @@ impl<D: Float> Axis<D> {
                 label_candidates.push(LabelCandidate {
                     tick,
                     normalized_position: pos_norm,
-                    label,
+                    label: label.clone(),
                     priority: label_priority.unwrap_or(tick.level),
                 });
+
+                // Make a paragraph for sizing
+                let paragraph: Plain<Renderer::Paragraph> = Plain::new(Text {
+                    content: label,
+                    bounds: bounds.size(),
+                    size: style.axis.label.size,
+                    line_height: style.axis.label.line_height,
+                    font: style.axis.label.font,
+                    align_x: Alignment::Left,
+                    align_y: Vertical::Top,
+                    shaping: style.axis.label.shaping,
+                    wrapping: Wrapping::None,
+                });
+
+                if paragraph.min_bounds().width > candidate_max_size.width {
+                    candidate_max_size.width = paragraph.min_bounds().width;
+                }
+                if paragraph.min_bounds().height > candidate_max_size.height {
+                    candidate_max_size.height = paragraph.min_bounds().height;
+                }
             }
 
             // Draw Tick Marks (Axis style + local config)
@@ -400,51 +421,11 @@ impl<D: Float> Axis<D> {
         }
 
         // 3. Resolve and Render Labels
-
-        let mut candidate_max = Size::ZERO;
-
-        // 3.1 Run all candidates, find the biggest label as source of truth for all label sizes
-        for candidate in label_candidates.iter() {
-            // Make a paragraph for sizing
-            let paragraph: Plain<Renderer::Paragraph> = Plain::new(Text {
-                content: candidate.label.clone(),
-                bounds: bounds.size(),
-                size: style.axis.label.size,
-                line_height: style.axis.label.line_height,
-                font: style.axis.label.font,
-                align_x: Alignment::Left,
-                align_y: Vertical::Top,
-                shaping: style.axis.label.shaping,
-                wrapping: Wrapping::None,
-            });
-
-            if paragraph.min_bounds().width > candidate_max.width {
-                candidate_max.width = paragraph.min_bounds().width;
-            }
-            if paragraph.min_bounds().height > candidate_max.height {
-                candidate_max.height = paragraph.min_bounds().height;
-            }
-            
-        }
-
         // Sort by priority so important labels (level 0) are processed first
         label_candidates.sort_by_key(|candidate| candidate.priority);
 
-        // // 3.2 Use this width to render evenly distributed labels / ticks
-        // for candidate in label_candidates.iter() {
-        //     let Some(label_center) = self.denormalize(candidate.normalized_position).to_f32()
-        //     else {
-        //         continue;
-        //     };
-        //
-        //     // For horizontal only for now
-        //     let label_left_bound = label_center - (candidate_max / 2.);
-        //     let label_right_bound = label_center + (candidate_max / 2.);
-        //
-        //     // let rail_pos = self.calculate_rail_position(&bounds, orientation, theme.text_offset);
-        //
-        //
-        // }
+        // 3.1 Run all candidates, find the biggest label as source of truth for all label sizes
+        for candidate in label_candidates.iter() {}
 
         self.layout_labels(
             renderer,
@@ -452,7 +433,7 @@ impl<D: Float> Axis<D> {
             &bounds,
             orientation,
             label_candidates,
-            candidate_max,
+            candidate_max_size,
             viewport,
         );
 
