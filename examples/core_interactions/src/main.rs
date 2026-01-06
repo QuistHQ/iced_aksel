@@ -97,7 +97,7 @@ impl Interactions {
                     thickness: 0.5.into(),
                     length: 2.5.into(),
                 }),
-                label: None, // Explicitly no label
+                label: None, // Explicitly no labe
                 ..Default::default()
             }
         });
