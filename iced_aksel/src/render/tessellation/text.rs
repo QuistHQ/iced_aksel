@@ -32,6 +32,7 @@ use lyon::path::builder::PathBuilder;
 use lyon::tessellation::{
     BuffersBuilder, FillOptions, FillTessellator, FillVertex, FillVertexConstructor, VertexBuffers,
 };
+use lyon_path::FillRule;
 use std::num::NonZeroUsize;
 
 // -----------------------------------------------------------------------------
@@ -320,7 +321,9 @@ pub fn draw_geometric_text(
     let tol_bucket_u16 = tol_bucket(tess_tol_px);
     let size_bucket_u16 = size_bucket(req.size);
 
-    let fill_options = FillOptions::default().with_tolerance(tess_tol_px);
+    let fill_options = FillOptions::default()
+        .with_tolerance(tess_tol_px)
+        .with_fill_rule(FillRule::NonZero);
 
     // --- Render glyphs ---
     for run in runs {
