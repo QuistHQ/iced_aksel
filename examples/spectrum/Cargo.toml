@@ -8,6 +8,7 @@ publish = false
 cpal.workspace = true
 iced.workspace = true
 realfft.workspace = true
+triple_buffer.workspace = true
 iced_aksel = { path = "../../iced_aksel/" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

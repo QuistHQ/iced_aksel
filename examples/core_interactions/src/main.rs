@@ -66,18 +66,18 @@ impl Interactions {
         // X AXIS: Time (Seconds)
         // Logic: Show simple ticks and labels, but ONLY for Major ticks.
         // ---------------------------------------------------------------------
-        let axis_x = Axis::new(linear_x, axis::Position::Bottom).with_tick_renderer(|ctx| {
-            // If it's a Major tick (Level 0), show it.
-            if ctx.tick.level == 0 {
+        let axis_x = Axis::new(linear_x, axis::Position::Bottom)
+            .skip_overlapping_labels(6.)
+            .with_tick_renderer(|ctx| {
+                // If it's a Major tick (Level 0), show it.
                 return TickResult {
                     label: Some(format!("{:.1}s", ctx.tick.value).into()),
                     ..Default::default()
                 };
-            }
 
-            // Otherwise, hide everything (Line and Label).
-            TickResult::new()
-        });
+                // Otherwise, hide everything (Line and Label).
+                TickResult::new()
+            });
 
         // ---------------------------------------------------------------------
         // Y AXIS: Voltage (Volts)
