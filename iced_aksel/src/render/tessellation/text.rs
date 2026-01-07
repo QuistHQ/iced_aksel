@@ -338,8 +338,6 @@ pub fn draw_geometric_text(
             _ => todo!(),
         };
 
-        let line_y = run.line_y + v_offset;
-
         for glyph in run.glyphs {
             // Find the chosen face index in fontdb (important for TTC)
             let face_info = match font_system.db().face(glyph.font_id) {
@@ -359,8 +357,8 @@ pub fn draw_geometric_text(
             if let Some(cached) = ctx.glyph_cache.get(key)
                 && !cached.is_empty()
             {
-                let local_x = h_offset + glyph.x_offset;
-                let local_y = line_y + glyph.y_offset;
+                let local_x = h_offset + glyph.font_size.mul_add(glyph.x_offset, glyph.x);
+                let local_y = v_offset + glyph.font_size.mul_add(-glyph.y_offset, glyph.y);
                 flush_character_to_mesh(
                     ctx.mesh_buffer,
                     &cached.geometry,
@@ -408,7 +406,8 @@ pub fn draw_geometric_text(
                 let mut path_builder = Path::builder();
                 let mut pen = LyonPathBuilder(&mut path_builder);
 
-                let settings = DrawSettings::unhinted(Size::new(req.size), LocationRef::default());
+                let settings =
+                    DrawSettings::unhinted(Size::new(glyph.font_size), LocationRef::default());
                 if outline_glyph.draw(settings, &mut pen).is_ok() {
                     let path = path_builder.build();
 
