@@ -85,17 +85,6 @@ where
     fn draw(&self, plot: &mut Plot<D, R>, theme: &Theme);
 }
 
-pub struct TextRenderer<'a> {
-    buffer: &'a mut MeshBuffer,
-    tessellator: &'a mut Tessellator,
-}
-
-impl TextRenderer<'_> {
-    pub fn draw_text(&mut self, text: Text) {
-        self.tessellator.draw_label(self.buffer, text);
-    }
-}
-
 /// Internal rendering context for shapes.
 ///
 /// Manages layer ordering and buffering for efficient rendering.
@@ -127,20 +116,6 @@ impl<'a, D: Float, Renderer: self::Renderer> Context<'a, D, Renderer> {
         if self.mesh_buffer.vertices_count() >= self.mesh_buffer.limit() {
             self.mesh_buffer.render(self.renderer, self.clip_bounds);
         }
-    }
-
-    /// Renders a text-based shape.
-    ///
-    /// Used internally by text shapes to render using the text renderer.
-    pub fn render_text<F>(&mut self, f: F)
-    where
-        F: FnOnce(&Transform<'a, D, f32, f32>, &mut TextRenderer),
-    {
-        let mut text_renderer = TextRenderer {
-            tessellator: self.tessellators,
-            buffer: self.mesh_buffer,
-        };
-        f(self.transform, &mut text_renderer)
     }
 }
 

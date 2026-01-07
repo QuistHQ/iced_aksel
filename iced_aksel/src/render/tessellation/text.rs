@@ -319,6 +319,7 @@ pub fn draw_geometric_text(
     let fill_options = FillOptions::default().with_tolerance(tess_tol_px);
 
     // --- Render glyphs ---
+    println!("\n\nNEW RUN: ================");
     for run in runs {
         let h_offset = match req.horizontal_alignment {
             Alignment::Left => 0.0,
@@ -397,12 +398,7 @@ pub fn draw_geometric_text(
                     );
                 } else {
                     // We can't draw - Insert empty cache key
-                    ctx.glyph_cache.insert(
-                        key,
-                        CachedGlyph {
-                            geometry: VertexBuffers::new(),
-                        },
-                    );
+                    ctx.glyph_cache.insert(key, CachedGlyph::empty());
                 }
             }
 
@@ -410,7 +406,11 @@ pub fn draw_geometric_text(
                 && !cached.is_empty()
             {
                 let local_x = h_offset + glyph.font_size.mul_add(glyph.x_offset, glyph.x);
-                let local_y = v_offset + glyph.font_size.mul_add(-glyph.y_offset, glyph.y);
+                let local_y = v_offset
+                    + glyph
+                        .font_size
+                        .mul_add(-glyph.y_offset, run.line_y + glyph.y);
+
                 flush_character_to_mesh(
                     ctx.mesh_buffer,
                     &cached.geometry,
@@ -435,6 +435,10 @@ fn flush_character_to_mesh(
     local_offset_x: f32,
     local_offset_y: f32,
 ) {
+    println!(
+        "Drawing Glyph at position: x={} y={}",
+        local_offset_x, local_offset_y
+    );
     let mesh = target_buffer.get_mesh_mut();
     let start_index = mesh.vertices.len() as u32;
 

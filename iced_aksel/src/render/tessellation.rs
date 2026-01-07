@@ -1130,8 +1130,7 @@ impl Tessellator {
     ///
     /// **Internal Refactor:** This method now bundles the rendering context and request
     /// parameters into structs to improve maintainability.
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn draw_label(&mut self, mesh_buffer: &mut MeshBuffer, text: Text) {
+    pub fn draw_text(&mut self, mesh_buffer: &mut MeshBuffer, text: Text) {
         let mut font_system = font_system().write().expect("Failed to get font-system");
         let mut text_buffer = Buffer::new(
             font_system.raw(),

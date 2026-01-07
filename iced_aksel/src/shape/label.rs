@@ -9,7 +9,6 @@ use iced_core::{
 };
 
 /// A text label rendered as a vector mesh.
-
 #[derive(Debug, Clone)]
 pub struct Label<D> {
     pub content: String,
@@ -23,14 +22,14 @@ pub struct Label<D> {
     pub letter_spacing: f32,
     pub font: Option<Font>,
     pub line_height: f32,
-    pub bounds: Size,
+    pub bounds: Size<f32>,
     pub wrapping: Wrapping,
 }
 
 impl<D: Float, R: plot::Renderer> Shape<D, R> for Label<D> {
     fn render(self, ctx: &mut plot::Context<'_, D, R>) {
-        let font = dbg!(self.font.unwrap_or_else(|| ctx.default_font()));
-        ctx.render_text(move |transform, text_renderer| {
+        let font = self.font.unwrap_or_else(|| ctx.default_font());
+        ctx.render_mesh(move |transform, mesh_buffer, tessellator| {
             // 1. Resolve Position to Screen Coordinates
             let screen_position = Point::new(
                 transform.x_to_screen(&self.position.x),
@@ -39,22 +38,54 @@ impl<D: Float, R: plot::Renderer> Shape<D, R> for Label<D> {
 
             // 2. Resolve Size (Screen Pixels vs Plot Units)
             let font_size_in_pixels = self.size.resolve_y(transform);
+            let line_height = font_size_in_pixels + self.line_height;
+
+            // 3. Resolve bounds
+            let bounds = match self.size {
+                Measure::Screen(_) => self.bounds,
+                Measure::Plot(_) => {
+                    let end_position = PlotPoint::new(
+                        self.position.x + D::from(self.bounds.width).unwrap(),
+                        self.position.y + D::from(self.bounds.height).unwrap(),
+                    );
+
+                    let end_screen_position = transform.chart_to_screen(&end_position);
+
+                    tessellator.draw_rectangle::<D>(
+                        mesh_buffer,
+                        screen_position.x,
+                        screen_position.y,
+                        end_screen_position.x,
+                        end_screen_position.y,
+                        Some(Color::WHITE),
+                        None,
+                    );
+
+                    let width = (end_screen_position.x - screen_position.x).abs();
+                    let height = (end_screen_position.y - screen_position.y).abs();
+
+                    Size::new(width, height)
+                }
+            };
 
             // 4. Draw
-            text_renderer.draw_text(Text {
-                content: &self.content,
-                position: screen_position,
-                size: font_size_in_pixels.into(),
-                rotation: self.rotation,
-                horizontal_alignment: self.horizontal_alignment,
-                vertical_alignment: self.vertical_alignment,
-                fill: self.fill,
-                quality: self.quality,
-                font,
-                line_height: self.line_height.into(),
-                bounds: self.bounds,
-                wrapping: self.wrapping,
-            });
+            tessellator.draw_text(
+                mesh_buffer,
+                Text {
+                    content: &self.content,
+                    position: screen_position,
+                    size: font_size_in_pixels.into(),
+                    rotation: self.rotation,
+                    horizontal_alignment: self.horizontal_alignment,
+                    vertical_alignment: self.vertical_alignment,
+                    fill: self.fill,
+                    quality: self.quality,
+                    font,
+                    line_height: line_height.into(),
+                    bounds,
+                    wrapping: self.wrapping,
+                },
+            );
         });
     }
 }
@@ -81,7 +112,7 @@ impl<D: Float> Label<D> {
         }
     }
 
-    pub const fn bounds(mut self, bounds: Size) -> Self {
+    pub const fn bounds(mut self, bounds: Size<f32>) -> Self {
         self.bounds = bounds;
         self
     }
