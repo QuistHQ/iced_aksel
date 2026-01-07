@@ -85,13 +85,12 @@ where
     fn draw(&self, plot: &mut Plot<D, R>, theme: &Theme);
 }
 
-pub struct TextRenderer<'a, Renderer: iced_graphics::mesh::Renderer> {
-    renderer: &'a mut Renderer,
+pub struct TextRenderer<'a> {
     buffer: &'a mut MeshBuffer,
     tessellator: &'a mut Tessellator,
 }
 
-impl<Renderer: iced_graphics::mesh::Renderer> TextRenderer<'_, Renderer> {
+impl TextRenderer<'_> {
     pub fn draw_text(&mut self, text: Text) {
         self.tessellator.draw_label(self.buffer, text);
     }
@@ -112,12 +111,6 @@ impl<'a, D: Float, Renderer: self::Renderer> Context<'a, D, Renderer> {
     #[inline(always)]
     pub fn default_font(&mut self) -> Font {
         self.renderer.default_font()
-    }
-
-    #[inline(always)]
-    fn reset_layer(&mut self) {
-        self.renderer.end_layer();
-        self.renderer.start_layer(*self.clip_bounds);
     }
 
     /// Renders a mesh-based shape (lines, polygons, etc.).
@@ -141,14 +134,13 @@ impl<'a, D: Float, Renderer: self::Renderer> Context<'a, D, Renderer> {
     /// Used internally by text shapes to render using the text renderer.
     pub fn render_text<F>(&mut self, f: F)
     where
-        F: FnOnce(&Transform<'a, D, f32, f32>, &mut TextRenderer<Renderer>),
+        F: FnOnce(&Transform<'a, D, f32, f32>, &mut TextRenderer),
     {
         let mut text_renderer = TextRenderer {
             tessellator: self.tessellators,
-            renderer: self.renderer,
             buffer: self.mesh_buffer,
         };
-        f(&self.transform, &mut text_renderer)
+        f(self.transform, &mut text_renderer)
     }
 }
 

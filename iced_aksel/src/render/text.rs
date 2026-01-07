@@ -14,7 +14,6 @@ pub struct Text<'a> {
     pub vertical_alignment: Vertical,
     pub fill: Color,
     pub quality: Quality,
-    pub letter_spacing: f32,
     pub line_height: Pixels,
     pub bounds: Size,
     pub wrapping: Wrapping,

@@ -50,7 +50,6 @@ impl<D: Float, R: plot::Renderer> Shape<D, R> for Label<D> {
                 vertical_alignment: self.vertical_alignment,
                 fill: self.fill,
                 quality: self.quality,
-                letter_spacing: self.letter_spacing,
                 font,
                 line_height: self.line_height.into(),
                 bounds: self.bounds,
@@ -82,8 +81,18 @@ impl<D: Float> Label<D> {
         }
     }
 
+    pub const fn font(mut self, font: Font) -> Self {
+        self.font = Some(font);
+        self
+    }
+
+    pub const fn font_maybe(mut self, font: Option<Font>) -> Self {
+        self.font = font;
+        self
+    }
+
     /// Sets the fill color of the text.
-    pub fn fill(mut self, color: Color) -> Self {
+    pub const fn fill(mut self, color: Color) -> Self {
         self.fill = color;
         self
     }
@@ -92,21 +101,25 @@ impl<D: Float> Label<D> {
     ///
     /// - `Measure::Screen(px)`: Fixed pixel size (e.g., 12px), stays constant when zooming.
     /// - `Measure::Plot(units)`: Size in plot units, scales up/down when zooming.
-    pub fn size(mut self, size: Measure<D>) -> Self {
+    pub const fn size(mut self, size: Measure<D>) -> Self {
         self.size = size;
         self
     }
 
     /// Sets the rotation of the text in radians.
-    pub fn rotation(mut self, radians: f32) -> Self {
+    pub const fn rotation(mut self, radians: f32) -> Self {
         self.rotation = radians;
         self
     }
 
     /// Sets the horizontal and vertical alignment relative to the position.
-    pub fn align(mut self, horizontal: Alignment, vertical: Vertical) -> Self {
-        self.horizontal_alignment = horizontal;
-        self.vertical_alignment = vertical;
+    pub fn align(
+        mut self,
+        horizontal: impl Into<Alignment>,
+        vertical: impl Into<Vertical>,
+    ) -> Self {
+        self.horizontal_alignment = horizontal.into();
+        self.vertical_alignment = vertical.into();
         self
     }
 
@@ -115,7 +128,7 @@ impl<D: Float> Label<D> {
     /// - `Quality::Medium` (Default) is balanced for most cases.
     /// - Use `Quality::Low` if rendering thousands of labels.
     /// - Use `Quality::High` for very large, cinematic text.
-    pub fn quality(mut self, quality: Quality) -> Self {
+    pub const fn quality(mut self, quality: Quality) -> Self {
         self.quality = quality;
         self
     }

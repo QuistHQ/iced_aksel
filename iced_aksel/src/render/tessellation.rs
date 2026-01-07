@@ -1138,12 +1138,6 @@ impl Tessellator {
             Metrics::new(text.size.into(), text.line_height.into()),
         );
 
-        let min_bounds = iced_graphics::text::align(
-            &mut text_buffer,
-            font_system.raw(),
-            text.horizontal_alignment,
-        );
-
         text_buffer.set_size(
             font_system.raw(),
             Some(text.bounds.width),
@@ -1176,7 +1170,6 @@ impl Tessellator {
         let req = TextRequest {
             content: text.content,
             position: text.position,
-            font: &text.font,
             size: text.size.0,
             color: text.fill,
             rotation: text.rotation,
@@ -1185,7 +1178,6 @@ impl Tessellator {
             quality: text.quality,
             // Pass the global tessellator quality multiplier down to the text engine
             quality_multiplier: self.quality,
-            letter_spacing: text.letter_spacing,
         };
 
         // Delegate to the text engine

@@ -11,7 +11,7 @@
 
 use crate::render::MeshBuffer;
 use core::f32;
-use iced_core::{Color, Font, Point, alignment::Vertical, text::Alignment};
+use iced_core::{Color, Point, alignment::Vertical, text::Alignment};
 use iced_graphics::{
     color::pack,
     text::cosmic_text::{
@@ -47,10 +47,11 @@ const CACHE_CAPACITY: usize = 2000;
 /// The rendering quality of the vector text.
 ///
 /// This controls the error tolerance of the tessellation algorithms.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum Quality {
     /// High triangle count, very smooth curves. (Tolerance: 0.2)
     High,
+    #[default]
     /// Balanced performance and visual fidelity. (Tolerance: 0.5)
     Medium,
     /// Low triangle count, "blocky" curves. Best for performance. (Tolerance: 1.5)
@@ -62,19 +63,13 @@ pub enum Quality {
 impl Quality {
     /// Converts the quality setting into a tessellation tolerance value.
     /// Lower values mean higher precision (more triangles).
-    pub fn to_tolerance(self) -> f32 {
+    pub const fn to_tolerance(self) -> f32 {
         match self {
             Self::High => 0.2,
             Self::Medium => 0.5,
             Self::Low => 1.5,
             Self::Custom(val) => val.max(0.001),
         }
-    }
-}
-
-impl Default for Quality {
-    fn default() -> Self {
-        Self::Medium
     }
 }
 
@@ -88,29 +83,25 @@ impl Default for Quality {
 /// into the main mesh buffer multiple times without re-running the expensive
 /// tessellation math.
 #[derive(Clone, Debug)]
-pub struct CachedGlyph {
+struct CachedGlyph {
     pub geometry: VertexBuffers<Point, u16>,
-    /// The tolerance used to generate this mesh. Used to determine if we need
-    /// to re-tessellate when the zoom level changes.
-    pub tolerance: f32,
 }
 
 impl CachedGlyph {
-    pub fn empty(tolerance: f32) -> Self {
-        CachedGlyph {
+    pub fn empty() -> Self {
+        Self {
             geometry: VertexBuffers::new(),
-            tolerance,
         }
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.geometry.vertices.is_empty() || self.geometry.indices.is_empty()
     }
 }
 
 /// Uniquely identifies a specific glyph's geometry across different fonts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) struct CacheKey {
+pub struct CacheKey {
     pub font_id: ID,
     pub face_index: u32,
     pub glyph_id: u16,
@@ -136,11 +127,11 @@ impl TextTessellationCache {
     ///
     /// **Note:** Takes `&mut self` because accessing an LRU cache updates the
     /// internal "recency" list.
-    pub fn get(&mut self, key: CacheKey) -> Option<&CachedGlyph> {
+    fn get(&mut self, key: CacheKey) -> Option<&CachedGlyph> {
         self.cache.get(&key)
     }
 
-    pub fn insert(&mut self, key: CacheKey, glyph: CachedGlyph) {
+    fn insert(&mut self, key: CacheKey, glyph: CachedGlyph) {
         self.cache.put(key, glyph);
     }
 
@@ -184,7 +175,6 @@ pub struct TextRenderContext<'a> {
 pub struct TextRequest<'a> {
     pub content: &'a str,
     pub position: Point,
-    pub font: &'a Font,
     /// Font size in screen pixels.
     pub size: f32,
     pub color: Color,
@@ -195,7 +185,6 @@ pub struct TextRequest<'a> {
     pub quality: Quality,
     /// A global multiplier for quality (e.g. from the Chart widget).
     pub quality_multiplier: f32,
-    pub letter_spacing: f32,
 }
 
 // -----------------------------------------------------------------------------
@@ -354,21 +343,7 @@ pub fn draw_geometric_text(
                 tolerance_bucket: tol_bucket_u16,
             };
 
-            if let Some(cached) = ctx.glyph_cache.get(key)
-                && !cached.is_empty()
-            {
-                let local_x = h_offset + glyph.font_size.mul_add(glyph.x_offset, glyph.x);
-                let local_y = v_offset + glyph.font_size.mul_add(-glyph.y_offset, glyph.y);
-                flush_character_to_mesh(
-                    ctx.mesh_buffer,
-                    &cached.geometry,
-                    req.position,
-                    req.rotation,
-                    req.color,
-                    local_x,
-                    local_y,
-                );
-            } else {
+            if ctx.glyph_cache.get(key).is_none() {
                 let font_arc = match font_system.get_font(glyph.font_id, glyph.font_weight) {
                     Some(f) => f,
                     // Font not found - Just continue
@@ -392,13 +367,7 @@ pub fn draw_geometric_text(
                     // Missing outline (e.g. Bitmap emoji)
                     None => {
                         // We cache an empty glyph to avoid calculations next frame
-                        ctx.glyph_cache.insert(
-                            key,
-                            CachedGlyph {
-                                geometry: VertexBuffers::new(),
-                                tolerance: tess_tol_px,
-                            },
-                        );
+                        ctx.glyph_cache.insert(key, CachedGlyph::empty());
                         continue;
                     }
                 };
@@ -424,7 +393,6 @@ pub fn draw_geometric_text(
                         key,
                         CachedGlyph {
                             geometry: ctx.scratch_geometry.clone(),
-                            tolerance: tess_tol_px,
                         },
                     );
                 } else {
@@ -433,10 +401,25 @@ pub fn draw_geometric_text(
                         key,
                         CachedGlyph {
                             geometry: VertexBuffers::new(),
-                            tolerance: tess_tol_px,
                         },
                     );
                 }
+            }
+
+            if let Some(cached) = ctx.glyph_cache.get(key)
+                && !cached.is_empty()
+            {
+                let local_x = h_offset + glyph.font_size.mul_add(glyph.x_offset, glyph.x);
+                let local_y = v_offset + glyph.font_size.mul_add(-glyph.y_offset, glyph.y);
+                flush_character_to_mesh(
+                    ctx.mesh_buffer,
+                    &cached.geometry,
+                    req.position,
+                    req.rotation,
+                    req.color,
+                    local_x,
+                    local_y,
+                );
             }
         }
     }
@@ -465,11 +448,11 @@ fn flush_character_to_mesh(
     for vertex in &source_geometry.vertices {
         // Position relative to the word/line start
         let local_x = vertex.x + local_offset_x;
-        let local_y = (vertex.y * flip_y) + local_offset_y;
+        let local_y = vertex.y.mul_add(flip_y, local_offset_y);
 
         // Rotate around the text origin
-        let rotated_x = local_x * cos - local_y * sin;
-        let rotated_y = local_x * sin + local_y * cos;
+        let rotated_x = local_x.mul_add(cos, -(local_y * sin));
+        let rotated_y = local_x.mul_add(sin, local_y * cos);
 
         // Translate to final screen position
         let final_x = screen_origin.x + rotated_x;
