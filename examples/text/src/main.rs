@@ -7,7 +7,7 @@ use iced::{
     widget::{column, pick_list, row, slider, text, text::Wrapping},
 };
 use iced_aksel::{
-    Axis, Chart, Measure, Plot, PlotData, PlotPoint, State,
+    Axis, Chart, Measure, Plot, PlotData, PlotPoint, Quality, State,
     axis::Position,
     plot::DragDelta,
     scale::Linear,
@@ -100,58 +100,58 @@ impl TextExample {
 
         // 1. Screen-Space Label (UI Style)
         // Stays 24px tall regardless of zoom level. Good for annotations.
-        // self.layer.labels.push(
-        //     Label::new("Screen Fixed (24px)", PlotPoint::new(10.0, 90.0))
-        //         .font(self.font)
-        //         .size(Measure::Screen(24.0))
-        //         .fill(Color::from_rgb(0.2, 0.4, 0.8)),
-        // );
-        //
-        // // 2. Plot-Space Label (World Style)
-        // // Stays 5 units tall. Zooms in/out with the chart. Good for measurements.
-        // self.layer.labels.push(
-        //     Label::new("World Fixed (5 Units)", PlotPoint::new(10.0, 70.0))
-        //         .font(self.font)
-        //         .size(Measure::Plot(5.0))
-        //         .fill(Color::from_rgb(0.8, 0.2, 0.2)),
-        // );
-        //
-        // // 3. Rotation Showcase
-        // self.layer.labels.push(
-        //     Label::new("Rotated 45°", PlotPoint::new(60.0, 70.0))
-        //         .font(self.font)
-        //         .size(Measure::Screen(20.0))
-        //         .rotation(45.0f32.to_radians())
-        //         .fill(Color::from_rgb(0.2, 0.8, 0.2)),
-        // );
-        //
-        // // 4. Alignment & Upside Down
-        // self.layer.labels.push(
-        //     Label::new("Upside Down / Centered", PlotPoint::new(60.0, 50.0))
-        //         .font(self.font)
-        //         .size(Measure::Screen(20.0))
-        //         .rotation(180.0f32.to_radians())
-        //         .fill(Color::from_rgb(0.5, 0.5, 0.5)),
-        // );
-        //
-        // // 5. High Quality Override
-        // // This label forces 'High' quality regardless of zoom, useful for large headers.
-        // self.layer.labels.push(
-        //     Label::new("Forced High Quality", PlotPoint::new(10.0, 30.0))
-        //         .font(self.font)
-        //         .size(Measure::Plot(8.0))
-        //         .quality(Quality::High)
-        //         .fill(Color::BLACK),
-        // );
-        //
-        // // 6. Tiny Detail
-        // // Zoom in here to test the LOD bucketing!
-        // self.layer.labels.push(
-        //     Label::new("Zoom In To Read Me", PlotPoint::new(10.0, 10.0))
-        //         .font(self.font)
-        //         .size(Measure::Plot(0.5)) // Very small
-        //         .fill(Color::BLACK),
-        // );
+        self.layer.labels.push(
+            Label::new("Screen Fixed (24px)", PlotPoint::new(10.0, 90.0))
+                .font(self.font)
+                .size(Measure::Screen(24.0))
+                .fill(Color::from_rgb(0.2, 0.4, 0.8)),
+        );
+
+        // 2. Plot-Space Label (World Style)
+        // Stays 5 units tall. Zooms in/out with the chart. Good for measurements.
+        self.layer.labels.push(
+            Label::new("World Fixed (5 Units)", PlotPoint::new(10.0, 70.0))
+                .font(self.font)
+                .size(Measure::Plot(5.0))
+                .fill(Color::from_rgb(0.8, 0.2, 0.2)),
+        );
+
+        // 3. Rotation Showcase
+        self.layer.labels.push(
+            Label::new("Rotated 45°", PlotPoint::new(60.0, 70.0))
+                .font(self.font)
+                .size(Measure::Screen(20.0))
+                .rotation(45.0f32.to_radians())
+                .fill(Color::from_rgb(0.2, 0.8, 0.2)),
+        );
+
+        // 4. Alignment & Upside Down
+        self.layer.labels.push(
+            Label::new("Upside Down / Centered", PlotPoint::new(60.0, 50.0))
+                .font(self.font)
+                .size(Measure::Screen(20.0))
+                .rotation(180.0f32.to_radians())
+                .fill(Color::from_rgb(0.5, 0.5, 0.5)),
+        );
+
+        // 5. High Quality Override
+        // This label forces 'High' quality regardless of zoom, useful for large headers.
+        self.layer.labels.push(
+            Label::new("Forced High Quality", PlotPoint::new(10.0, 30.0))
+                .font(self.font)
+                .size(Measure::Plot(8.0))
+                .quality(Quality::High)
+                .fill(Color::BLACK),
+        );
+
+        // 6. Tiny Detail
+        // Zoom in here to test the LOD bucketing!
+        self.layer.labels.push(
+            Label::new("Zoom In To Read Me", PlotPoint::new(10.0, 10.0))
+                .font(self.font)
+                .size(Measure::Plot(0.5)) // Very small
+                .fill(Color::BLACK),
+        );
 
         // 6. Japanese
         self.layer.labels.push(
