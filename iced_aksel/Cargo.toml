@@ -23,8 +23,6 @@ lyon_tessellation.workspace = true
 lyon_path.workspace = true
 lyon.workspace = true
 earcutr.workspace = true
-ab_glyph.workspace = true
-ttf-parser.workspace = true
 lru.workspace = true
 
 [dev-dependencies]
