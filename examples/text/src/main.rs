@@ -7,8 +7,11 @@ use iced::{
     widget::{column, pick_list, row, slider, text, text::Wrapping},
 };
 use iced_aksel::{
-    Axis, Chart, Measure, Plot, PlotData, PlotPoint, Quality, State, axis::Position,
-    plot::DragDelta, scale::Linear, shape::{BoundsSize, Label},
+    Axis, Chart, Measure, Plot, PlotData, PlotPoint, State,
+    axis::Position,
+    plot::DragDelta,
+    scale::Linear,
+    shape::{Bounds, Label},
 };
 
 const AXIS_X: &str = "x";
@@ -159,7 +162,7 @@ impl TextExample {
             .font(self.font)
             .size(Measure::Plot(20.0))
             .align(Horizontal::Left, Vertical::Center)
-            .bounds(BoundsSize::Plot(Size::new(100.0, 100.0)))
+            .bounds(Bounds::Plot(Size::new(100.0, 100.0)))
             .wrapping(Wrapping::WordOrGlyph)
             .fill(Color::BLACK),
         );

@@ -9,6 +9,53 @@ use iced_core::{
 };
 use std::fmt::Debug;
 
+/// Defines how text bounds should be interpreted.
+///
+/// `BoundsSize` allows you to specify text wrapping bounds in either screen pixels (fixed)
+/// or plot units (scales with zoom). This is useful for wrapping text within plot rectangles
+/// or maintaining fixed-width text boxes.
+#[derive(Debug, Clone, Copy)]
+pub enum Bounds<D> {
+    /// Fixed bounds in screen pixels.
+    ///
+    /// The text will wrap at the specified pixel width/height regardless of zoom level.
+    Screen(Size),
+
+    /// Bounds in plot data units.
+    ///
+    /// The text will wrap within a rectangle defined in plot coordinates, scaling
+    /// proportionally when zooming the chart.
+    Plot(Size<D>),
+}
+
+impl<D: Float> Bounds<D> {
+    /// Infinite bounds (no wrapping).
+    pub const INFINITE: Self = Self::Screen(Size::INFINITE);
+
+    /// Resolves the bounds to screen pixels.
+    ///
+    /// * If `Screen`, returns the size directly.
+    /// * If `Plot`, converts the plot-space size to screen pixels using the transform.
+    pub fn resolve(
+        &self,
+        transform: &aksel::Transform<D, f32, f32>,
+        position: &PlotPoint<D>,
+    ) -> Size {
+        match self {
+            Self::Screen(size) => *size,
+            Self::Plot(size) => {
+                let start = transform.chart_to_screen(position);
+                let end = transform.chart_to_screen(&PlotPoint::new(
+                    position.x + size.width,
+                    position.y + size.height,
+                ));
+
+                Size::new((end.x - start.x).abs(), (end.y - start.y).abs())
+            }
+        }
+    }
+}
+
 /// A text label rendered as a vector mesh.
 #[derive(Debug, Clone)]
 pub struct Label<D> {
@@ -23,7 +70,7 @@ pub struct Label<D> {
     pub letter_spacing: f32,
     pub font: Option<Font>,
     pub line_height: f32,
-    pub bounds: Size<f32>,
+    pub bounds: Bounds<D>,
     pub wrapping: Wrapping,
 }
 
@@ -32,51 +79,33 @@ impl<D: Float + Debug, R: plot::Renderer> Shape<D, R> for Label<D> {
         let font = self.font.unwrap_or_else(|| ctx.default_font());
         ctx.render_mesh(move |transform, mesh_buffer, tessellator| {
             // 1. Resolve Position to Screen Coordinates
-            let screen_position = Point::new(
-                transform.x_to_screen(&self.position.x),
-                transform.y_to_screen(&self.position.y),
-            );
+            let screen_position = transform.chart_to_screen(&self.position);
 
             // 2. Resolve Size (Screen Pixels vs Plot Units)
             let font_size_in_pixels = self.size.resolve_y(transform);
             let line_height = font_size_in_pixels + self.line_height;
 
             // 3. Resolve bounds
-            let bounds = match self.size {
-                Measure::Screen(_) => self.bounds,
-                Measure::Plot(_) => {
-                    let end_position = dbg!(PlotPoint::new(
-                        self.position.x + D::from(self.bounds.width).unwrap(),
-                        self.position.y + D::from(self.bounds.height).unwrap(),
-                    ));
+            let bounds = self.bounds.resolve(transform, &self.position);
 
-                    let end_screen_position = transform.chart_to_screen(&end_position);
-
-                    tessellator.draw_rectangle::<D>(
-                        mesh_buffer,
-                        screen_position.x,
-                        screen_position.y,
-                        end_screen_position.x,
-                        end_screen_position.y,
-                        Some(Color::WHITE),
-                        None,
-                    );
-
-                    let width = (end_screen_position.x - screen_position.x).abs();
-                    let height = (end_screen_position.y - screen_position.y).abs();
-
-                    println!("Bounds: {width} {height}");
-
-                    Size::new(width, height)
-                }
-            };
+            // Debug rect to show bounds (Doesn't always match label bounds, because it doesn't
+            // care about alignment)
+            // tessellator.draw_rectangle::<D>(
+            //     mesh_buffer,
+            //     screen_position.x,
+            //     screen_position.y,
+            //     screen_position.x + bounds.width,
+            //     screen_position.y + bounds.height,
+            //     Some(Color::WHITE),
+            //     None,
+            // );
 
             // 4. Draw
             tessellator.draw_text(
                 mesh_buffer,
                 Text {
                     content: &self.content,
-                    position: screen_position,
+                    position: Point::new(screen_position.x, screen_position.y),
                     size: font_size_in_pixels.into(),
                     rotation: self.rotation,
                     horizontal_alignment: self.horizontal_alignment,
@@ -110,12 +139,12 @@ impl<D: Float> Label<D> {
             letter_spacing: 1.2,
             font: None,
             line_height: 1.0,
-            bounds: Size::INFINITE,
+            bounds: Bounds::INFINITE,
             wrapping: Wrapping::None,
         }
     }
 
-    pub const fn bounds(mut self, bounds: Size<f32>) -> Self {
+    pub const fn bounds(mut self, bounds: Bounds<D>) -> Self {
         self.bounds = bounds;
         self
     }
