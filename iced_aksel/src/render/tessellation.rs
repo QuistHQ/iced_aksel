@@ -22,15 +22,18 @@ pub mod text;
 
 use crate::{
     Stroke,
-    render::{
-        MeshBuffer,
-        text::{GeometricFont, Text},
-    },
+    render::{MeshBuffer, text::Text},
     stroke::StrokeStyle,
 };
 use complex::{ComplexTessellator, DashedPolyline, LyonAdapter, SolidVertexConstructor};
 use iced_core::{Color, Point, Rectangle};
-use iced_graphics::color::pack;
+use iced_graphics::{
+    color::pack,
+    text::{
+        cosmic_text::{Buffer, Metrics},
+        font_system,
+    },
+};
 use lyon_path::{LineCap, LineJoin, Path, PathEvent, iterator::FromPolyline, traits::PathIterator};
 use lyon_tessellation::{StrokeOptions, VertexBuffers};
 use math::*;
@@ -1128,10 +1131,42 @@ impl Tessellator {
     /// **Internal Refactor:** This method now bundles the rendering context and request
     /// parameters into structs to improve maintainability.
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn draw_label(&mut self, buffer: &mut MeshBuffer, text: Text, font: &GeometricFont) {
+    pub(crate) fn draw_label(&mut self, mesh_buffer: &mut MeshBuffer, text: Text) {
+        let mut font_system = font_system().write().expect("Failed to get font-system");
+        let mut text_buffer = Buffer::new(
+            font_system.raw(),
+            Metrics::new(text.size.into(), text.line_height.into()),
+        );
+
+        let min_bounds = iced_graphics::text::align(
+            &mut text_buffer,
+            font_system.raw(),
+            text.horizontal_alignment,
+        );
+
+        text_buffer.set_size(
+            font_system.raw(),
+            Some(text.bounds.width),
+            Some(text.bounds.height),
+        );
+
+        text_buffer.set_wrap(
+            font_system.raw(),
+            iced_graphics::text::to_wrap(text.wrapping),
+        );
+
+        text_buffer.set_text(
+            font_system.raw(),
+            text.content,
+            &iced_graphics::text::to_attributes(text.font),
+            iced_graphics::text::to_shaping(iced_core::text::Shaping::Auto, text.content),
+            None,
+        );
+
         // Construct the context to hold heavy resources (caches, buffers)
         let ctx = &mut TextRenderContext {
-            buffer,
+            mesh_buffer,
+            text_buffer,
             tessellator: &mut self.complex.fill,
             glyph_cache: &mut self.glyph_cache,
             scratch_geometry: &mut self.scratch_geometry,
@@ -1141,7 +1176,7 @@ impl Tessellator {
         let req = TextRequest {
             content: text.content,
             position: text.position,
-            font,
+            font: &text.font,
             size: text.size.0,
             color: text.fill,
             rotation: text.rotation,
@@ -1154,7 +1189,7 @@ impl Tessellator {
         };
 
         // Delegate to the text engine
-        text::draw_geometric_text(ctx, req);
+        text::draw_geometric_text(ctx, font_system.raw(), req);
     }
 
     // =========================================================================

@@ -119,7 +119,6 @@ pub use state::State;
 pub use stroke::Stroke;
 pub use style::Catalog;
 
-use crate::render::text::GeometricFont;
 use action::Action;
 use axis::{Orientation, Position};
 use layer::Layer;
@@ -225,7 +224,6 @@ pub struct Chart<
     quality: f32,
 
     // Fonts
-    plot_font: Option<Font>,
     axis_font: Option<Font>,
 
     // Interaction Handlers
@@ -274,7 +272,6 @@ where
             quality: 1.0,
 
             // Handlers and fonts default to None
-            plot_font: None,
             axis_font: None,
             on_error: None,
             on_click: None,
@@ -321,12 +318,6 @@ where
     /// Sets the font used to render the Axes labels and cursor
     pub const fn axes_font(mut self, font: Font) -> Self {
         self.axis_font = Some(font);
-        self
-    }
-
-    /// Sets the font used to render the plot labels
-    pub const fn plot_font(mut self, font: Font) -> Self {
-        self.plot_font = Some(font);
         self
     }
 
@@ -768,8 +759,7 @@ where
     }
 
     fn state(&self) -> tree::State {
-        let default_font = Renderer::Font::default();
-        tree::State::new(Memory::<AxisId>::new(default_font, default_font))
+        tree::State::new(Memory::<AxisId>::new())
     }
 
     fn children(&self) -> Vec<Tree> {
@@ -861,7 +851,7 @@ where
         event: &Event,
         layout: layout::Layout<'_>,
         cursor: mouse::Cursor,
-        renderer: &Renderer,
+        _renderer: &Renderer,
         _clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
@@ -876,10 +866,6 @@ where
             }
             return;
         }
-
-        let plot_font = self.plot_font.unwrap_or_else(|| renderer.default_font());
-        let axis_font = self.axis_font.unwrap_or_else(|| renderer.default_font());
-        memory.update_fonts(axis_font, plot_font);
 
         // Only handle events if the cursor is near the chart
         let bounds = layout.bounds();
@@ -1013,7 +999,6 @@ where
                 &plot_bounds,
                 &mut mesh_buffer,
                 &transform,
-                GeometricFont::new(&memory.plot_font).expect("Failed to create font"),
             );
 
             // User code draws shapes into the plot here

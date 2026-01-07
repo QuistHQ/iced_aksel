@@ -10,14 +10,21 @@
 //! * **Memory Safety:** Uses an LRU (Least Recently Used) cache to prevent unbounded memory growth.
 
 use crate::render::MeshBuffer;
-use crate::render::text::GeometricFont;
-use ab_glyph::{Font, PxScale, ScaleFont};
-use iced_core::{
-    Color, Point,
-    alignment::{Horizontal, Vertical},
+use core::f32;
+use iced_core::{Color, Font, Point, alignment::Vertical, text::Alignment};
+use iced_graphics::{
+    color::pack,
+    text::cosmic_text::{
+        FontSystem,
+        fontdb::ID,
+        skrifa::{
+            FontRef, GlyphId16, MetadataProvider,
+            outline::{DrawSettings, OutlinePen},
+            prelude::{LocationRef, Size},
+        },
+    },
 };
-use iced_graphics::mesh::SolidVertex2D;
-use iced_graphics::{color::pack, text::cosmic_text::fontdb::ID};
+use iced_graphics::{mesh::SolidVertex2D, text::cosmic_text};
 use lru::LruCache;
 use lyon::math::point;
 use lyon::path::Path;
@@ -26,7 +33,6 @@ use lyon::tessellation::{
     BuffersBuilder, FillOptions, FillTessellator, FillVertex, FillVertexConstructor, VertexBuffers,
 };
 use std::num::NonZeroUsize;
-use ttf_parser::OutlineBuilder;
 
 // -----------------------------------------------------------------------------
 // Configuration & Types
@@ -89,11 +95,27 @@ pub struct CachedGlyph {
     pub tolerance: f32,
 }
 
+impl CachedGlyph {
+    pub fn empty(tolerance: f32) -> Self {
+        CachedGlyph {
+            geometry: VertexBuffers::new(),
+            tolerance,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.geometry.vertices.is_empty() || self.geometry.indices.is_empty()
+    }
+}
+
 /// Uniquely identifies a specific glyph's geometry across different fonts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct CacheKey {
     pub font_id: ID,
+    pub face_index: u32,
     pub glyph_id: u16,
+    pub size_bucket: u16,
+    pub tolerance_bucket: u16,
 }
 
 /// A safe wrapper around the glyph cache to enforce correct keying and memory limits.
@@ -145,7 +167,9 @@ impl Default for TextTessellationCache {
 /// to rendering functions.
 pub struct TextRenderContext<'a> {
     /// The final destination for the mesh data.
-    pub buffer: &'a mut MeshBuffer,
+    pub mesh_buffer: &'a mut MeshBuffer,
+    /// Text buffer
+    pub text_buffer: cosmic_text::Buffer,
     /// The Lyon tessellator instance (reused to avoid allocation).
     pub tessellator: &'a mut FillTessellator,
     /// The LRU cache for glyph geometry.
@@ -160,12 +184,12 @@ pub struct TextRenderContext<'a> {
 pub struct TextRequest<'a> {
     pub content: &'a str,
     pub position: Point,
-    pub font: &'a GeometricFont<'a>,
+    pub font: &'a Font,
     /// Font size in screen pixels.
     pub size: f32,
     pub color: Color,
     pub rotation: f32,
-    pub horizontal_alignment: Horizontal,
+    pub horizontal_alignment: Alignment,
     pub vertical_alignment: Vertical,
     /// The base quality setting (High/Medium/Low).
     pub quality: Quality,
@@ -181,7 +205,7 @@ pub struct TextRequest<'a> {
 // Adapter to bridge ttf-parser commands (MoveTo, LineTo) to lyon commands.
 struct LyonPathBuilder<'a>(pub &'a mut dyn PathBuilder);
 
-impl<'a> OutlineBuilder for LyonPathBuilder<'a> {
+impl<'a> OutlinePen for LyonPathBuilder<'a> {
     fn move_to(&mut self, x: f32, y: f32) {
         self.0.begin(point(x, y), &[]);
     }
@@ -231,168 +255,191 @@ fn snap_to_bucket(raw_tolerance: f32) -> f32 {
     }
 }
 
+fn size_bucket(px: f32) -> u16 {
+    // Example: quarter-pixel buckets
+    ((px * 4.0).round().clamp(1.0, u16::MAX as f32)) as u16
+}
+
+fn tol_bucket(px: f32) -> u16 {
+    // Example: thousandth-pixel buckets
+    ((px * 1000.0).round().clamp(1.0, u16::MAX as f32)) as u16
+}
+
 // -----------------------------------------------------------------------------
 // Main Render Logic
 // -----------------------------------------------------------------------------
+
+#[derive(Clone)]
+struct OwnedRun {
+    line_w: f32,
+    line_y: f32,
+    line_height: f32,
+    glyphs: Vec<cosmic_text::LayoutGlyph>,
+}
 
 /// Draws text as a geometric mesh (triangles).
 ///
 /// This is the core function of the text-to-mesh engine. It performs layout,
 /// retrieves/generates glyph geometry, and flushes it to the mesh buffer.
-pub fn draw_geometric_text(ctx: &mut TextRenderContext, req: TextRequest) {
-    if req.content.is_empty() {
+pub fn draw_geometric_text(
+    ctx: &mut TextRenderContext,
+    font_system: &mut FontSystem,
+    req: TextRequest,
+) {
+    if req.content.is_empty() || req.size <= 2.0 {
         return;
     }
 
-    if req.size <= 2.0 {
-        return;
-    }
-
-    let font_layout = &req.font.layout;
-    let font_geometry = &req.font.geometry;
-    let font_id = req.font.id;
-
-    // 1. Setup Metrics & Scaling
-    let pixel_scale = PxScale::from(req.size);
-    let scaled_font = font_layout.as_scaled(pixel_scale);
-
-    let font_units_per_em = font_geometry.units_per_em() as f32;
-    // This factor converts font-units (integers) to screen-units (pixels)
-    let geometry_scale_factor = req.size / font_units_per_em;
-
-    // 2. Resolve Level of Detail (LOD)
-    // We calculate the ideal error tolerance based on the requested size and quality.
-    let base_error = req.quality.to_tolerance();
-    // Higher multiplier = lower error (better quality)
-    let desired_pixel_error = base_error / req.quality_multiplier.max(0.1);
-    let safe_font_size = req.size.max(0.001);
-
-    let raw_tolerance = (desired_pixel_error * font_units_per_em) / safe_font_size;
-
-    // Apply the "Bucketing" optimization to prevent cache thrashing
-    let tessellation_tolerance = snap_to_bucket(raw_tolerance);
-
-    let fill_options = FillOptions::default().with_tolerance(tessellation_tolerance);
-
-    // 3. Layout Phase: Measure lines
-    let ascent = scaled_font.ascent();
-    let descent = scaled_font.descent();
-    let line_gap = scaled_font.line_gap();
-    let line_height = ascent - descent + line_gap;
-
-    let lines: Vec<&str> = req.content.lines().collect();
-    let line_count = lines.len() as f32;
-    let total_block_height = line_height * line_count;
-
-    let mut current_y = match req.vertical_alignment {
-        Vertical::Top => ascent,
-        Vertical::Center => ascent - (total_block_height / 2.0) + (line_height / 2.0),
-        Vertical::Bottom => ascent - total_block_height + line_height,
+    // --- Get layout runs ---
+    let runs: Vec<OwnedRun> = {
+        let bw = ctx.text_buffer.borrow_with(font_system);
+        bw.layout_runs()
+            .map(|run| OwnedRun {
+                line_y: run.line_y,
+                line_w: run.line_w,
+                line_height: run.line_height,
+                glyphs: run.glyphs.to_vec(),
+            })
+            .collect()
     };
 
-    // 4. Render Phase: Iterate lines and characters
-    for line_text in lines {
-        // Measure line width for horizontal alignment
-        let mut line_width = 0.0;
-        let mut last_glyph_id = None;
+    if runs.is_empty() {
+        return;
+    }
 
-        for character in line_text.chars() {
-            let glyph_id = font_layout.glyph_id(character);
-            if let Some(last) = last_glyph_id {
-                line_width += scaled_font.kern(last, glyph_id);
-            }
-            line_width += scaled_font.h_advance(glyph_id) * req.letter_spacing;
-            last_glyph_id = Some(glyph_id);
-        }
+    // --- Compute vertical alignment ---
+    let min_y = runs.first().unwrap().line_y;
+    let max_y = runs
+        .iter()
+        .map(|r| r.line_y + r.line_height)
+        .fold(f32::NEG_INFINITY, f32::max);
+    let block_h = max_y - min_y;
+    let v_offset = match req.vertical_alignment {
+        Vertical::Top => 0.0,
+        Vertical::Center => -block_h / 2.0,
+        Vertical::Bottom => -block_h,
+    };
 
-        let alignment_offset_x = match req.horizontal_alignment {
-            Horizontal::Left => 0.0,
-            Horizontal::Center => -line_width / 2.0,
-            Horizontal::Right => -line_width,
+    // --- Decide pixel tolerance ---
+    let base_error_px = req.quality.to_tolerance();
+    let desired_error_px = base_error_px / req.quality_multiplier.max(0.1);
+    let tess_tol_px = snap_to_bucket(desired_error_px);
+    let tol_bucket_u16 = tol_bucket(tess_tol_px);
+    let size_bucket_u16 = size_bucket(req.size);
+
+    let fill_options = FillOptions::default().with_tolerance(tess_tol_px);
+
+    // --- Render glyphs ---
+    for run in runs {
+        let h_offset = match req.horizontal_alignment {
+            Alignment::Left => 0.0,
+            Alignment::Center => -run.line_w / 2.0,
+            Alignment::Right => -run.line_w,
+            _ => todo!(),
         };
 
-        let mut cursor_x = 0.0;
-        last_glyph_id = None;
+        let line_y = run.line_y + v_offset;
 
-        for character in line_text.chars() {
-            let glyph_id = font_layout.glyph_id(character);
-            let glyph_index = glyph_id.0;
+        for glyph in run.glyphs {
+            // Find the chosen face index in fontdb (important for TTC)
+            let face_info = match font_system.db().face(glyph.font_id) {
+                Some(info) => info,
+                None => continue,
+            };
+            let face_index = face_info.index;
 
-            let cache_key = CacheKey {
-                font_id: *font_id,
-                glyph_id: glyph_index,
+            let key = CacheKey {
+                font_id: glyph.font_id,
+                face_index,
+                glyph_id: glyph.glyph_id,
+                size_bucket: size_bucket_u16,
+                tolerance_bucket: tol_bucket_u16,
             };
 
-            // Apply Kerning (Spacing adjustment between specific pairs like 'AV')
-            if let Some(last) = last_glyph_id {
-                cursor_x += scaled_font.kern(last, glyph_id);
-            }
-
-            // --- Cache Check & Update ---
-            // We check if we need to generate new geometry.
-            // This happens if:
-            // 1. The glyph is not in cache.
-            // 2. The cached glyph has a HIGHER tolerance (rougher) than what we need now.
-            let needs_update = if let Some(cached) = ctx.glyph_cache.get(cache_key) {
-                cached.tolerance > tessellation_tolerance + 0.0001
+            if let Some(cached) = ctx.glyph_cache.get(key)
+                && !cached.is_empty()
+            {
+                let local_x = h_offset + glyph.x_offset;
+                let local_y = line_y + glyph.y_offset;
+                flush_character_to_mesh(
+                    ctx.mesh_buffer,
+                    &cached.geometry,
+                    req.position,
+                    req.rotation,
+                    req.color,
+                    local_x,
+                    local_y,
+                );
             } else {
-                true
-            };
+                let font_arc = match font_system.get_font(glyph.font_id, glyph.font_weight) {
+                    Some(f) => f,
+                    // Font not found - Just continue
+                    None => continue,
+                };
 
-            if needs_update {
-                // Generate new geometry
-                ctx.scratch_geometry.vertices.clear();
-                ctx.scratch_geometry.indices.clear();
+                let font_bytes = font_arc.data();
 
-                let ttf_glyph_id = ttf_parser::GlyphId(glyph_index);
+                // Create skrifa font ref
+                let font_ref = match FontRef::from_index(font_bytes, face_index) {
+                    Ok(f) => f,
+                    // Same here - Not found, just continue
+                    Err(_) => continue,
+                };
+
+                let outlines = font_ref.outline_glyphs();
+                let gid = GlyphId16::new(glyph.glyph_id);
+
+                let outline_glyph = match outlines.get(gid.into()) {
+                    Some(og) => og,
+                    // Missing outline (e.g. Bitmap emoji)
+                    None => {
+                        // We cache an empty glyph to avoid calculations next frame
+                        ctx.glyph_cache.insert(
+                            key,
+                            CachedGlyph {
+                                geometry: VertexBuffers::new(),
+                                tolerance: tess_tol_px,
+                            },
+                        );
+                        continue;
+                    }
+                };
+
                 let mut path_builder = Path::builder();
-                let mut builder_adapter = LyonPathBuilder(&mut path_builder);
+                let mut pen = LyonPathBuilder(&mut path_builder);
 
-                // Extract contours from font file
-                if font_geometry
-                    .outline_glyph(ttf_glyph_id, &mut builder_adapter)
-                    .is_some()
-                {
+                let settings = DrawSettings::unhinted(Size::new(req.size), LocationRef::default());
+                if outline_glyph.draw(settings, &mut pen).is_ok() {
                     let path = path_builder.build();
 
-                    // Tessellate the contours into triangles
+                    ctx.scratch_geometry.vertices.clear();
+                    ctx.scratch_geometry.indices.clear();
+
                     let _ = ctx.tessellator.tessellate_path(
                         &path,
                         &fill_options,
                         &mut BuffersBuilder::new(ctx.scratch_geometry, TextVertexConstructor),
                     );
+
+                    ctx.glyph_cache.insert(
+                        key,
+                        CachedGlyph {
+                            geometry: ctx.scratch_geometry.clone(),
+                            tolerance: tess_tol_px,
+                        },
+                    );
+                } else {
+                    // We can't draw - Insert empty cache key
+                    ctx.glyph_cache.insert(
+                        key,
+                        CachedGlyph {
+                            geometry: VertexBuffers::new(),
+                            tolerance: tess_tol_px,
+                        },
+                    );
                 }
-
-                // Store in LRU cache
-                ctx.glyph_cache.insert(
-                    cache_key,
-                    CachedGlyph {
-                        geometry: ctx.scratch_geometry.clone(),
-                        tolerance: tessellation_tolerance,
-                    },
-                );
             }
-
-            // Render using the cached data (which is now guaranteed to be ready)
-            if let Some(cached_glyph) = ctx.glyph_cache.get(cache_key) {
-                flush_character_to_mesh(
-                    ctx.buffer,
-                    &cached_glyph.geometry,
-                    req.position,
-                    req.rotation,
-                    req.color,
-                    alignment_offset_x + cursor_x,
-                    current_y,
-                    geometry_scale_factor,
-                );
-            }
-
-            // Advance Cursor
-            cursor_x += scaled_font.h_advance(glyph_id) * req.letter_spacing;
-            last_glyph_id = Some(glyph_id);
         }
-
-        current_y += line_height;
     }
 }
 
@@ -405,31 +452,27 @@ fn flush_character_to_mesh(
     color: Color,
     local_offset_x: f32,
     local_offset_y: f32,
-    scale_factor: f32,
 ) {
     let mesh = target_buffer.get_mesh_mut();
     let start_index = mesh.vertices.len() as u32;
 
     let (sin, cos) = rotation_radians.sin_cos();
     let packed_color = pack(color);
+
     // Fonts are usually Y-up, screens are Y-down.
     let flip_y = -1.0;
 
     // Transform every vertex in the glyph
     for vertex in &source_geometry.vertices {
-        // 1. Scale from font-units to pixels
-        let scaled_x = vertex.x * scale_factor;
-        let scaled_y = vertex.y * scale_factor;
+        // Position relative to the word/line start
+        let local_x = vertex.x + local_offset_x;
+        let local_y = (vertex.y * flip_y) + local_offset_y;
 
-        // 2. Position relative to the word/line start
-        let local_x = scaled_x + local_offset_x;
-        let local_y = (scaled_y * flip_y) + local_offset_y;
-
-        // 3. Rotate around the text origin
+        // Rotate around the text origin
         let rotated_x = local_x * cos - local_y * sin;
         let rotated_y = local_x * sin + local_y * cos;
 
-        // 4. Translate to final screen position
+        // Translate to final screen position
         let final_x = screen_origin.x + rotated_x;
         let final_y = screen_origin.y + rotated_y;
 

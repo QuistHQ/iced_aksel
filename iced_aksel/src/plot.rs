@@ -4,14 +4,12 @@
 //! The main entry point is the [`PlotData`] trait, which you implement to draw your data.
 
 use crate::{
-    render::{
-        MeshBuffer, Tessellator,
-        text::{GeometricFont, Text},
-    },
+    render::{MeshBuffer, Tessellator, text::Text},
     shape::Shape,
 };
 
 use aksel::{Float, PlotRect, Transform};
+use iced_core::Font;
 
 /// Normalized drag delta for panning operations.
 ///
@@ -91,12 +89,11 @@ pub struct TextRenderer<'a, Renderer: iced_graphics::mesh::Renderer> {
     renderer: &'a mut Renderer,
     buffer: &'a mut MeshBuffer,
     tessellator: &'a mut Tessellator,
-    font: &'a GeometricFont<'a>,
 }
 
 impl<Renderer: iced_graphics::mesh::Renderer> TextRenderer<'_, Renderer> {
     pub fn draw_text(&mut self, text: Text) {
-        self.tessellator.draw_label(self.buffer, text, self.font);
+        self.tessellator.draw_label(self.buffer, text);
     }
 }
 
@@ -108,11 +105,15 @@ pub struct Context<'a, D: Float, Renderer: self::Renderer = iced_renderer::Rende
     clip_bounds: &'a iced_core::Rectangle,
     renderer: &'a mut Renderer,
     tessellators: &'a mut Tessellator,
-    font: GeometricFont<'a>,
     mesh_buffer: &'a mut MeshBuffer,
 }
 
 impl<'a, D: Float, Renderer: self::Renderer> Context<'a, D, Renderer> {
+    #[inline(always)]
+    pub fn default_font(&mut self) -> Font {
+        self.renderer.default_font()
+    }
+
     #[inline(always)]
     fn reset_layer(&mut self) {
         self.renderer.end_layer();
@@ -146,7 +147,6 @@ impl<'a, D: Float, Renderer: self::Renderer> Context<'a, D, Renderer> {
             tessellator: self.tessellators,
             renderer: self.renderer,
             buffer: self.mesh_buffer,
-            font: &self.font,
         };
         f(&self.transform, &mut text_renderer)
     }
@@ -174,7 +174,6 @@ where
         clip_bounds: &'a iced_core::Rectangle,
         mesh_buffer: &'a mut MeshBuffer,
         transform: &'a Transform<'a, D, f32, f32>,
-        font: GeometricFont<'a>,
     ) -> Self {
         renderer.start_layer(*clip_bounds);
         let context = Context {
@@ -183,7 +182,6 @@ where
             renderer,
             tessellators,
             mesh_buffer,
-            font,
         };
         Self { context }
     }

@@ -3,8 +3,9 @@ use crate::render::text::Text;
 use crate::{Measure, Shape, plot};
 use aksel::{Float, PlotPoint};
 use iced_core::{
-    Color, Point,
-    alignment::{Horizontal, Vertical},
+    Color, Font, Point, Size,
+    alignment::Vertical,
+    text::{Alignment, Wrapping},
 };
 
 /// A text label rendered as a vector mesh.
@@ -15,15 +16,20 @@ pub struct Label<D> {
     pub position: PlotPoint<D>,
     pub size: Measure<D>,
     pub rotation: f32, // Radians
-    pub horizontal_alignment: Horizontal,
+    pub horizontal_alignment: Alignment,
     pub vertical_alignment: Vertical,
     pub fill: Color,
     pub quality: Quality,
     pub letter_spacing: f32,
+    pub font: Option<Font>,
+    pub line_height: f32,
+    pub bounds: Size,
+    pub wrapping: Wrapping,
 }
 
 impl<D: Float, R: plot::Renderer> Shape<D, R> for Label<D> {
     fn render(self, ctx: &mut plot::Context<'_, D, R>) {
+        let font = self.font.unwrap_or_else(|| ctx.default_font());
         ctx.render_text(move |transform, text_renderer| {
             // 1. Resolve Position to Screen Coordinates
             let screen_position = Point::new(
@@ -45,6 +51,10 @@ impl<D: Float, R: plot::Renderer> Shape<D, R> for Label<D> {
                 fill: self.fill,
                 quality: self.quality,
                 letter_spacing: self.letter_spacing,
+                font,
+                line_height: self.line_height.into(),
+                bounds: self.bounds,
+                wrapping: self.wrapping,
             });
         });
     }
@@ -60,11 +70,15 @@ impl<D: Float> Label<D> {
             position,
             size: Measure::Screen(12.0),
             rotation: 0.0,
-            horizontal_alignment: Horizontal::Center,
+            horizontal_alignment: Alignment::Center,
             vertical_alignment: Vertical::Center,
             fill: Color::BLACK,
             quality: Quality::default(), // Defaults to Medium
             letter_spacing: 1.2,
+            font: None,
+            line_height: 1.0,
+            bounds: Size::INFINITE,
+            wrapping: Wrapping::None,
         }
     }
 
@@ -90,7 +104,7 @@ impl<D: Float> Label<D> {
     }
 
     /// Sets the horizontal and vertical alignment relative to the position.
-    pub fn align(mut self, horizontal: Horizontal, vertical: Vertical) -> Self {
+    pub fn align(mut self, horizontal: Alignment, vertical: Vertical) -> Self {
         self.horizontal_alignment = horizontal;
         self.vertical_alignment = vertical;
         self

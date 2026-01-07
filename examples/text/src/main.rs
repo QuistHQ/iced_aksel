@@ -183,7 +183,6 @@ impl TextExample {
             .debug(true) // Shows the tile boundaries
             .quality(self.global_quality)
             .plot_data(&self.layer, AXIS_X, AXIS_Y)
-            .plot_font(self.font)
             .on_drag(Message::ChartDragged)
             .on_scroll(Message::ChartScrolled);
 
