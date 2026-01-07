@@ -8,7 +8,7 @@ use iced::{
 };
 use iced_aksel::{
     Axis, Chart, Measure, Plot, PlotData, PlotPoint, Quality, State, axis::Position,
-    plot::DragDelta, scale::Linear, shape::Label,
+    plot::DragDelta, scale::Linear, shape::{BoundsSize, Label},
 };
 
 const AXIS_X: &str = "x";
@@ -152,13 +152,16 @@ impl TextExample {
 
         // 6. Japanese
         self.layer.labels.push(
-            Label::new("畝 　ま代　苛ゑニーヌ現グ委る", PlotPoint::new(50.0, 10.0))
-                .font(self.font)
-                .size(Measure::Screen(20.0))
-                .align(Horizontal::Left, Vertical::Center)
-                .bounds(Size::new(100.0, f32::INFINITY))
-                .wrapping(Wrapping::WordOrGlyph)
-                .fill(Color::BLACK),
+            Label::new(
+                "This japanese text is wrapped! 畝 　ま代　苛ゑニーヌ現グ委る",
+                PlotPoint::new(50.0, 10.0),
+            )
+            .font(self.font)
+            .size(Measure::Plot(20.0))
+            .align(Horizontal::Left, Vertical::Center)
+            .bounds(BoundsSize::Plot(Size::new(100.0, 100.0)))
+            .wrapping(Wrapping::WordOrGlyph)
+            .fill(Color::BLACK),
         );
     }
 

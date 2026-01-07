@@ -7,6 +7,7 @@ use iced_core::{
     alignment::Vertical,
     text::{Alignment, Wrapping},
 };
+use std::fmt::Debug;
 
 /// A text label rendered as a vector mesh.
 #[derive(Debug, Clone)]
@@ -26,7 +27,7 @@ pub struct Label<D> {
     pub wrapping: Wrapping,
 }
 
-impl<D: Float, R: plot::Renderer> Shape<D, R> for Label<D> {
+impl<D: Float + Debug, R: plot::Renderer> Shape<D, R> for Label<D> {
     fn render(self, ctx: &mut plot::Context<'_, D, R>) {
         let font = self.font.unwrap_or_else(|| ctx.default_font());
         ctx.render_mesh(move |transform, mesh_buffer, tessellator| {
@@ -44,10 +45,10 @@ impl<D: Float, R: plot::Renderer> Shape<D, R> for Label<D> {
             let bounds = match self.size {
                 Measure::Screen(_) => self.bounds,
                 Measure::Plot(_) => {
-                    let end_position = PlotPoint::new(
+                    let end_position = dbg!(PlotPoint::new(
                         self.position.x + D::from(self.bounds.width).unwrap(),
                         self.position.y + D::from(self.bounds.height).unwrap(),
-                    );
+                    ));
 
                     let end_screen_position = transform.chart_to_screen(&end_position);
 
@@ -63,6 +64,8 @@ impl<D: Float, R: plot::Renderer> Shape<D, R> for Label<D> {
 
                     let width = (end_screen_position.x - screen_position.x).abs();
                     let height = (end_screen_position.y - screen_position.y).abs();
+
+                    println!("Bounds: {width} {height}");
 
                     Size::new(width, height)
                 }

@@ -88,12 +88,14 @@ struct CachedGlyph {
 }
 
 impl CachedGlyph {
+    /// Creates a new **empty** cached glyph - Useful for non-drawable glyphs
     pub fn empty() -> Self {
         Self {
             geometry: VertexBuffers::new(),
         }
     }
 
+    /// Returns true if the cached glyph is empty
     pub const fn is_empty(&self) -> bool {
         self.geometry.vertices.is_empty() || self.geometry.indices.is_empty()
     }
@@ -131,6 +133,7 @@ impl TextTessellationCache {
         self.cache.get(&key)
     }
 
+    /// Inserts a new glyph into the cache
     fn insert(&mut self, key: CacheKey, glyph: CachedGlyph) {
         self.cache.put(key, glyph);
     }
@@ -258,9 +261,10 @@ fn tol_bucket(px: f32) -> u16 {
 // Main Render Logic
 // -----------------------------------------------------------------------------
 
+/// An owned LayoutRun
 #[derive(Clone)]
 struct OwnedRun {
-    line_w: f32,
+    line_width: f32,
     line_y: f32,
     line_height: f32,
     glyphs: Vec<cosmic_text::LayoutGlyph>,
@@ -285,7 +289,7 @@ pub fn draw_geometric_text(
         bw.layout_runs()
             .map(|run| OwnedRun {
                 line_y: run.line_y,
-                line_w: run.line_w,
+                line_width: run.line_w,
                 line_height: run.line_height,
                 glyphs: run.glyphs.to_vec(),
             })
@@ -302,11 +306,11 @@ pub fn draw_geometric_text(
         .iter()
         .map(|r| r.line_y + r.line_height)
         .fold(f32::NEG_INFINITY, f32::max);
-    let block_h = max_y - min_y;
-    let v_offset = match req.vertical_alignment {
+    let block_height = max_y - min_y;
+    let vertical_offset = match req.vertical_alignment {
         Vertical::Top => 0.0,
-        Vertical::Center => -block_h / 2.0,
-        Vertical::Bottom => -block_h,
+        Vertical::Center => -block_height / 2.0,
+        Vertical::Bottom => -block_height,
     };
 
     // --- Decide pixel tolerance ---
@@ -319,12 +323,12 @@ pub fn draw_geometric_text(
     let fill_options = FillOptions::default().with_tolerance(tess_tol_px);
 
     // --- Render glyphs ---
-    println!("\n\nNEW RUN: ================");
     for run in runs {
-        let h_offset = match req.horizontal_alignment {
+        // Horizontal offset
+        let horizontal_offset = match req.horizontal_alignment {
             Alignment::Left => 0.0,
-            Alignment::Center => -run.line_w / 2.0,
-            Alignment::Right => -run.line_w,
+            Alignment::Center => -run.line_width / 2.0,
+            Alignment::Right => -run.line_width,
             _ => todo!(),
         };
 
@@ -344,25 +348,25 @@ pub fn draw_geometric_text(
                 tolerance_bucket: tol_bucket_u16,
             };
 
+            // --- Create cached glyph ---
             if ctx.glyph_cache.get(key).is_none() {
+                // Get font from system
                 let font_arc = match font_system.get_font(glyph.font_id, glyph.font_weight) {
                     Some(f) => f,
                     // Font not found - Just continue
                     None => continue,
                 };
 
-                let font_bytes = font_arc.data();
-
                 // Create skrifa font ref
-                let font_ref = match FontRef::from_index(font_bytes, face_index) {
+                let font_ref = match FontRef::from_index(font_arc.data(), face_index) {
                     Ok(f) => f,
                     // Same here - Not found, just continue
                     Err(_) => continue,
                 };
 
+                // Create the outline
                 let outlines = font_ref.outline_glyphs();
                 let gid = GlyphId16::new(glyph.glyph_id);
-
                 let outline_glyph = match outlines.get(gid.into()) {
                     Some(og) => og,
                     // Missing outline (e.g. Bitmap emoji)
@@ -373,16 +377,19 @@ pub fn draw_geometric_text(
                     }
                 };
 
+                // Create a "pan" to draw the path
                 let mut path_builder = Path::builder();
                 let mut pen = LyonPathBuilder(&mut path_builder);
 
+                // Create the settings for drawing
                 let settings =
                     DrawSettings::unhinted(Size::new(glyph.font_size), LocationRef::default());
+
+                // Draw the glyph and cache it
                 if outline_glyph.draw(settings, &mut pen).is_ok() {
                     let path = path_builder.build();
 
-                    ctx.scratch_geometry.vertices.clear();
-                    ctx.scratch_geometry.indices.clear();
+                    ctx.scratch_geometry.clear();
 
                     let _ = ctx.tessellator.tessellate_path(
                         &path,
@@ -402,11 +409,12 @@ pub fn draw_geometric_text(
                 }
             }
 
+            // --- Use cached glyph ---
             if let Some(cached) = ctx.glyph_cache.get(key)
                 && !cached.is_empty()
             {
-                let local_x = h_offset + glyph.font_size.mul_add(glyph.x_offset, glyph.x);
-                let local_y = v_offset
+                let local_x = horizontal_offset + glyph.font_size.mul_add(glyph.x_offset, glyph.x);
+                let local_y = vertical_offset
                     + glyph
                         .font_size
                         .mul_add(-glyph.y_offset, run.line_y + glyph.y);
@@ -435,10 +443,6 @@ fn flush_character_to_mesh(
     local_offset_x: f32,
     local_offset_y: f32,
 ) {
-    println!(
-        "Drawing Glyph at position: x={} y={}",
-        local_offset_x, local_offset_y
-    );
     let mesh = target_buffer.get_mesh_mut();
     let start_index = mesh.vertices.len() as u32;
 
