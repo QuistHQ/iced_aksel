@@ -29,7 +29,7 @@ pub struct Label<D> {
 
 impl<D: Float, R: plot::Renderer> Shape<D, R> for Label<D> {
     fn render(self, ctx: &mut plot::Context<'_, D, R>) {
-        let font = self.font.unwrap_or_else(|| ctx.default_font());
+        let font = dbg!(self.font.unwrap_or_else(|| ctx.default_font()));
         ctx.render_text(move |transform, text_renderer| {
             // 1. Resolve Position to Screen Coordinates
             let screen_position = Point::new(
@@ -81,6 +81,11 @@ impl<D: Float> Label<D> {
         }
     }
 
+    pub const fn bounds(mut self, bounds: Size) -> Self {
+        self.bounds = bounds;
+        self
+    }
+
     pub const fn font(mut self, font: Font) -> Self {
         self.font = Some(font);
         self
@@ -88,6 +93,11 @@ impl<D: Float> Label<D> {
 
     pub const fn font_maybe(mut self, font: Option<Font>) -> Self {
         self.font = font;
+        self
+    }
+
+    pub const fn wrapping(mut self, wrapping: Wrapping) -> Self {
+        self.wrapping = wrapping;
         self
     }
 

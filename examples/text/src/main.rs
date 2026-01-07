@@ -1,9 +1,10 @@
 use iced::{
-    Color, Element, Font, Point, Task, Theme,
+    Color, Element, Font, Point, Size, Task, Theme,
     advanced::graphics::text::font_system,
+    alignment::{Horizontal, Vertical},
     mouse::ScrollDelta,
     time::Instant,
-    widget::{column, pick_list, row, slider, text},
+    widget::{column, pick_list, row, slider, text, text::Wrapping},
 };
 use iced_aksel::{
     Axis, Chart, Measure, Plot, PlotData, PlotPoint, Quality, State, axis::Position,
@@ -98,6 +99,7 @@ impl TextExample {
         // Stays 24px tall regardless of zoom level. Good for annotations.
         self.layer.labels.push(
             Label::new("Screen Fixed (24px)", PlotPoint::new(10.0, 90.0))
+                .font(self.font)
                 .size(Measure::Screen(24.0))
                 .fill(Color::from_rgb(0.2, 0.4, 0.8)),
         );
@@ -106,6 +108,7 @@ impl TextExample {
         // Stays 5 units tall. Zooms in/out with the chart. Good for measurements.
         self.layer.labels.push(
             Label::new("World Fixed (5 Units)", PlotPoint::new(10.0, 70.0))
+                .font(self.font)
                 .size(Measure::Plot(5.0))
                 .fill(Color::from_rgb(0.8, 0.2, 0.2)),
         );
@@ -113,6 +116,7 @@ impl TextExample {
         // 3. Rotation Showcase
         self.layer.labels.push(
             Label::new("Rotated 45°", PlotPoint::new(60.0, 70.0))
+                .font(self.font)
                 .size(Measure::Screen(20.0))
                 .rotation(45.0f32.to_radians())
                 .fill(Color::from_rgb(0.2, 0.8, 0.2)),
@@ -121,6 +125,7 @@ impl TextExample {
         // 4. Alignment & Upside Down
         self.layer.labels.push(
             Label::new("Upside Down / Centered", PlotPoint::new(60.0, 50.0))
+                .font(self.font)
                 .size(Measure::Screen(20.0))
                 .rotation(180.0f32.to_radians())
                 .fill(Color::from_rgb(0.5, 0.5, 0.5)),
@@ -130,6 +135,7 @@ impl TextExample {
         // This label forces 'High' quality regardless of zoom, useful for large headers.
         self.layer.labels.push(
             Label::new("Forced High Quality", PlotPoint::new(10.0, 30.0))
+                .font(self.font)
                 .size(Measure::Plot(8.0))
                 .quality(Quality::High)
                 .fill(Color::BLACK),
@@ -139,7 +145,20 @@ impl TextExample {
         // Zoom in here to test the LOD bucketing!
         self.layer.labels.push(
             Label::new("Zoom In To Read Me", PlotPoint::new(10.0, 10.0))
+                .font(self.font)
                 .size(Measure::Plot(0.5)) // Very small
+                .fill(Color::BLACK),
+        );
+
+        // 6. Japanese
+        // Zoom in here to test the LOD bucketing!
+        self.layer.labels.push(
+            Label::new("畝 　ま代　苛ゑニーヌ現グ委る", PlotPoint::new(50.0, 10.0))
+                .font(self.font)
+                .size(Measure::Plot(20.0))
+                .align(Horizontal::Left, Vertical::Center)
+                .bounds(Size::new(40.0, f32::INFINITY))
+                .wrapping(Wrapping::WordOrGlyph)
                 .fill(Color::BLACK),
         );
     }
@@ -172,7 +191,8 @@ impl TextExample {
                 self.selected_family = family.clone();
                 // Hack to get a static ref to the family - This isn't great, but good enough to
                 // showcase the fonts
-                self.font = Font::with_name(Box::leak(family.into_boxed_str()));
+                self.font = dbg!(Font::with_name(Box::leak(family.into_boxed_str())));
+                self.generate_showcase();
             }
         }
         Task::none()
