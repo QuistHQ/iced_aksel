@@ -5,17 +5,15 @@ use iced_core::{Border, Color, Font, Padding, Pixels, Shadow, Theme};
 /// Global style of a `Chart`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Style {
-    /// Style of the crosshair cursor on the plot area.
-    pub plot_cursor: PlotCursorStyle,
     /// Style of the axes.
     pub axis: AxisStyle,
     /// Style of the grid lines.
-    pub grid: GridStyle,
+    pub grid: LineStyle,
 }
 
-/// Style of the grid lines.
+/// Style of lines.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct GridStyle {
+pub struct LineStyle {
     /// The color of the grid lines.
     pub color: Color,
     /// The thickness of the grid lines in pixels.
@@ -33,6 +31,8 @@ pub struct AxisStyle {
     pub ticks: TickStyle,
     /// Style of the cursor badge and line on the axis.
     pub cursor: AxisCursorStyle,
+    /// Style of the axis spine (The line that seperates the axis from the plot)
+    pub spine: LineStyle,
 }
 
 /// Style of axis ticks.
@@ -71,15 +71,6 @@ pub struct AxisCursorBadgeStyle {
     pub border: Border,
     /// Shadow style of the badge.
     pub shadow: Shadow,
-}
-
-/// Style of the plot cursor that follows the mouse position over the chart.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct PlotCursorStyle {
-    /// The color of the cursor crosshair.
-    pub color: Color,
-    /// The thickness of the cursor lines.
-    pub width: Pixels,
 }
 
 /// General text styling configuration.
@@ -135,11 +126,7 @@ pub fn default(theme: &Theme) -> Style {
     let palette = theme.extended_palette();
 
     Style {
-        plot_cursor: PlotCursorStyle {
-            color: palette.background.strong.color,
-            width: 1.0.into(),
-        },
-        grid: GridStyle {
+        grid: LineStyle {
             color: palette.background.strong.color,
             width: 1.0.into(),
         },
@@ -171,6 +158,10 @@ pub fn default(theme: &Theme) -> Style {
                     },
                     shadow: Shadow::default(),
                 },
+            },
+            spine: LineStyle {
+                color: palette.background.strong.color.inverse(),
+                width: 10.0.into(),
             },
         },
     }

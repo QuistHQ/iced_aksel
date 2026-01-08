@@ -8,7 +8,7 @@ use iced_aksel::{
     plot::{Plot, PlotData},
     scale::Linear,
     shape::Polyline,
-    style::{AxisStyle, Style},
+    style::Style,
 };
 
 pub fn main() -> iced::Result {
@@ -59,13 +59,13 @@ impl AxesShowcase {
 
     fn view(&self) -> Element<'_, Message> {
         row![
-            self.panel(
-                "1. Minimal Layout",
-                "Hidden Y-axis. No Grid.",
-                Chart::new(&self.minimal_state)
-                    .plot_data(&self.minimal_data, Self::X, Self::Y)
-                    .style(Box::new(style_base))
-            ),
+            // self.panel(
+            //     "1. Minimal Layout",
+            //     "Hidden Y-axis. No Grid.",
+            //     Chart::new(&self.minimal_state)
+            //         .plot_data(&self.minimal_data, Self::X, Self::Y)
+            //         .style(Box::new(style_base))
+            // ),
             self.panel(
                 "2. Engineering Layout",
                 "Custom Ruler Ticks. Monospace.",
@@ -73,13 +73,13 @@ impl AxesShowcase {
                     .plot_data(&self.engineering_data, Self::X, Self::Y)
                     .style(Box::new(style_engineering))
             ),
-            self.panel(
-                "3. Custom Placement",
-                "Top & Right Axes. Badges.",
-                Chart::new(&self.custom_state)
-                    .plot_data(&self.custom_data, Self::X, Self::Y)
-                    .style(Box::new(style_base))
-            ),
+            // self.panel(
+            //     "3. Custom Placement",
+            //     "Top & Right Axes. Badges.",
+            //     Chart::new(&self.custom_state)
+            //         .plot_data(&self.custom_data, Self::X, Self::Y)
+            //         .style(Box::new(style_base))
+            // ),
         ]
         .spacing(20)
         .padding(20)
@@ -185,7 +185,7 @@ fn setup_engineering_axes() -> State<&'static str, f64> {
 
     state.set_axis(
         AxesShowcase::X,
-        Axis::new(Linear::new(0.0, 100.0), axis::Position::Bottom)
+        Axis::new(Linear::new(0.0, 100.0), axis::Position::Top)
             .with_thickness(35.0)
             .with_tick_renderer(ruler_renderer),
     );
@@ -255,8 +255,6 @@ fn style_base(theme: &Theme) -> Style {
     style.axis.cursor.color = palette.primary.base.color;
     style.axis.cursor.badge.background = palette.primary.base.color;
     style.axis.cursor.text.color = palette.primary.base.text;
-
-    style.plot_cursor.color = palette.primary.base.color;
 
     style
 }

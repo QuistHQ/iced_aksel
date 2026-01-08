@@ -7,7 +7,6 @@
 use std::{
     cell::RefCell,
     ops::{Deref, DerefMut},
-    rc::Rc,
 };
 
 use aksel::{Float, Scale};
@@ -25,8 +24,11 @@ use iced_graphics::{color, mesh::SolidVertex2D};
 
 use crate::{
     plot,
-    render::MeshBuffer,
-    style::{AxisStyle, GridStyle, Style, TextStyle, TickStyle},
+    render::{
+        MeshBuffer,
+        tessellation::manual::linear::{draw_horizontal_line, draw_vertical_line},
+    },
+    style::{AxisStyle, LineStyle, Style, TextStyle, TickStyle},
 };
 
 mod grid;
@@ -39,8 +41,9 @@ pub use label::*;
 pub use position::*;
 pub use tick::*;
 
-type TickRendererFn<D> = Rc<RefCell<dyn FnMut(TickContext<D>) -> TickResult>>;
-type CursorRendererFn<D> = Rc<RefCell<dyn FnMut(D) -> Option<String>>>;
+type TickRendererFn<D> = RefCell<Box<dyn FnMut(TickContext<D>) -> TickResult>>;
+type CursorRendererFn<D> = RefCell<Box<dyn FnMut(D) -> Option<String>>>;
+type StyleOverrideFn = RefCell<Box<dyn FnMut(&mut AxisStyle)>>;
 
 /// An axis that maps data values to screen coordinates.
 ///
@@ -74,6 +77,9 @@ pub struct Axis<D> {
     #[derivative(Debug = "ignore")]
     pub(crate) cursor_formatter: Option<CursorRendererFn<D>>,
     #[derivative(Debug = "ignore")]
+    pub(crate) style_override: Option<StyleOverrideFn>,
+
+    #[derivative(Debug = "ignore")]
     label_policy: LabelPolicy<D>,
 }
 
@@ -89,7 +95,7 @@ impl<D: Float> Axis<D> {
         position: Position,
     ) -> Self {
         // Default tick renderer: major ticks get grid lines and long marks; minor ticks get short marks.
-        let tick_renderer = Rc::new(RefCell::new(|ctx: TickContext<D>| {
+        let tick_renderer = RefCell::new(Box::new(|ctx: TickContext<D>| {
             let mut result = TickResult::with_tick_line(TickLine {
                 length: match ctx.tick.level {
                     0 => 10.0,
@@ -118,6 +124,7 @@ impl<D: Float> Axis<D> {
             scale: Box::new(scale),
             tick_renderer: Some(tick_renderer),
             cursor_formatter: None,
+            style_override: None,
             label_policy: LabelPolicy::default(),
         }
     }
@@ -128,6 +135,17 @@ impl<D: Float> Axis<D> {
     /// Increase this if your labels are being clipped or overlapping with the chart area.
     pub fn with_thickness<P: Into<Pixels>>(mut self, thickness: P) -> Self {
         self.thickness = thickness.into();
+        self
+    }
+
+    /// Adds a function that overrides the default styling coming from chart.
+    ///
+    /// If you just want to set a general style for the chart in general, see [`crate::Chart`] instead.
+    pub fn style<F>(mut self, style_fn: F) -> Self
+    where
+        F: FnMut(&mut AxisStyle) + 'static,
+    {
+        self.style_override = Some(RefCell::new(Box::new(style_fn)));
         self
     }
 
@@ -149,7 +167,7 @@ impl<D: Float> Axis<D> {
     where
         F: FnMut(TickContext<D>) -> TickResult + 'static,
     {
-        self.tick_renderer = Some(Rc::new(RefCell::new(renderer)));
+        self.tick_renderer = Some(RefCell::new(Box::new(renderer)));
         self
     }
 
@@ -186,7 +204,7 @@ impl<D: Float> Axis<D> {
     where
         F: FnMut(D) -> Option<String> + 'static,
     {
-        self.cursor_formatter = Some(Rc::new(RefCell::new(renderer)));
+        self.cursor_formatter = Some(RefCell::new(Box::new(renderer)));
         self
     }
 
@@ -204,7 +222,7 @@ impl<D: Float> Axis<D> {
     where
         F: Fn(TickContext<D>) -> TickResult + 'static,
     {
-        self.tick_renderer = Some(Rc::new(RefCell::new(renderer)));
+        self.tick_renderer = Some(RefCell::new(Box::new(renderer)));
     }
 
     /// Sets the visibility of the axis.
@@ -450,6 +468,8 @@ impl<D: Float> Axis<D> {
                 theme,
             );
         }
+
+        self.draw_axis_spine(&theme.spine, &bounds, mesh_buffer);
     }
     /// Draws the interactive cursor badge and line.
     ///
@@ -835,7 +855,7 @@ impl<D: Float> Axis<D> {
     /// Renders a single grid line into the mesh buffer.
     fn draw_grid_line(
         &self,
-        style: &GridStyle,
+        style: &LineStyle,
         bounds: &Rectangle,
         line: GridLine,
         mesh_buffer: &mut MeshBuffer,
@@ -937,13 +957,51 @@ impl<D: Float> Axis<D> {
 
         prioritized
     }
-}
-struct PrioritizedTick<D> {
-    tick: aksel::Tick<D>,
-    /// 0.0 = Major Tick (Critical)
-    /// 1.0 = Center of Interval (High Priority)
-    /// 1.5 = Edge of Interval (Low Priority)
-    score: f32,
+
+    fn draw_axis_spine(&self, style: &LineStyle, bounds: &Rectangle, mesh_buffer: &mut MeshBuffer) {
+        let thickness = style.width.0;
+        let color = style.color;
+        let half_width = thickness / 2.0;
+
+        match self.position {
+            Position::Bottom => draw_horizontal_line(
+                mesh_buffer,
+                bounds.x,
+                bounds.x + bounds.width,
+                bounds.y - thickness + half_width,
+                thickness,
+                color,
+                false,
+            ),
+            Position::Top => draw_horizontal_line(
+                mesh_buffer,
+                bounds.x,
+                bounds.x + bounds.width,
+                bounds.y + bounds.height + thickness - half_width,
+                thickness,
+                color,
+                false,
+            ),
+            Position::Left => draw_vertical_line(
+                mesh_buffer,
+                bounds.x + bounds.width + thickness - half_width,
+                bounds.y,
+                bounds.y + bounds.height,
+                thickness,
+                color,
+                false,
+            ),
+            Position::Right => draw_vertical_line(
+                mesh_buffer,
+                bounds.x - thickness + half_width,
+                bounds.y,
+                bounds.y + bounds.height,
+                thickness,
+                color,
+                false,
+            ),
+        };
+    }
 }
 
 impl<D: Float> Deref for Axis<D> {

@@ -321,7 +321,6 @@ where
     ///
     /// The data will be plotted using the coordinate system defined by the two specified axes.
     /// Multiple layers can be added to a single chart, potentially using different axes.
-
     pub fn plot_data<T: plot::PlotData<Domain, Renderer, Theme>>(
         mut self,
         items: &'a T,
@@ -792,6 +791,10 @@ where
                 Position::Right => right_total += thickness,
             }
         }
+
+        println!(
+            "Top: {top_total} | Bot: {bottom_total} | Left: {left_total} | Right: {right_total}",
+        );
 
         // Pass 2: Calculate the remaining area for the actual chart
         let chart_height = (bounds.height - top_total - bottom_total).max(0.0);

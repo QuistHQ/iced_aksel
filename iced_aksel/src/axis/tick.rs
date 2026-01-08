@@ -176,6 +176,14 @@ pub struct PlacedLabelInfo<D> {
     pub bounds: LabelBounds,
 }
 
+pub(crate) struct PrioritizedTick<D> {
+    pub tick: aksel::Tick<D>,
+    /// 0.0 = Major Tick (Critical)
+    /// 1.0 = Center of Interval (High Priority)
+    /// 1.5 = Edge of Interval (Low Priority)
+    pub score: f32,
+}
+
 /// A decision on whether to render or skip a tick label.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LabelDecision {
