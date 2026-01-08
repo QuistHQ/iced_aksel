@@ -136,14 +136,13 @@ where
     /// Creates a new plot context.
     ///
     /// This is typically called internally by the Chart widget.
-    pub fn new(
+    pub const fn new(
         tessellators: &'a mut Tessellator,
         renderer: &'a mut R,
         clip_bounds: &'a iced_core::Rectangle,
         mesh_buffer: &'a mut MeshBuffer,
         transform: &'a Transform<'a, D, f32, f32>,
     ) -> Self {
-        renderer.start_layer(*clip_bounds);
         let context = Context {
             transform,
             clip_bounds,
@@ -193,41 +192,6 @@ where
     pub fn add_shape<S: Shape<D, R>>(&mut self, shape: S) {
         shape.render(&mut self.context)
     }
-
-    // OLD CODE: See Context now
-    // fn add_to_mesh(&mut self, shape: Shape<D>) {
-    //     shape.add_to_buffer(self.transform, self.tessellators, self.mesh_buffer);
-    //
-    //     if self.mesh_buffer.vertices_count() >= self.mesh_buffer.limit() {
-    //         self.mesh_buffer.render(self.renderer, self.bounds);
-    //         self.renderer.end_layer();
-    //         self.renderer.start_layer(*self.bounds);
-    //     }
-    // }
-    //
-    // fn render_text(&mut self, shape: Shape<D>) {
-    //     // --- CRITICAL FIX FOR Z-ORDERING ---
-    //     // This is an immediate-mode shape (like text).
-    //     // We MUST render all meshes that came before it *first*.
-    //
-    //     // 1. Render all meshes currently in the buffer.
-    //     self.mesh_buffer.render(self.renderer, self.bounds);
-    //
-    //     // 2. End the layer that contained those meshes.
-    //     self.renderer.end_layer();
-    //
-    //     // 3. Start a NEW layer just for this single immediate shape.
-    //     self.renderer.start_layer(*self.bounds);
-    //
-    //     // 4. Render the immediate shape (text, etc.).
-    //     shape.render(self.transform, self.renderer);
-    //
-    //     // 5. End the layer for the immediate shape.
-    //     self.renderer.end_layer();
-    //
-    //     // 6. Start another NEW layer for the *next* batch of meshes.
-    //     self.renderer.start_layer(*self.bounds);
-    // }
 }
 
 impl<'a, D, R> Drop for Plot<'a, D, R>
@@ -239,6 +203,5 @@ where
         self.context
             .mesh_buffer
             .render(self.context.renderer, self.context.clip_bounds);
-        self.context.renderer.end_layer()
     }
 }
