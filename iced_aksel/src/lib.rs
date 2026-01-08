@@ -241,9 +241,6 @@ pub struct Chart<
     drag_deadband: f32,
     padding: Padding,
 
-    // Axis neighbours [top, bottom, left, right]
-    axis_neighbours: [bool; 4],
-
     // Interaction Handlers
     on_error: Option<ErrorHandler<AxisId, Message>>,
 
@@ -287,7 +284,6 @@ where
             errors: vec![],
             drag_deadband: DEFAULT_DRAG_DEADBAND,
             padding: Padding::new(0.),
-            axis_neighbours: [false; 4],
 
             // Handlers default to None
             on_error: None,
@@ -789,28 +785,12 @@ where
         for (_, axis) in self.state.axes() {
             let thickness = axis.thickness().0;
             match axis.position() {
-                Position::Top => {
-                    top_total += thickness;
-                    self.axis_neighbours[0] = true;
-                }
-                Position::Bottom => {
-                    bottom_total += thickness;
-                    self.axis_neighbours[1] = true;
-                }
-                Position::Left => {
-                    left_total += thickness;
-                    self.axis_neighbours[2] = true;
-                }
-                Position::Right => {
-                    right_total += thickness;
-                    self.axis_neighbours[3] = true;
-                }
+                Position::Top => top_total += thickness,
+                Position::Bottom => bottom_total += thickness,
+                Position::Left => left_total += thickness,
+                Position::Right => right_total += thickness,
             }
         }
-
-        println!(
-            "Top: {top_total} | Bot: {bottom_total} | Left: {left_total} | Right: {right_total}",
-        );
 
         // Pass 2: Calculate the remaining area for the actual chart
         let chart_height = (bounds.height - top_total - bottom_total).max(0.0);
