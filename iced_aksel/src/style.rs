@@ -9,6 +9,8 @@ pub struct Style {
     pub axis: AxisStyle,
     /// Style of the grid lines.
     pub grid: LineStyle,
+    /// Style of the axis-spines (The line between an Axis and the Plot)
+    pub axis_spine: LineStyle,
 }
 
 /// Style of lines.
@@ -31,8 +33,6 @@ pub struct AxisStyle {
     pub ticks: TickStyle,
     /// Style of the cursor badge and line on the axis.
     pub cursor: AxisCursorStyle,
-    /// Style of the axis spine (The line that seperates the axis from the plot)
-    pub spine: LineStyle,
 }
 
 /// Style of axis ticks.
@@ -126,6 +126,10 @@ pub fn default(theme: &Theme) -> Style {
     let palette = theme.extended_palette();
 
     Style {
+        axis_spine: LineStyle {
+            color: palette.background.strong.color.inverse(),
+            width: 1.0.into(),
+        },
         grid: LineStyle {
             color: palette.background.strong.color,
             width: 1.0.into(),
@@ -158,10 +162,6 @@ pub fn default(theme: &Theme) -> Style {
                     },
                     shadow: Shadow::default(),
                 },
-            },
-            spine: LineStyle {
-                color: palette.background.strong.color.inverse(),
-                width: 10.0.into(),
             },
         },
     }
