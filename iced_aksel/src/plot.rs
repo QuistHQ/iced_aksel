@@ -4,7 +4,7 @@
 //! The main entry point is the [`PlotData`] trait, which you implement to draw your data.
 
 use crate::{
-    render::{MeshBuffer, Tessellator, text::Text},
+    render::{MeshBuffer, Tessellator},
     shape::Shape,
 };
 
@@ -97,6 +97,7 @@ pub struct Context<'a, D: Float, Renderer: self::Renderer = iced_renderer::Rende
 }
 
 impl<'a, D: Float, Renderer: self::Renderer> Context<'a, D, Renderer> {
+    /// Returns the default font of the underlying renderer
     #[inline(always)]
     pub fn default_font(&mut self) -> Font {
         self.renderer.default_font()

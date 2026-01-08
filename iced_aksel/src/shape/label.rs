@@ -1,11 +1,11 @@
 use crate::Quality;
-use crate::render::text::Text;
+use crate::render::Text;
 use crate::{Measure, Shape, plot};
 use aksel::{Float, PlotPoint};
 use iced_core::{
     Color, Font, Point, Size,
-    alignment::Vertical,
-    text::{Alignment, Wrapping},
+    alignment::{Horizontal, Vertical},
+    text::Wrapping,
 };
 use std::fmt::Debug;
 
@@ -63,7 +63,7 @@ pub struct Label<D> {
     pub position: PlotPoint<D>,
     pub size: Measure<D>,
     pub rotation: f32, // Radians
-    pub horizontal_alignment: Alignment,
+    pub horizontal_alignment: Horizontal,
     pub vertical_alignment: Vertical,
     pub fill: Color,
     pub quality: Quality,
@@ -87,18 +87,6 @@ impl<D: Float + Debug, R: plot::Renderer> Shape<D, R> for Label<D> {
 
             // 3. Resolve bounds
             let bounds = self.bounds.resolve(transform, &self.position);
-
-            // Debug rect to show bounds (Doesn't always match label bounds, because it doesn't
-            // care about alignment)
-            // tessellator.draw_rectangle::<D>(
-            //     mesh_buffer,
-            //     screen_position.x,
-            //     screen_position.y,
-            //     screen_position.x + bounds.width,
-            //     screen_position.y + bounds.height,
-            //     Some(Color::WHITE),
-            //     None,
-            // );
 
             // 4. Draw
             tessellator.draw_text(
@@ -132,7 +120,7 @@ impl<D: Float> Label<D> {
             position,
             size: Measure::Screen(12.0),
             rotation: 0.0,
-            horizontal_alignment: Alignment::Center,
+            horizontal_alignment: Horizontal::Left,
             vertical_alignment: Vertical::Center,
             fill: Color::BLACK,
             quality: Quality::default(), // Defaults to Medium
@@ -144,21 +132,27 @@ impl<D: Float> Label<D> {
         }
     }
 
+    /// Add bounds to the label - A label won't wrap, if no bounds are set
     pub const fn bounds(mut self, bounds: Bounds<D>) -> Self {
         self.bounds = bounds;
         self
     }
 
+    /// Set the font for the label - If not set, the default font of the renderer will be rendered
     pub const fn font(mut self, font: Font) -> Self {
         self.font = Some(font);
         self
     }
 
+    /// Set the font as an option (See [`Self::font`] for more info)
     pub const fn font_maybe(mut self, font: Option<Font>) -> Self {
-        self.font = font;
+        if font.is_some() {
+            self.font = font;
+        }
         self
     }
 
+    /// Set the wrapping behaviour of the label
     pub const fn wrapping(mut self, wrapping: Wrapping) -> Self {
         self.wrapping = wrapping;
         self
@@ -188,7 +182,7 @@ impl<D: Float> Label<D> {
     /// Sets the horizontal and vertical alignment relative to the position.
     pub fn align(
         mut self,
-        horizontal: impl Into<Alignment>,
+        horizontal: impl Into<Horizontal>,
         vertical: impl Into<Vertical>,
     ) -> Self {
         self.horizontal_alignment = horizontal.into();

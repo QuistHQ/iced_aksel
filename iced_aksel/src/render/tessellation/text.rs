@@ -9,19 +9,25 @@
 //! * **Dynamic LOD:** The engine automatically adjusts the triangle count based on the size of the text on screen.
 //! * **Memory Safety:** Uses an LRU (Least Recently Used) cache to prevent unbounded memory growth.
 
-use crate::render::MeshBuffer;
+use crate::render::{MeshBuffer, Text};
 use core::f32;
-use iced_core::{Color, Point, alignment::Vertical, text::Alignment};
+use iced_core::{
+    Color, Point,
+    alignment::{Horizontal, Vertical},
+};
 use iced_graphics::{
     color::pack,
-    text::cosmic_text::{
-        FontSystem,
-        fontdb::ID,
-        skrifa::{
-            FontRef, GlyphId16, MetadataProvider,
-            outline::{DrawSettings, OutlinePen},
-            prelude::{LocationRef, Size},
+    text::{
+        cosmic_text::{
+            Buffer, Metrics,
+            fontdb::ID,
+            skrifa::{
+                FontRef, GlyphId16, MetadataProvider,
+                outline::{DrawSettings, OutlinePen},
+                prelude::{LocationRef, Size},
+            },
         },
+        font_system,
     },
 };
 use iced_graphics::{mesh::SolidVertex2D, text::cosmic_text};
@@ -163,30 +169,12 @@ impl Default for TextTessellationCache {
 pub struct TextRenderContext<'a> {
     /// The final destination for the mesh data.
     pub mesh_buffer: &'a mut MeshBuffer,
-    /// Text buffer
-    pub text_buffer: cosmic_text::Buffer,
     /// The Lyon tessellator instance (reused to avoid allocation).
     pub tessellator: &'a mut FillTessellator,
     /// The LRU cache for glyph geometry.
     pub glyph_cache: &'a mut TextTessellationCache,
     /// A scratch buffer for intermediate tessellation results.
     pub scratch_geometry: &'a mut VertexBuffers<Point, u16>,
-}
-
-/// The specific properties for a single text draw call.
-///
-/// Contains all the "Read-Only" parameters describing *what* to draw.
-pub struct TextRequest<'a> {
-    pub content: &'a str,
-    pub position: Point,
-    /// Font size in screen pixels.
-    pub size: f32,
-    pub color: Color,
-    pub rotation: f32,
-    pub horizontal_alignment: Alignment,
-    pub vertical_alignment: Vertical,
-    /// The base quality setting (High/Medium/Low).
-    pub quality: Quality,
     /// A global multiplier for quality (e.g. from the Chart widget).
     pub quality_multiplier: f32,
 }
@@ -275,18 +263,31 @@ struct OwnedRun {
 ///
 /// This is the core function of the text-to-mesh engine. It performs layout,
 /// retrieves/generates glyph geometry, and flushes it to the mesh buffer.
-pub fn draw_geometric_text(
-    ctx: &mut TextRenderContext,
-    font_system: &mut FontSystem,
-    req: TextRequest,
-) {
-    if req.content.is_empty() || req.size <= 2.0 {
+pub fn draw_geometric_text(ctx: &mut TextRenderContext, req: Text) {
+    if req.content.is_empty() || req.size.0 <= 2.0 {
         return;
     }
 
+    let mut lock = font_system().write().expect("Failed to get font-system");
+    let font_system = lock.raw();
+    let mut text_buffer = Buffer::new(
+        font_system,
+        Metrics::new(req.size.into(), req.line_height.into()),
+    );
+
+    text_buffer.set_size(font_system, Some(req.bounds.width), Some(req.bounds.height));
+    text_buffer.set_wrap(font_system, iced_graphics::text::to_wrap(req.wrapping));
+    text_buffer.set_text(
+        font_system,
+        req.content,
+        &iced_graphics::text::to_attributes(req.font),
+        iced_graphics::text::to_shaping(iced_core::text::Shaping::Auto, req.content),
+        None,
+    );
+
     // --- Get layout runs ---
     let runs: Vec<OwnedRun> = {
-        let bw = ctx.text_buffer.borrow_with(font_system);
+        let bw = text_buffer.borrow_with(font_system);
         bw.layout_runs()
             .map(|run| OwnedRun {
                 line_y: run.line_y,
@@ -316,10 +317,10 @@ pub fn draw_geometric_text(
 
     // --- Decide pixel tolerance ---
     let base_error_px = req.quality.to_tolerance();
-    let desired_error_px = base_error_px / req.quality_multiplier.max(0.1);
+    let desired_error_px = base_error_px / ctx.quality_multiplier.max(0.1);
     let tess_tol_px = snap_to_bucket(desired_error_px);
     let tol_bucket_u16 = tol_bucket(tess_tol_px);
-    let size_bucket_u16 = size_bucket(req.size);
+    let size_bucket_u16 = size_bucket(req.size.0);
 
     let fill_options = FillOptions::default()
         .with_tolerance(tess_tol_px)
@@ -329,10 +330,9 @@ pub fn draw_geometric_text(
     for run in runs {
         // Horizontal offset
         let horizontal_offset = match req.horizontal_alignment {
-            Alignment::Left => 0.0,
-            Alignment::Center => -run.line_width / 2.0,
-            Alignment::Right => -run.line_width,
-            _ => todo!(),
+            Horizontal::Left => 0.0,
+            Horizontal::Center => -run.line_width / 2.0,
+            Horizontal::Right => -run.line_width,
         };
 
         for glyph in run.glyphs {
@@ -427,7 +427,7 @@ pub fn draw_geometric_text(
                     &cached.geometry,
                     req.position,
                     req.rotation,
-                    req.color,
+                    req.fill,
                     local_x,
                     local_y,
                 );
