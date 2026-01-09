@@ -322,7 +322,6 @@ pub fn draw_horizontal_dashed_line(
         (x_end, x_start)
     };
 
-    let total_len = end - start;
     let mut current_x = start;
 
     // Pre-calculate Y geometry to avoid doing it per dash
@@ -446,68 +445,4 @@ pub fn draw_vertical_dashed_line(
 
         current_y += dash_length + gap_length;
     }
-}
-
-/// Draws a filled rectangle (or square) defined by two corner points.
-#[inline]
-pub fn draw_rect(
-    buffer: &mut MeshBuffer,
-    p1: [f32; 2], // First corner (e.g., top-left)
-    p2: [f32; 2], // Second corner (e.g., bottom-right)
-    color: Color,
-    snap: bool,
-) {
-    let packed_color = pack(color);
-    let mesh = buffer.get_mesh_mut();
-    let start_index = mesh.vertices.len() as u32;
-
-    // 1. Calculate the bounds.
-    // We use min/max so it doesn't matter which order p1 and p2 are passed in.
-    let mut x_min = p1[0].min(p2[0]);
-    let mut x_max = p1[0].max(p2[0]);
-    let mut y_min = p1[1].min(p2[1]);
-    let mut y_max = p1[1].max(p2[1]);
-
-    // 2. Handle Snapping.
-    // Unlike the line function (which likely snaps the center),
-    // a box usually needs its edges snapped to the nearest integer grid.
-    if snap {
-        x_min = x_min.round();
-        x_max = x_max.round();
-        y_min = y_min.round();
-        y_max = y_max.round();
-    }
-
-    // 3. Push Vertices.
-    // We strictly follow the ordering of your line function:
-    // 0: Top-Left, 1: Bottom-Left, 2: Top-Right, 3: Bottom-Right
-    mesh.vertices.extend_from_slice(&[
-        SolidVertex2D {
-            position: [x_min, y_min],
-            color: packed_color,
-        }, // Top-Left (0)
-        SolidVertex2D {
-            position: [x_min, y_max],
-            color: packed_color,
-        }, // Bottom-Left (1)
-        SolidVertex2D {
-            position: [x_max, y_min],
-            color: packed_color,
-        }, // Top-Right (2)
-        SolidVertex2D {
-            position: [x_max, y_max],
-            color: packed_color,
-        }, // Bottom-Right (3)
-    ]);
-
-    // 4. Push Indices.
-    // Matches the winding order of your line function (0-1-2, 1-3-2).
-    mesh.indices.extend_from_slice(&[
-        start_index,
-        start_index + 1,
-        start_index + 2,
-        start_index + 1,
-        start_index + 3,
-        start_index + 2,
-    ]);
 }

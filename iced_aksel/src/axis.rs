@@ -24,7 +24,7 @@ use iced_graphics::{color, mesh::SolidVertex2D};
 
 use crate::{
     plot,
-    render::{MeshBuffer, tessellation::manual::linear::draw_rect},
+    render::MeshBuffer,
     style::{AxisStyle, LineStyle, Style, TextStyle, TickStyle},
 };
 
@@ -322,7 +322,6 @@ impl<D: Float> Axis<D> {
         let full_bounds = plot_bounds.union(&bounds);
         let orientation = Orientation::from(self.position());
         let (&d_min, &d_max) = self.scale.domain();
-        let spine_offset = style.axis_spine.width.0;
 
         // 1. Calculate Cursor State (if active)
         let cursor_state = if self.render_cursor
@@ -433,14 +432,7 @@ impl<D: Float> Axis<D> {
 
             // Draw Tick Marks (Axis style + local config)
             if let Some(line) = tick_line {
-                self.draw_tick_line(
-                    &theme.ticks,
-                    line,
-                    &bounds,
-                    mesh_buffer,
-                    pos_norm,
-                    spine_offset,
-                );
+                self.draw_tick_line(&theme.ticks, line, &bounds, mesh_buffer, pos_norm);
             }
         }
 
@@ -459,7 +451,6 @@ impl<D: Float> Axis<D> {
             label_candidates,
             candidate_max_size,
             viewport,
-            spine_offset,
         );
 
         // 4. Draw Cursor Overlay
@@ -472,11 +463,8 @@ impl<D: Float> Axis<D> {
                 viewport,
                 orientation,
                 theme,
-                spine_offset,
             );
         }
-
-        self.draw_axis_spine(&style.axis_spine, &bounds, mesh_buffer);
     }
 
     /// Draws the interactive cursor badge and line.
@@ -493,12 +481,10 @@ impl<D: Float> Axis<D> {
         viewport: &Rectangle,
         orientation: Orientation,
         theme: AxisStyle,
-        spine_offset: f32,
     ) where
         Renderer: plot::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
     {
-        let rail_pos =
-            self.calculate_rail_position(&bounds, orientation, theme.text_offset.0 + spine_offset);
+        let rail_pos = self.calculate_rail_position(&bounds, orientation, theme.text_offset.0);
         let min_bounds = paragraph.min_bounds();
         let padding = theme.cursor.badge.padding;
         let badge_width = min_bounds.width + padding.left + padding.right;
@@ -653,7 +639,6 @@ impl<D: Float> Axis<D> {
         label_candidates: Vec<LabelCandidate<D>>,
         candidate_size: Size,
         viewport: &Rectangle,
-        spine_offset: f32,
     ) where
         Renderer: plot::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
     {
@@ -666,7 +651,7 @@ impl<D: Float> Axis<D> {
                 bounds,
                 orientation,
                 &theme.label,
-                theme.text_offset.0 + spine_offset,
+                theme.text_offset.0,
             ) else {
                 continue;
             };
@@ -809,42 +794,31 @@ impl<D: Float> Axis<D> {
         bounds: &Rectangle,
         mesh_buffer: &mut MeshBuffer,
         pos_norm: f32,
-        spine_offset: f32,
     ) {
         let (x0, y0, x1, y1) = match self.position {
             Position::Bottom => {
                 let x = bounds.width.mul_add(pos_norm, bounds.x).round();
-                (
-                    x,
-                    bounds.y + spine_offset,
-                    x + line.thickness.0,
-                    bounds.y + line.length.0 + spine_offset,
-                )
+                (x, bounds.y, x + line.thickness.0, bounds.y + line.length.0)
             }
             Position::Top => {
                 let x = bounds.width.mul_add(pos_norm, bounds.x).round();
                 (
                     x,
-                    bounds.y + bounds.height - line.length.0 - spine_offset,
+                    bounds.y + bounds.height - line.length.0,
                     x + line.thickness.0,
-                    bounds.y + bounds.height - spine_offset,
+                    bounds.y + bounds.height,
                 )
             }
             Position::Right => {
                 let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y).round();
-                (
-                    bounds.x + spine_offset,
-                    y,
-                    bounds.x + line.length.0 + spine_offset,
-                    y + line.thickness.0,
-                )
+                (bounds.x, y, bounds.x + line.length.0, y + line.thickness.0)
             }
             Position::Left => {
                 let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y).round();
                 (
-                    bounds.x + bounds.width - line.length.0 - spine_offset,
+                    bounds.x + bounds.width - line.length.0,
                     y,
-                    bounds.x + bounds.width - spine_offset,
+                    bounds.x + bounds.width,
                     y + line.thickness.0,
                 )
             }
@@ -978,49 +952,6 @@ impl<D: Float> Axis<D> {
         });
 
         prioritized
-    }
-
-    fn draw_axis_spine(&self, style: &LineStyle, bounds: &Rectangle, mesh_buffer: &mut MeshBuffer) {
-        let thickness = style.width.0;
-        let color = style.color;
-
-        let Rectangle {
-            x,
-            y,
-            width,
-            height,
-        } = *dbg!(bounds);
-
-        match self.position {
-            Position::Bottom => draw_rect(
-                mesh_buffer,
-                [x, y],
-                [x + width, y + thickness],
-                color,
-                false,
-            ),
-            Position::Top => draw_rect(
-                mesh_buffer,
-                [x, y + height],
-                [x + width, y + height - thickness],
-                color,
-                false,
-            ),
-            Position::Left => draw_rect(
-                mesh_buffer,
-                [x + width, y],
-                [x + width - thickness, y + height],
-                color,
-                false,
-            ),
-            Position::Right => draw_rect(
-                mesh_buffer,
-                [x, y],
-                [x + thickness, y + height],
-                color,
-                false,
-            ),
-        };
     }
 }
 
