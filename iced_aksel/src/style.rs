@@ -1,6 +1,5 @@
 use iced_core::text::LineHeight;
-use iced_core::widget::text::Shaping;
-use iced_core::{Border, Color, Font, Padding, Pixels, Shadow, Theme};
+use iced_core::{Border, Color, Padding, Pixels, Shadow, Theme};
 
 /// Global style of a `Chart`.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -37,28 +36,34 @@ pub struct AxisStyle {
     pub label: LabelStyle,
     /// Style of the ticks (lines).
     pub tick: TickLineStyle,
-    /// Style of the cursor badge and line on the axis.
-    pub cursor: AxisCursorStyle,
+    /// Style of the marker badge and line on the axis.
+    pub marker: MarkerStyle,
     /// Style of the grid lines.
     pub grid: GridLineStyle,
 }
 
-/// Style of a `Chart`'s interactive axis cursor.
+/// Style of a `Chart`'s interactive axis marker.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct AxisCursorStyle {
-    /// Color of the cursor line.
-    pub color: Color,
-    /// Width of the cursor line.
-    pub width: Pixels,
-    /// Distance between the end of the cursor line and the start of the badge.
-    pub line_gap: Pixels,
+pub struct MarkerStyle {
+    pub line: MarkerLineStyle,
     /// Style of the label inside the badge.
     pub label: LabelStyle,
     /// Style of the badge container (background, border, shadow).
     pub badge: BadgeStyle,
 }
 
-/// Style of the badge container for the axis cursor.
+/// Style of the marker line above the badge
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MarkerLineStyle {
+    /// Color of the marker line.
+    pub color: Color,
+    /// Width of the marker line.
+    pub width: Pixels,
+    /// Distance between the end of the marker line and the start of the badge.
+    pub gap: Pixels,
+}
+
+/// Style of the badge container for the axis marker.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BadgeStyle {
     /// Background color of the badge.
@@ -134,10 +139,12 @@ pub fn default(theme: &Theme) -> Style {
                 color: palette.background.strong.color,
                 width: 1.0.into(),
             },
-            cursor: AxisCursorStyle {
-                color: palette.primary.base.color,
-                width: 1.0.into(),
-                line_gap: 4.0.into(),
+            marker: MarkerStyle {
+                line: MarkerLineStyle {
+                    color: palette.primary.base.color,
+                    width: 1.0.into(),
+                    gap: 4.0.into(),
+                },
                 label: LabelStyle {
                     color: palette.primary.strong.text,
                     ..Default::default()

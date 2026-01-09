@@ -9,7 +9,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use aksel::{Float, Scale, Tick};
+use aksel::{Float, Scale};
 use derivative::Derivative;
 use iced_core::{
     Layout, Pixels, Point, Rectangle, Size, Text,
@@ -25,126 +25,23 @@ use iced_graphics::{color, mesh::SolidVertex2D};
 use crate::{
     plot,
     render::MeshBuffer,
-    style::{AxisStyle, LineStyle, Style, TextStyle, TickStyle},
+    style::{AxisStyle, Style},
 };
 
 mod grid;
 mod label;
+mod marker;
 mod position;
 mod tick;
 
 pub use grid::*;
 pub use label::*;
+pub use marker::*;
 pub use position::*;
 pub use tick::*;
 
-/// Context provided to tick renderer functions.
-///
-/// Contains all the information needed to make decisions about how to render a tick.
-#[derive(Debug, Clone, Copy)]
-pub struct TickContext<'a, D> {
-    /// The tick value and metadata from the scale.
-    pub tick: Tick<D>,
-    /// Normalized position (0.0-1.0) along the axis.
-    pub normalized_position: f32,
-    /// The bounds of the axis in screen coordinates.
-    pub axis_bounds: &'a Rectangle,
-    /// The domain (min, max) of the scale.
-    pub scale_domain: (D, D),
-    /// The orientation of the axis (horizontal or vertical).
-    pub orientation: &'a Orientation,
-
-    /// The default styling for this context
-    style: &'a AxisStyle,
-}
-
-impl<D: Float> TickContext<'_, D> {
-    /// Returns the total span of the axis in screen pixels.
-    pub const fn axis_span(&self) -> f32 {
-        match self.orientation {
-            Orientation::Horizontal => self.axis_bounds.width,
-            Orientation::Vertical => self.axis_bounds.height,
-        }
-    }
-
-    /// Returns the total span of the scale's domain in data units.
-    pub fn scale_span(&self) -> D {
-        let (min, max) = self.scale_domain;
-        min.abs_sub(max)
-    }
-
-    /// Creates a new [`TickLine`] with applied styling. Only one [`TickLine`] can be returned in the
-    /// [`TickResult`]
-    pub fn tickline(&self) -> TickLine {
-        TickLine::from(self.style.tick)
-    }
-
-    /// Creates a new [`GridLine`] with applied styling. Only one [`GridLine`] can be returned in the
-    /// [`TickResult`]
-    pub fn gridline(&self) -> GridLine {
-        GridLine::from(self.style.grid)
-    }
-
-    /// Creates a new [`Label`] with applied styling and supplied content. Only one [`Label`] can be returned in the
-    /// [`TickResult`]
-    pub fn label(&self, content: impl std::fmt::Display) -> Label {
-        Label {
-            size: self.style.label.size,
-            content: content.to_string(),
-            padding: self.style.label.padding,
-            font: None,
-            line_height: self.style.label.line_height,
-        }
-    }
-
-    /// Creates a new [`Label`] with applied styling. Only one [`Label`] can be returned in the
-    /// [`TickResult`]
-    pub fn label_empty(&self) -> Label {
-        Label {
-            size: self.style.label.size,
-            content: "".to_string(),
-            padding: self.style.label.padding,
-            font: None,
-            line_height: self.style.label.line_height,
-        }
-    }
-}
-
-/// The result returned from a tick renderer function.
-///
-/// This struct specifies exactly what should be rendered for a specific tick mark.
-/// It effectively decouples the tick logic from the rendering logic, allowing
-/// for highly customizable axes.
-///
-/// # Example
-///
-/// ```rust
-/// use iced_aksel::axis::{TickResult, TickLine};
-///
-/// // Create a tick that has a label and a short line
-/// let result = TickResult::with_label("100")
-///     .tick_line(TickLine::default());
-/// ```
-#[derive(Default)]
-pub struct TickResult {
-    /// Optional tick line mark on the axis.
-    pub tick_line: Option<TickLine>,
-    /// Optional grid line extending into the plot area.
-    pub grid_line: Option<GridLine>,
-    /// Optional text label for this tick.
-    pub label: Option<String>,
-    /// Optional label rendering-priority (lower is higher priority).
-    pub label_priority: Option<u8>,
-}
-
-impl TickResult {
-    pub fn empty() -> Self {
-        Self::default()
-    }
-}
-
 type TickRendererFn<D> = RefCell<Box<dyn FnMut(TickContext<D>) -> TickResult>>;
-type CursorRendererFn<D> = RefCell<Box<dyn FnMut(D) -> Option<String>>>;
+type CursorRendererFn<D> = RefCell<Box<dyn FnMut(D) -> Option<Marker>>>;
 type StyleOverrideFn = RefCell<Box<dyn FnMut(&mut AxisStyle)>>;
 
 /// An axis that maps data values to screen coordinates.
@@ -152,7 +49,7 @@ type StyleOverrideFn = RefCell<Box<dyn FnMut(&mut AxisStyle)>>;
 /// The `Axis` struct is responsible for:
 /// 1. Defining the scale (linear, log, etc.) for mapping data to pixels.
 /// 2. Configuring visual elements like ticks, grid lines, and labels.
-/// 3. Handling layout and rendering of the axis and its interactive cursor.
+/// 3. Handling layout and rendering of the axis and its interactive marker.
 ///
 /// # Example
 ///
@@ -161,7 +58,7 @@ type StyleOverrideFn = RefCell<Box<dyn FnMut(&mut AxisStyle)>>;
 ///
 /// let axis = Axis::new(Linear::new(0.0, 100.0), Position::Bottom)
 ///     .with_thickness(40.0)
-///     .with_cursor_formatter(|val| Some(format!("{:.1}", val)));
+///     .with_marker_formatter(|val| Some(format!("{:.1}", val)));
 /// ```
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -169,17 +66,17 @@ pub struct Axis<D> {
     position: Position,
     thickness: Pixels,
     invisible: bool,
-    render_cursor: bool,
+    render_marker: bool,
     render_grid: bool,
 
     #[derivative(Debug = "ignore")]
     scale: Box<dyn Scale<Domain = D, Normalized = f32>>,
     #[derivative(Debug = "ignore")]
-    pub(crate) tick_renderer: Option<TickRendererFn<D>>,
+    tick_renderer: Option<TickRendererFn<D>>,
     #[derivative(Debug = "ignore")]
-    pub(crate) cursor_formatter: Option<CursorRendererFn<D>>,
+    marker_formatter: Option<CursorRendererFn<D>>,
     #[derivative(Debug = "ignore")]
-    pub(crate) style_override: Option<StyleOverrideFn>,
+    style_override: Option<StyleOverrideFn>,
 
     #[derivative(Debug = "ignore")]
     label_policy: LabelPolicy<D>,
@@ -220,13 +117,13 @@ impl<D: Float> Axis<D> {
         Self {
             position,
             thickness: 50.0.into(),
-            render_cursor: true,
+            render_marker: true,
             render_grid: true,
             invisible: false,
 
             scale: Box::new(scale),
             tick_renderer: Some(tick_renderer),
-            cursor_formatter: None,
+            marker_formatter: None,
             style_override: None,
             label_policy: LabelPolicy::default(),
         }
@@ -299,15 +196,15 @@ impl<D: Float> Axis<D> {
         self
     }
 
-    /// Sets the formatter for the interactive cursor badge.
+    /// Sets the formatter for the interactive marker badge.
     ///
-    /// If not set, the cursor badge will not be rendered.
-    /// The closure receives the data value at the cursor position and returns the string to display.
-    pub fn with_cursor_formatter<F>(mut self, renderer: F) -> Self
+    /// If not set, the marker badge will not be rendered.
+    /// The closure receives the data value at the marker position and returns the string to display.
+    pub fn with_marker_formatter<F>(mut self, renderer: F) -> Self
     where
-        F: FnMut(D) -> Option<String> + 'static,
+        F: FnMut(D) -> Option<Marker> + 'static,
     {
-        self.cursor_formatter = Some(RefCell::new(Box::new(renderer)));
+        self.marker_formatter = Some(RefCell::new(Box::new(renderer)));
         self
     }
 
@@ -405,7 +302,7 @@ impl<D: Float> Axis<D> {
         Node::new(size)
     }
 
-    /// Draws the axis, including ticks, grid lines, labels, and the interactive cursor.
+    /// Draws the axis, including ticks, grid lines, labels, and the interactive marker.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn draw<Renderer>(
         &self,
@@ -429,43 +326,6 @@ impl<D: Float> Axis<D> {
         let orientation = Orientation::from(self.position());
         let (&d_min, &d_max) = self.scale.domain();
 
-        // 1. Calculate Cursor State (if active)
-        let cursor_state = if self.render_cursor
-            && let Some(cursor_pos) = cursor.position_over(full_bounds)
-            && let Some(cursor_renderer) = &self.cursor_formatter
-        {
-            let value_to_render = match orientation {
-                Orientation::Horizontal => (cursor_pos.x - plot_bounds.x) / plot_bounds.width,
-                Orientation::Vertical => {
-                    1.0 - ((cursor_pos.y - plot_bounds.y) / plot_bounds.height)
-                }
-            };
-
-            self.denormalize_opt(value_to_render)
-                .and_then(|val| cursor_renderer.borrow_mut()(val))
-                .map(|content| {
-                    let paragraph = Plain::<Renderer::Paragraph>::new(Text {
-                        content,
-                        bounds: bounds.size(),
-                        size: theme.cursor.label.size,
-                        line_height: theme.cursor.label.line_height,
-                        font: theme
-                            .cursor
-                            .label
-                            .font
-                            .unwrap_or_else(|| renderer.default_font()),
-                        align_x: Alignment::Left,
-                        align_y: Vertical::Top,
-                        shaping: theme.cursor.text.shaping,
-                        wrapping: Wrapping::None,
-                    });
-
-                    (cursor_pos, paragraph)
-                })
-        } else {
-            None
-        };
-
         // --- Prioritize Ticks (Center-Out) ---
 
         let prioritized_ticks = self.collect_prioritized_ticks();
@@ -482,9 +342,10 @@ impl<D: Float> Axis<D> {
                 renderer.borrow_mut()(TickContext {
                     tick,
                     normalized_position: pos_norm,
-                    axis_bounds: bounds,
+                    axis_bounds: &bounds,
                     scale_domain: (d_max, d_min),
-                    orientation,
+                    orientation: &orientation,
+                    style: &style.axis,
                 })
             });
 
@@ -502,7 +363,7 @@ impl<D: Float> Axis<D> {
             if self.render_grid
                 && let Some(line) = grid_line
             {
-                self.draw_grid_line(&style.grid, plot_bounds, line, mesh_buffer, pos_norm);
+                self.draw_grid_line(line, plot_bounds, mesh_buffer, pos_norm);
             }
 
             if self.invisible {
@@ -521,14 +382,14 @@ impl<D: Float> Axis<D> {
                 // 3.1 Run all candidates, find the biggest label as source of truth for all label sizes
                 // Make a paragraph for sizing
                 let paragraph: Plain<Renderer::Paragraph> = Plain::new(Text {
-                    content: label,
+                    content: label.content,
                     bounds: bounds.size(),
-                    size: style.axis.label.size,
-                    line_height: style.axis.label.line_height,
-                    font: style.axis.label.font,
+                    size: label.size,
+                    line_height: label.line_height,
+                    font: label.font.unwrap_or_else(|| renderer.default_font()),
                     align_x: Alignment::Left,
                     align_y: Vertical::Top,
-                    shaping: style.axis.label.shaping,
+                    shaping: iced_core::text::Shaping::Auto,
                     wrapping: Wrapping::None,
                 });
 
@@ -542,7 +403,7 @@ impl<D: Float> Axis<D> {
 
             // Draw Tick Marks (Axis style + local config)
             if let Some(line) = tick_line {
-                self.draw_tick_line(&theme.ticks, line, &bounds, mesh_buffer, pos_norm);
+                self.draw_tick_line(line, &bounds, mesh_buffer, pos_norm);
             }
         }
 
@@ -562,30 +423,52 @@ impl<D: Float> Axis<D> {
             viewport,
         );
 
-        // 4. Draw Cursor Overlay
-        if let Some((cursor_pos, paragraph)) = cursor_state {
-            self.draw_cursor_overlay(
-                renderer,
-                cursor_pos,
-                paragraph,
-                bounds,
-                viewport,
-                orientation,
-                theme,
-            );
-        }
+        // Make sure everything is available for drawing the marker
+        if !self.render_marker {
+            return;
+        };
+
+        let Some(cursor_pos) = cursor.position_over(full_bounds) else {
+            return;
+        };
+
+        let Some(marker_renderer) = &self.marker_formatter else {
+            return;
+        };
+
+        let value_to_render = match orientation {
+            Orientation::Horizontal => (cursor_pos.x - plot_bounds.x) / plot_bounds.width,
+            Orientation::Vertical => 1.0 - ((cursor_pos.y - plot_bounds.y) / plot_bounds.height),
+        };
+
+        let Some(marker) = self
+            .denormalize_opt(value_to_render)
+            .and_then(|val| marker_renderer.borrow_mut()(val))
+        else {
+            return;
+        };
+
+        self.draw_marker_overlay(
+            renderer,
+            cursor_pos,
+            marker,
+            bounds,
+            viewport,
+            orientation,
+            theme,
+        );
     }
 
-    /// Draws the interactive cursor badge and line.
+    /// Draws the interactive marker badge and line.
     ///
     /// This method ensures the badge stays within the viewport even if the mouse
     /// is at the extreme edges of the axis, preventing clipping.
     #[allow(clippy::too_many_arguments)]
-    fn draw_cursor_overlay<Renderer>(
+    fn draw_marker_overlay<Renderer>(
         &self,
         renderer: &mut Renderer,
-        cursor_pos: Point,
-        paragraph: Plain<Renderer::Paragraph>,
+        pos: Point,
+        marker: Marker,
         bounds: Rectangle,
         viewport: &Rectangle,
         orientation: Orientation,
@@ -593,16 +476,28 @@ impl<D: Float> Axis<D> {
     ) where
         Renderer: plot::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
     {
+        let paragraph = Plain::<Renderer::Paragraph>::new(Text {
+            content: marker.label.content,
+            bounds: bounds.size(),
+            size: theme.marker.label.size,
+            line_height: theme.marker.label.line_height,
+            font: marker.label.font.unwrap_or_else(|| renderer.default_font()),
+            align_x: Alignment::Left,
+            align_y: Vertical::Top,
+            shaping: iced_core::text::Shaping::Auto,
+            wrapping: Wrapping::None,
+        });
+
         let rail_pos = self.calculate_rail_position(&bounds, orientation, theme.text_offset.0);
         let min_bounds = paragraph.min_bounds();
-        let padding = theme.cursor.badge.padding;
+        let padding = theme.marker.label.padding;
         let badge_width = min_bounds.width + padding.left + padding.right;
         let badge_height = min_bounds.height + padding.top + padding.bottom;
 
         // Calculate initial badge position
         let mut badge_rect = match orientation {
             Orientation::Horizontal => {
-                let x = cursor_pos.x - (badge_width / 2.0);
+                let x = pos.x - (badge_width / 2.0);
                 let y = match self.position {
                     Position::Top => rail_pos - padding.bottom - min_bounds.height - padding.top,
                     _ => rail_pos,
@@ -610,7 +505,7 @@ impl<D: Float> Axis<D> {
                 Rectangle::new(Point::new(x, y), Size::new(badge_width, badge_height))
             }
             Orientation::Vertical => {
-                let y = cursor_pos.y - (badge_height / 2.0);
+                let y = pos.y - (badge_height / 2.0);
                 let x = match self.position {
                     Position::Right => rail_pos,
                     _ => rail_pos - badge_width, // badge_width already includes all padding
@@ -639,11 +534,11 @@ impl<D: Float> Axis<D> {
             }
         }
 
-        let gap = theme.cursor.line_gap.0;
-        let line_width = theme.cursor.width.0;
+        let gap = theme.marker.line.gap.0;
+        let line_width = theme.marker.line.width.0;
 
-        // Calculate cursor line position (respecting the gap)
-        let cursor_line_rect = match orientation {
+        // Calculate marker line position (respecting the gap)
+        let marker_line_rect = match orientation {
             Orientation::Horizontal => {
                 let (y_start, y_end) = match self.position {
                     Position::Top => {
@@ -659,7 +554,7 @@ impl<D: Float> Axis<D> {
                 };
 
                 Rectangle {
-                    x: cursor_pos.x - (line_width / 2.0),
+                    x: pos.x - (line_width / 2.0),
                     y: y_start.min(y_end),
                     width: line_width,
                     height: (y_end - y_start).abs(),
@@ -681,7 +576,7 @@ impl<D: Float> Axis<D> {
 
                 Rectangle {
                     x: x_start.min(x_end),
-                    y: cursor_pos.y - (line_width / 2.0),
+                    y: pos.y - (line_width / 2.0),
                     width: (x_end - x_start).abs(),
                     height: line_width,
                 }
@@ -693,20 +588,20 @@ impl<D: Float> Axis<D> {
 
         renderer.fill_quad(
             Quad {
-                bounds: cursor_line_rect,
+                bounds: marker_line_rect,
                 ..Default::default()
             },
-            theme.cursor.color,
+            theme.marker.badge.background,
         );
 
         renderer.fill_quad(
             Quad {
                 bounds: badge_rect,
-                border: theme.cursor.badge.border,
-                shadow: theme.cursor.badge.shadow,
+                border: theme.marker.badge.border,
+                shadow: theme.marker.badge.shadow,
                 ..Default::default()
             },
-            theme.cursor.badge.background,
+            theme.marker.badge.background,
         );
 
         let text_pos = Point::new(badge_rect.x + padding.left, badge_rect.y + padding.top);
@@ -716,7 +611,7 @@ impl<D: Float> Axis<D> {
                 .as_text()
                 .with_content(paragraph.content().to_string()),
             text_pos,
-            theme.cursor.text.color,
+            theme.marker.label.color,
             *viewport,
         );
 
@@ -755,9 +650,9 @@ impl<D: Float> Axis<D> {
         for candidate in label_candidates {
             let Some(resolved) = self.resolve_label_candidate(
                 candidate,
+                renderer,
                 bounds,
                 orientation,
-                &theme.label,
                 theme.text_offset.0,
             ) else {
                 continue;
@@ -802,16 +697,16 @@ impl<D: Float> Axis<D> {
     fn resolve_label_candidate<Renderer>(
         &self,
         candidate: LabelCandidate<D>,
+        renderer: &mut Renderer,
         bounds: &Rectangle,
         orientation: Orientation,
-        text_style: &TextStyle,
         offset: f32,
     ) -> Option<ResolvedLabelCandidate<Renderer, D>>
     where
         Renderer: iced_core::text::Renderer<Font = iced_core::Font>,
     {
-        let label_content = candidate.label;
-        if label_content.is_empty() {
+        let label = candidate.label;
+        if label.content.is_empty() {
             return None;
         }
 
@@ -820,14 +715,14 @@ impl<D: Float> Axis<D> {
         }
 
         let paragraph = Plain::new(Text {
-            content: label_content,
+            content: label.content,
             bounds: bounds.size(),
-            size: text_style.size,
-            line_height: text_style.line_height,
-            font: text_style.font,
+            size: label.size,
+            line_height: label.line_height,
+            font: label.font.unwrap_or(renderer.default_font()),
             align_x: Alignment::Left,
             align_y: Vertical::Top,
-            shaping: text_style.shaping,
+            shaping: iced_core::text::Shaping::Auto,
             wrapping: Wrapping::None,
         });
 
@@ -895,7 +790,6 @@ impl<D: Float> Axis<D> {
     /// Renders a single tick mark into the mesh buffer.
     fn draw_tick_line(
         &self,
-        style: &TickStyle,
         line: TickLine,
         bounds: &Rectangle,
         mesh_buffer: &mut MeshBuffer,
@@ -904,20 +798,20 @@ impl<D: Float> Axis<D> {
         let (x0, y0, x1, y1) = match self.position {
             Position::Bottom => {
                 let x = bounds.width.mul_add(pos_norm, bounds.x).round();
-                (x, bounds.y, x + line.thickness.0, bounds.y + line.length.0)
+                (x, bounds.y, x + line.width.0, bounds.y + line.length.0)
             }
             Position::Top => {
                 let x = bounds.width.mul_add(pos_norm, bounds.x).round();
                 (
                     x,
                     bounds.y + bounds.height - line.length.0,
-                    x + line.thickness.0,
+                    x + line.width.0,
                     bounds.y + bounds.height,
                 )
             }
             Position::Right => {
                 let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y).round();
-                (bounds.x, y, bounds.x + line.length.0, y + line.thickness.0)
+                (bounds.x, y, bounds.x + line.length.0, y + line.width.0)
             }
             Position::Left => {
                 let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y).round();
@@ -925,12 +819,12 @@ impl<D: Float> Axis<D> {
                     bounds.x + bounds.width - line.length.0,
                     y,
                     bounds.x + bounds.width,
-                    y + line.thickness.0,
+                    y + line.width.0,
                 )
             }
         };
 
-        let color = color::pack(style.color);
+        let color = color::pack(line.color);
         mesh_buffer.add(
             &[0, 1, 2, 2, 1, 3],
             &[
@@ -957,9 +851,8 @@ impl<D: Float> Axis<D> {
     /// Renders a single grid line into the mesh buffer.
     fn draw_grid_line(
         &self,
-        style: &LineStyle,
-        bounds: &Rectangle,
         line: GridLine,
+        bounds: &Rectangle,
         mesh_buffer: &mut MeshBuffer,
         pos_norm: f32,
     ) {
@@ -967,15 +860,15 @@ impl<D: Float> Axis<D> {
         let (x0, y0, x1, y1) = match orientation {
             Orientation::Horizontal => {
                 let x = bounds.width.mul_add(pos_norm, bounds.x).round();
-                (x, bounds.y, x + line.thickness.0, bounds.y + bounds.height)
+                (x, bounds.y, x + line.width.0, bounds.y + bounds.height)
             }
             Orientation::Vertical => {
                 let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y).round();
-                (bounds.x, y, bounds.x + bounds.width, y + line.thickness.0)
+                (bounds.x, y, bounds.x + bounds.width, y + line.width.0)
             }
         };
 
-        let packed = color::pack(style.color);
+        let packed = color::pack(line.color);
         mesh_buffer.add(
             &[0, 1, 2, 2, 1, 3],
             &[

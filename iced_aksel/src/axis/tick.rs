@@ -1,13 +1,105 @@
-use crate::style::TickLineStyle;
+use crate::style::{AxisStyle, TickLineStyle};
 
 use super::{Orientation, label::LabelBounds};
 
-use aksel::Tick;
+use aksel::{Float, Tick};
 use derivative::Derivative;
 use iced_core::{
-    Color, Pixels, Point,
+    Color, Pixels, Point, Rectangle,
     text::{self, paragraph::Plain},
 };
+
+/// The result returned from a tick renderer function.
+///
+/// This struct specifies exactly what should be rendered for a specific tick mark.
+/// It effectively decouples the tick logic from the rendering logic, allowing
+/// for highly customizable axes.
+///
+/// # Example
+///
+/// ```rust
+/// use iced_aksel::axis::{TickResult, TickLine};
+///
+/// // Create a tick that has a label and a short line
+/// let result = TickResult::with_label("100")
+///     .tick_line(TickLine::default());
+/// ```
+#[derive(Default)]
+pub struct TickResult {
+    /// Optional tick line mark on the axis.
+    pub tick_line: Option<TickLine>,
+    /// Optional grid line extending into the plot area.
+    pub grid_line: Option<super::GridLine>,
+    /// Optional text label for this tick.
+    pub label: Option<super::Label>,
+    /// Optional label rendering-priority (lower is higher priority).
+    pub label_priority: Option<u8>,
+}
+
+impl TickResult {
+    pub fn empty() -> Self {
+        Self::default()
+    }
+}
+
+/// Context provided to tick renderer functions.
+///
+/// Contains all the information needed to make decisions about how to render a tick.
+#[derive(Debug, Clone, Copy)]
+pub struct TickContext<'a, D> {
+    /// The tick value and metadata from the scale.
+    pub tick: Tick<D>,
+    /// Normalized position (0.0-1.0) along the axis.
+    pub normalized_position: f32,
+    /// The bounds of the axis in screen coordinates.
+    pub axis_bounds: &'a Rectangle,
+    /// The domain (min, max) of the scale.
+    pub scale_domain: (D, D),
+    /// The orientation of the axis (horizontal or vertical).
+    pub orientation: &'a Orientation,
+    /// The default styling for this context
+    pub style: &'a AxisStyle,
+}
+
+impl<D: Float> TickContext<'_, D> {
+    /// Returns the total span of the axis in screen pixels.
+    pub const fn axis_span(&self) -> f32 {
+        match self.orientation {
+            Orientation::Horizontal => self.axis_bounds.width,
+            Orientation::Vertical => self.axis_bounds.height,
+        }
+    }
+
+    /// Returns the total span of the scale's domain in data units.
+    pub fn scale_span(&self) -> D {
+        let (min, max) = self.scale_domain;
+        min.abs_sub(max)
+    }
+
+    /// Creates a new [`TickLine`] with applied styling. Only one [`TickLine`] can be returned in the
+    /// [`TickResult`]
+    pub fn tickline(&self) -> TickLine {
+        TickLine::from(self.style.tick)
+    }
+
+    /// Creates a new [`GridLine`] with applied styling. Only one [`GridLine`] can be returned in the
+    /// [`TickResult`]
+    pub fn gridline(&self) -> super::GridLine {
+        super::GridLine::from(self.style.grid)
+    }
+
+    /// Creates a new [`Label`] with applied styling and supplied content. Only one [`Label`] can be returned in the
+    /// [`TickResult`]
+    pub fn label(&self, content: String) -> super::Label {
+        super::Label::from_style(content, self.style.label)
+    }
+
+    /// Creates a new [`Label`] with applied styling. Only one [`Label`] can be returned in the
+    /// [`TickResult`]
+    pub fn label_empty(&self) -> super::Label {
+        super::Label::from_style("".to_string(), self.style.label)
+    }
+}
 
 /// Defines the visual styling of a single tick mark on an Axis.
 #[derive(Debug, Clone)]
@@ -68,7 +160,7 @@ pub enum LabelDecision {
 pub struct LabelCandidate<D> {
     pub tick: Tick<D>,
     pub normalized_position: f32,
-    pub label: String,
+    pub label: super::Label,
     pub priority: u8,
 }
 

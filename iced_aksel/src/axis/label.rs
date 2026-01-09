@@ -1,8 +1,10 @@
-use iced_core::{Font, Padding, Pixels, text::LineHeight};
+use iced_core::{Color, Font, Padding, Pixels, text::LineHeight};
+
+use crate::style::LabelStyle;
 
 /// Configuration for a label on an axis.
 ///
-/// Labels display the numeric or textual value at each tick (or cursor) position.
+/// Labels display the numeric or textual value at each tick (or marker) position.
 ///
 /// # Example
 ///
@@ -24,6 +26,8 @@ use iced_core::{Font, Padding, Pixels, text::LineHeight};
 pub struct Label {
     /// The font size of the label text.
     pub size: Pixels,
+    /// The color of the label
+    pub color: Color,
     /// The text content to display.
     pub content: String,
     /// Padding around the label.
@@ -32,6 +36,19 @@ pub struct Label {
     pub font: Option<Font>,
     /// The lineheight of the label
     pub line_height: LineHeight,
+}
+
+impl Label {
+    pub fn from_style(content: String, style: LabelStyle) -> Self {
+        Self {
+            content,
+            font: None,
+            size: style.size,
+            color: style.color,
+            padding: style.padding,
+            line_height: style.line_height,
+        }
+    }
 }
 
 /// The spatial bounds of a label along the axis.
