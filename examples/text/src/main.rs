@@ -154,6 +154,7 @@ impl TextExample {
         );
 
         // 6. Japanese
+        // Showcases more advanced glyph rendering
         self.layer.labels.push(
             Label::new(
                 "This japanese text is wrapped! 畝 　ま代　苛ゑニーヌ現グ委る",
@@ -170,6 +171,7 @@ impl TextExample {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            // Update FPS counter
             Message::Tick(now) => {
                 if let Some(last) = self.last_frame {
                     let delta = now.duration_since(last).as_secs_f32();
@@ -180,9 +182,11 @@ impl TextExample {
                 }
                 self.last_frame = Some(now);
             }
+            // Pan the chart when dragged
             Message::ChartDragged(delta) => {
                 self.state.pan_axes(AXIS_X, AXIS_Y, delta.x, delta.y);
             }
+            // Zoom the access on scroll
             Message::ChartScrolled(pt, delta) => {
                 if let ScrollDelta::Lines { y, .. } = delta {
                     let factor = if y > 0.0 { 1.1 } else { 0.9 };
@@ -194,9 +198,10 @@ impl TextExample {
             }
             Message::FontSelected(family) => {
                 self.selected_family = family.clone();
-                // Hack to get a static ref to the family - This isn't great, but good enough to
-                // showcase the fonts
+                // Hack to get a static ref to the family - We leak the family name to get a
+                // 'static str
                 self.font = dbg!(Font::with_name(Box::leak(family.into_boxed_str())));
+                // Update the text so we showcase the new font in action
                 self.generate_showcase();
             }
         }

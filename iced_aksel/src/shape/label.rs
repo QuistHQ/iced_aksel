@@ -57,20 +57,54 @@ impl<D: Float> Bounds<D> {
 }
 
 /// A text label rendered as a vector mesh.
+///
+/// Unlike geometric shapes, labels are rendered using the backend's native text engine
+/// ensuring crisp, hinted typography.
+///
+/// # Example
+///
+/// ```rust
+/// use iced_aksel::{PlotPoint, shape::Label};
+/// use iced::Color;
+/// use iced::alignment::{Horizontal, Vertical};
+///
+/// // Simple centered label
+/// let label = Label::new("Hello", PlotPoint::new(10.0, 20.0))
+///     .fill(Color::from_rgb(1.0, 0.0, 0.0))
+///     .size(16.0);
+///
+/// // Left-aligned label at a data point
+/// let marker_label = Label::new("Max", PlotPoint::new(50.0, 100.0))
+///     .align(Horizontal::Left, Vertical::Center)
+///     .size(14.0);
+/// ```
 #[derive(Debug, Clone)]
 pub struct Label<D> {
+    /// Text content to display
     pub content: String,
+    /// Position in plot coordinates where the label is anchored
     pub position: PlotPoint<D>,
+    /// Font-size of the label
     pub size: Measure<D>,
+    /// Text rotation in radians
     pub rotation: f32, // Radians
+    /// Horizontal alignment
     pub horizontal_alignment: Horizontal,
+    /// Vertical alignment
     pub vertical_alignment: Vertical,
+    /// Color of the text
     pub fill: Color,
+    /// Quality preset to render at
     pub quality: Quality,
+    /// Letter spacing for the text
     pub letter_spacing: f32,
+    /// Font override - Defaults to the default font of the application
     pub font: Option<Font>,
+    /// Line height for the text (How much space **between** lines)
     pub line_height: f32,
+    /// Bounding box of the text - If this is not set, no wrapping will occur, if set
     pub bounds: Bounds<D>,
+    /// Wrapping of the text - Won't have an effect if no bounds have been set
     pub wrapping: Wrapping,
 }
 
