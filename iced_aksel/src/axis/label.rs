@@ -1,4 +1,4 @@
-use iced_core::{Padding, Pixels};
+use iced_core::{Font, Padding, Pixels, text::LineHeight};
 
 /// Configuration for a label on an axis.
 ///
@@ -28,33 +28,10 @@ pub struct Label {
     pub content: String,
     /// Padding around the label.
     pub padding: Padding,
-}
-
-impl Default for Label {
-    fn default() -> Self {
-        Self {
-            size: Pixels(12.0),
-            content: String::default(),
-            padding: Padding::new(4.0),
-        }
-    }
-}
-impl From<String> for Label {
-    fn from(content: String) -> Self {
-        Self {
-            content,
-            ..Default::default()
-        }
-    }
-}
-
-impl From<&str> for Label {
-    fn from(content: &str) -> Self {
-        Self {
-            content: content.to_string(),
-            ..Default::default()
-        }
-    }
+    /// Override the font used on the label - Defaults to the default font of the renderer
+    pub font: Option<Font>,
+    /// The lineheight of the label
+    pub line_height: LineHeight,
 }
 
 /// The spatial bounds of a label along the axis.

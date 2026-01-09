@@ -1,4 +1,6 @@
-use iced_core::Pixels;
+use iced_core::{Color, Pixels};
+
+use crate::style::GridLineStyle;
 
 /// Configuration for a single grid line on the chart.
 ///
@@ -21,22 +23,19 @@ use iced_core::Pixels;
 #[derive(Debug, Clone, Copy)]
 pub struct GridLine {
     /// The thickness of the grid line in pixels.
-    pub thickness: Pixels,
+    pub width: Pixels,
+    /// The color of the gridline
+    pub color: Color,
+    /// Wether the Gridline should be dashed
+    pub dashed: bool,
 }
 
-impl Default for GridLine {
-    fn default() -> Self {
+impl From<GridLineStyle> for GridLine {
+    fn from(value: GridLineStyle) -> Self {
         Self {
-            thickness: Pixels(1.0),
-        }
-    }
-}
-
-impl GridLine {
-    /// Creates a new grid line with the specified thickness.
-    pub fn new<I: Into<Pixels>>(thickness: I) -> Self {
-        Self {
-            thickness: thickness.into(),
+            width: value.width,
+            color: value.color,
+            dashed: value.dashed,
         }
     }
 }

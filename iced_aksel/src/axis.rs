@@ -9,7 +9,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use aksel::{Float, Scale};
+use aksel::{Float, Scale, Tick};
 use derivative::Derivative;
 use iced_core::{
     Layout, Pixels, Point, Rectangle, Size, Text,
@@ -37,6 +37,111 @@ pub use grid::*;
 pub use label::*;
 pub use position::*;
 pub use tick::*;
+
+/// Context provided to tick renderer functions.
+///
+/// Contains all the information needed to make decisions about how to render a tick.
+#[derive(Debug, Clone, Copy)]
+pub struct TickContext<'a, D> {
+    /// The tick value and metadata from the scale.
+    pub tick: Tick<D>,
+    /// Normalized position (0.0-1.0) along the axis.
+    pub normalized_position: f32,
+    /// The bounds of the axis in screen coordinates.
+    pub axis_bounds: &'a Rectangle,
+    /// The domain (min, max) of the scale.
+    pub scale_domain: (D, D),
+    /// The orientation of the axis (horizontal or vertical).
+    pub orientation: &'a Orientation,
+
+    /// The default styling for this context
+    style: &'a AxisStyle,
+}
+
+impl<D: Float> TickContext<'_, D> {
+    /// Returns the total span of the axis in screen pixels.
+    pub const fn axis_span(&self) -> f32 {
+        match self.orientation {
+            Orientation::Horizontal => self.axis_bounds.width,
+            Orientation::Vertical => self.axis_bounds.height,
+        }
+    }
+
+    /// Returns the total span of the scale's domain in data units.
+    pub fn scale_span(&self) -> D {
+        let (min, max) = self.scale_domain;
+        min.abs_sub(max)
+    }
+
+    /// Creates a new [`TickLine`] with applied styling. Only one [`TickLine`] can be returned in the
+    /// [`TickResult`]
+    pub fn tickline(&self) -> TickLine {
+        TickLine::from(self.style.tick)
+    }
+
+    /// Creates a new [`GridLine`] with applied styling. Only one [`GridLine`] can be returned in the
+    /// [`TickResult`]
+    pub fn gridline(&self) -> GridLine {
+        GridLine::from(self.style.grid)
+    }
+
+    /// Creates a new [`Label`] with applied styling and supplied content. Only one [`Label`] can be returned in the
+    /// [`TickResult`]
+    pub fn label(&self, content: impl std::fmt::Display) -> Label {
+        Label {
+            size: self.style.label.size,
+            content: content.to_string(),
+            padding: self.style.label.padding,
+            font: None,
+            line_height: self.style.label.line_height,
+        }
+    }
+
+    /// Creates a new [`Label`] with applied styling. Only one [`Label`] can be returned in the
+    /// [`TickResult`]
+    pub fn label_empty(&self) -> Label {
+        Label {
+            size: self.style.label.size,
+            content: "".to_string(),
+            padding: self.style.label.padding,
+            font: None,
+            line_height: self.style.label.line_height,
+        }
+    }
+}
+
+/// The result returned from a tick renderer function.
+///
+/// This struct specifies exactly what should be rendered for a specific tick mark.
+/// It effectively decouples the tick logic from the rendering logic, allowing
+/// for highly customizable axes.
+///
+/// # Example
+///
+/// ```rust
+/// use iced_aksel::axis::{TickResult, TickLine};
+///
+/// // Create a tick that has a label and a short line
+/// let result = TickResult::with_label("100")
+///     .tick_line(TickLine::default());
+/// ```
+#[derive(Default)]
+pub struct TickResult {
+    /// Optional tick line mark on the axis.
+    pub tick_line: Option<TickLine>,
+    /// Optional grid line extending into the plot area.
+    pub grid_line: Option<GridLine>,
+    /// Optional text label for this tick.
+    pub label: Option<String>,
+    /// Optional label rendering-priority (lower is higher priority).
+    pub label_priority: Option<u8>,
+}
+
+impl TickResult {
+    pub fn empty() -> Self {
+        Self::default()
+    }
+}
 
 type TickRendererFn<D> = RefCell<Box<dyn FnMut(TickContext<D>) -> TickResult>>;
 type CursorRendererFn<D> = RefCell<Box<dyn FnMut(D) -> Option<String>>>;
@@ -93,19 +198,20 @@ impl<D: Float> Axis<D> {
     ) -> Self {
         // Default tick renderer: major ticks get grid lines and long marks; minor ticks get short marks.
         let tick_renderer = RefCell::new(Box::new(|ctx: TickContext<D>| {
-            let mut result = TickResult::with_tick_line(TickLine {
-                length: match ctx.tick.level {
-                    0 => 10.0,
-                    _ => 5.0,
-                }
-                .into(),
+            let mut tickline = ctx.tickline();
+            tickline.length = match ctx.tick.level {
+                0 => 10.0,
+                _ => 5.0,
+            }
+            .into();
+
+            let mut result = TickResult {
+                tick_line: Some(tickline),
                 ..Default::default()
-            });
+            };
 
             if ctx.tick.level == 0 {
-                result = result.grid_line(GridLine {
-                    thickness: 1.0.into(),
-                });
+                result.grid_line = Some(ctx.gridline());
             }
 
             result
@@ -341,9 +447,13 @@ impl<D: Float> Axis<D> {
                     let paragraph = Plain::<Renderer::Paragraph>::new(Text {
                         content,
                         bounds: bounds.size(),
-                        size: theme.cursor.text.size,
-                        line_height: theme.cursor.text.line_height,
-                        font: theme.cursor.text.font,
+                        size: theme.cursor.label.size,
+                        line_height: theme.cursor.label.line_height,
+                        font: theme
+                            .cursor
+                            .label
+                            .font
+                            .unwrap_or_else(|| renderer.default_font()),
                         align_x: Alignment::Left,
                         align_y: Vertical::Top,
                         shaping: theme.cursor.text.shaping,

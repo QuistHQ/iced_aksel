@@ -7,18 +7,24 @@ use iced_core::{Border, Color, Font, Padding, Pixels, Shadow, Theme};
 pub struct Style {
     /// Style of the axes.
     pub axis: AxisStyle,
-    /// Style of the grid lines.
-    pub grid: LineStyle,
-    /// Style of the axis-spines (The line between an Axis and the Plot)
-    pub axis_spine: LineStyle,
 }
 
 /// Style of lines.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct LineStyle {
+pub struct GridLineStyle {
     /// The color of the grid lines.
     pub color: Color,
     /// The thickness of the grid lines in pixels.
+    pub width: Pixels,
+    /// Wether the gridline should have a dashed pattern
+    pub dashed: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TickLineStyle {
+    /// The color of the tick-lines.
+    pub color: Color,
+    /// The thickness of the tick-lines in pixels.
     pub width: Pixels,
 }
 
@@ -28,20 +34,13 @@ pub struct AxisStyle {
     /// Distance from the Axis Line to the text baseline (The "Rail").
     pub text_offset: Pixels,
     /// Style of the text labels.
-    pub label: TextStyle,
+    pub label: LabelStyle,
     /// Style of the ticks (lines).
-    pub ticks: TickStyle,
+    pub tick: TickLineStyle,
     /// Style of the cursor badge and line on the axis.
     pub cursor: AxisCursorStyle,
-}
-
-/// Style of axis ticks.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct TickStyle {
-    /// The color of the tick lines.
-    pub color: Color,
-    /// The thickness of the tick lines.
-    pub width: Pixels,
+    /// Style of the grid lines.
+    pub grid: GridLineStyle,
 }
 
 /// Style of a `Chart`'s interactive axis cursor.
@@ -53,18 +52,15 @@ pub struct AxisCursorStyle {
     pub width: Pixels,
     /// Distance between the end of the cursor line and the start of the badge.
     pub line_gap: Pixels,
-
-    /// Style of the text inside the badge.
-    pub text: TextStyle,
+    /// Style of the label inside the badge.
+    pub label: LabelStyle,
     /// Style of the badge container (background, border, shadow).
-    pub badge: AxisCursorBadgeStyle,
+    pub badge: BadgeStyle,
 }
 
 /// Style of the badge container for the axis cursor.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct AxisCursorBadgeStyle {
-    /// Padding around the text inside the badge.
-    pub padding: Padding,
+pub struct BadgeStyle {
     /// Background color of the badge.
     pub background: Color,
     /// Border style of the badge.
@@ -75,27 +71,24 @@ pub struct AxisCursorBadgeStyle {
 
 /// General text styling configuration.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct TextStyle {
+pub struct LabelStyle {
     /// The font size in pixels.
     pub size: Pixels,
-    /// The font family to use.
-    pub font: Font,
     /// The text color.
     pub color: Color,
     /// The line height.
     pub line_height: LineHeight,
-    /// The text shaping strategy.
-    pub shaping: Shaping,
+    /// Padding around the label
+    pub padding: Padding,
 }
 
-impl Default for TextStyle {
+impl Default for LabelStyle {
     fn default() -> Self {
         Self {
             size: Pixels(12.0),
-            font: Font::default(),
             color: Color::BLACK,
             line_height: LineHeight::Relative(1.2),
-            shaping: Shaping::Basic,
+            padding: Padding::new(2.0),
         }
     }
 }
@@ -126,21 +119,18 @@ pub fn default(theme: &Theme) -> Style {
     let palette = theme.extended_palette();
 
     Style {
-        axis_spine: LineStyle {
-            color: palette.background.strong.color.inverse(),
-            width: 1.0.into(),
-        },
-        grid: LineStyle {
-            color: palette.background.strong.color,
-            width: 1.0.into(),
-        },
         axis: AxisStyle {
             text_offset: 12.0.into(),
-            label: TextStyle {
+            label: LabelStyle {
                 color: palette.background.strong.text,
                 ..Default::default()
             },
-            ticks: TickStyle {
+            grid: GridLineStyle {
+                color: palette.background.strong.color,
+                width: 1.0.into(),
+                dashed: false,
+            },
+            tick: TickLineStyle {
                 color: palette.background.strong.color,
                 width: 1.0.into(),
             },
@@ -148,12 +138,11 @@ pub fn default(theme: &Theme) -> Style {
                 color: palette.primary.base.color,
                 width: 1.0.into(),
                 line_gap: 4.0.into(),
-                text: TextStyle {
+                label: LabelStyle {
                     color: palette.primary.strong.text,
                     ..Default::default()
                 },
-                badge: AxisCursorBadgeStyle {
-                    padding: Padding::new(4.0),
+                badge: BadgeStyle {
                     background: palette.primary.base.color,
                     border: Border {
                         radius: 4.0.into(),
