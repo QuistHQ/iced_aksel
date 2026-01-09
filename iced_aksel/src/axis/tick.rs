@@ -176,6 +176,7 @@ where
     pub bounds: LabelBounds,
     pub paragraph: Plain<Renderer::Paragraph>,
     pub position: Point,
+    pub color: Color,
 }
 
 /// Context provided to custom label policy functions.

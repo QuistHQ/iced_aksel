@@ -41,7 +41,7 @@ pub use position::*;
 pub use tick::*;
 
 type TickRendererFn<D> = RefCell<Box<dyn FnMut(TickContext<D>) -> TickResult>>;
-type CursorRendererFn<D> = RefCell<Box<dyn FnMut(D) -> Option<Marker>>>;
+type MarkerRendererFn<D> = RefCell<Box<dyn FnMut(MarkerContext<D>) -> Option<Marker>>>;
 type StyleOverrideFn = RefCell<Box<dyn FnMut(&mut AxisStyle)>>;
 
 /// An axis that maps data values to screen coordinates.
@@ -74,7 +74,7 @@ pub struct Axis<D> {
     #[derivative(Debug = "ignore")]
     tick_renderer: Option<TickRendererFn<D>>,
     #[derivative(Debug = "ignore")]
-    marker_formatter: Option<CursorRendererFn<D>>,
+    marker_renderer: Option<MarkerRendererFn<D>>,
     #[derivative(Debug = "ignore")]
     style_override: Option<StyleOverrideFn>,
 
@@ -123,7 +123,7 @@ impl<D: Float> Axis<D> {
 
             scale: Box::new(scale),
             tick_renderer: Some(tick_renderer),
-            marker_formatter: None,
+            marker_renderer: None,
             style_override: None,
             label_policy: LabelPolicy::default(),
         }
@@ -200,11 +200,11 @@ impl<D: Float> Axis<D> {
     ///
     /// If not set, the marker badge will not be rendered.
     /// The closure receives the data value at the marker position and returns the string to display.
-    pub fn with_marker_formatter<F>(mut self, renderer: F) -> Self
+    pub fn with_marker_renderer<F>(mut self, renderer: F) -> Self
     where
-        F: FnMut(D) -> Option<Marker> + 'static,
+        F: FnMut(MarkerContext<D>) -> Option<Marker> + 'static,
     {
-        self.marker_formatter = Some(RefCell::new(Box::new(renderer)));
+        self.marker_renderer = Some(RefCell::new(Box::new(renderer)));
         self
     }
 
@@ -302,6 +302,8 @@ impl<D: Float> Axis<D> {
         Node::new(size)
     }
 
+    // TODO: Collect arguments in a struct to avoid too_many_arguments lint and to better support
+    // non-breaking changes in the future
     /// Draws the axis, including ticks, grid lines, labels, and the interactive marker.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn draw<Renderer>(
@@ -320,7 +322,11 @@ impl<D: Float> Axis<D> {
             return;
         }
 
-        let theme = style.axis;
+        let mut style = style.axis;
+        if let Some(style_override) = self.style_override.as_ref() {
+            style_override.borrow_mut()(&mut style)
+        };
+
         let bounds = layout.bounds();
         let full_bounds = plot_bounds.union(&bounds);
         let orientation = Orientation::from(self.position());
@@ -345,7 +351,7 @@ impl<D: Float> Axis<D> {
                     axis_bounds: &bounds,
                     scale_domain: (d_max, d_min),
                     orientation: &orientation,
-                    style: &style.axis,
+                    style: &style,
                 })
             });
 
@@ -416,7 +422,7 @@ impl<D: Float> Axis<D> {
 
         self.layout_labels(
             renderer,
-            &theme,
+            &style,
             &bounds,
             orientation,
             label_candidates,
@@ -428,11 +434,10 @@ impl<D: Float> Axis<D> {
             return;
         };
 
-        let Some(cursor_pos) = cursor.position_over(full_bounds) else {
-            return;
-        };
-
-        let Some(marker_renderer) = &self.marker_formatter else {
+        let Some((cursor_pos, marker_renderer)) = cursor
+            .position_over(full_bounds)
+            .zip(self.marker_renderer.as_ref())
+        else {
             return;
         };
 
@@ -441,22 +446,22 @@ impl<D: Float> Axis<D> {
             Orientation::Vertical => 1.0 - ((cursor_pos.y - plot_bounds.y) / plot_bounds.height),
         };
 
-        let Some(marker) = self
-            .denormalize_opt(value_to_render)
-            .and_then(|val| marker_renderer.borrow_mut()(val))
-        else {
-            return;
-        };
-
-        self.draw_marker_overlay(
-            renderer,
-            cursor_pos,
-            marker,
-            bounds,
-            viewport,
-            orientation,
-            theme,
-        );
+        if let Some(marker) = self.denormalize_opt(value_to_render).and_then(|value| {
+            marker_renderer.borrow_mut()(MarkerContext {
+                value,
+                style: &style.marker,
+            })
+        }) {
+            self.draw_marker_overlay(
+                renderer,
+                cursor_pos,
+                marker,
+                bounds,
+                viewport,
+                orientation,
+                style.text_offset,
+            );
+        }
     }
 
     /// Draws the interactive marker badge and line.
@@ -472,15 +477,15 @@ impl<D: Float> Axis<D> {
         bounds: Rectangle,
         viewport: &Rectangle,
         orientation: Orientation,
-        theme: AxisStyle,
+        text_offset: Pixels,
     ) where
         Renderer: plot::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
     {
         let paragraph = Plain::<Renderer::Paragraph>::new(Text {
             content: marker.label.content,
             bounds: bounds.size(),
-            size: theme.marker.label.size,
-            line_height: theme.marker.label.line_height,
+            size: marker.label.size,
+            line_height: marker.label.line_height,
             font: marker.label.font.unwrap_or_else(|| renderer.default_font()),
             align_x: Alignment::Left,
             align_y: Vertical::Top,
@@ -488,9 +493,9 @@ impl<D: Float> Axis<D> {
             wrapping: Wrapping::None,
         });
 
-        let rail_pos = self.calculate_rail_position(&bounds, orientation, theme.text_offset.0);
+        let rail_pos = self.calculate_rail_position(&bounds, orientation, text_offset.0);
         let min_bounds = paragraph.min_bounds();
-        let padding = theme.marker.label.padding;
+        let padding = marker.label.padding;
         let badge_width = min_bounds.width + padding.left + padding.right;
         let badge_height = min_bounds.height + padding.top + padding.bottom;
 
@@ -534,8 +539,8 @@ impl<D: Float> Axis<D> {
             }
         }
 
-        let gap = theme.marker.line.gap.0;
-        let line_width = theme.marker.line.width.0;
+        let gap = marker.line.gap.0;
+        let line_width = marker.line.width.0;
 
         // Calculate marker line position (respecting the gap)
         let marker_line_rect = match orientation {
@@ -591,17 +596,17 @@ impl<D: Float> Axis<D> {
                 bounds: marker_line_rect,
                 ..Default::default()
             },
-            theme.marker.badge.background,
+            marker.badge.background,
         );
 
         renderer.fill_quad(
             Quad {
                 bounds: badge_rect,
-                border: theme.marker.badge.border,
-                shadow: theme.marker.badge.shadow,
+                border: marker.badge.border,
+                shadow: marker.badge.shadow,
                 ..Default::default()
             },
-            theme.marker.badge.background,
+            marker.badge.background,
         );
 
         let text_pos = Point::new(badge_rect.x + padding.left, badge_rect.y + padding.top);
@@ -611,7 +616,7 @@ impl<D: Float> Axis<D> {
                 .as_text()
                 .with_content(paragraph.content().to_string()),
             text_pos,
-            theme.marker.label.color,
+            marker.label.color,
             *viewport,
         );
 
@@ -637,7 +642,7 @@ impl<D: Float> Axis<D> {
     fn layout_labels<Renderer>(
         &self,
         renderer: &mut Renderer,
-        theme: &AxisStyle,
+        style: &AxisStyle,
         bounds: &Rectangle,
         orientation: Orientation,
         label_candidates: Vec<LabelCandidate<D>>,
@@ -653,7 +658,7 @@ impl<D: Float> Axis<D> {
                 renderer,
                 bounds,
                 orientation,
-                theme.text_offset.0,
+                style.text_offset.0,
             ) else {
                 continue;
             };
@@ -664,6 +669,7 @@ impl<D: Float> Axis<D> {
                 bounds: label_bounds,
                 paragraph,
                 position,
+                color,
             }: ResolvedLabelCandidate<Renderer, _> = resolved;
 
             let context = LabelDecisionContext {
@@ -680,7 +686,7 @@ impl<D: Float> Axis<D> {
                         .as_text()
                         .with_content(paragraph.content().to_string()),
                     position,
-                    theme.label.color,
+                    color,
                     *viewport,
                 );
 
@@ -697,7 +703,7 @@ impl<D: Float> Axis<D> {
     fn resolve_label_candidate<Renderer>(
         &self,
         candidate: LabelCandidate<D>,
-        renderer: &mut Renderer,
+        renderer: &Renderer,
         bounds: &Rectangle,
         orientation: Orientation,
         offset: f32,
@@ -719,7 +725,7 @@ impl<D: Float> Axis<D> {
             bounds: bounds.size(),
             size: label.size,
             line_height: label.line_height,
-            font: label.font.unwrap_or(renderer.default_font()),
+            font: label.font.unwrap_or_else(|| renderer.default_font()),
             align_x: Alignment::Left,
             align_y: Vertical::Top,
             shaping: iced_core::text::Shaping::Auto,
@@ -784,6 +790,7 @@ impl<D: Float> Axis<D> {
             bounds: LabelBounds::new(start, end),
             paragraph,
             position,
+            color: label.color,
         })
     }
 
@@ -891,6 +898,7 @@ impl<D: Float> Axis<D> {
             ],
         );
     }
+
     /// Collects ticks and sorts them so that "Center" ticks in minor intervals come before "Edge" ticks.
     fn collect_prioritized_ticks(&self) -> Vec<PrioritizedTick<D>> {
         let all_ticks = self.ticks();
@@ -961,6 +969,7 @@ impl<D: Float> Deref for Axis<D> {
         &*self.scale
     }
 }
+
 impl<D: Float> DerefMut for Axis<D> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut *self.scale

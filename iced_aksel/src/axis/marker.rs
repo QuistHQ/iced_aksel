@@ -1,14 +1,14 @@
-use aksel::Tick;
 use iced_core::{Border, Color, Pixels, Shadow};
 
 use crate::style::{BadgeStyle, MarkerLineStyle, MarkerStyle};
 
 pub struct MarkerContext<'a, D> {
-    pub tick: Tick<D>,
-    style: &'a MarkerStyle,
+    pub value: D,
+    pub style: &'a MarkerStyle,
 }
 
 impl<D> MarkerContext<'_, D> {
+    /// Creates a new [`Marker`] with applied styling.
     pub fn marker(&self, content: String) -> Marker {
         Marker {
             line: MarkerLine::from(self.style.line),
@@ -27,7 +27,7 @@ pub struct Marker {
 pub struct MarkerLine {
     pub color: Color,
     pub width: Pixels,
-    pub line_gap: Pixels,
+    pub gap: Pixels,
 }
 
 impl From<MarkerLineStyle> for MarkerLine {
@@ -35,7 +35,7 @@ impl From<MarkerLineStyle> for MarkerLine {
         Self {
             color: value.color,
             width: value.width,
-            line_gap: value.gap,
+            gap: value.gap,
         }
     }
 }
