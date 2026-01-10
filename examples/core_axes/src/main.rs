@@ -1,25 +1,25 @@
 use iced::{
-    Border, Color, Element, Font, Length, Padding, Pixels, Shadow, Theme,
-    widget::{column, container, row, text},
+    Color, Element, Font, Length, Padding, Theme,
+    widget::{column, container, pick_list, row, text},
 };
 use iced_aksel::{
     Axis, Chart, Measure, PlotPoint, State, Stroke,
-    axis::{self, GridLine, TickLine, TickResult},
+    axis::{self, GridLine, Label, TickLine, TickResult},
     plot::{Plot, PlotData},
     scale::Linear,
     shape::Polyline,
-    style::Style,
 };
 
 pub fn main() -> iced::Result {
     iced::application(AxesShowcase::new, AxesShowcase::update, AxesShowcase::view)
         .title("Axes Styling Showcase")
-        .theme(Theme::Dark)
+        .theme(AxesShowcase::theme)
         .antialiasing(true)
         .run()
 }
 
 struct AxesShowcase {
+    theme: iced::Theme,
     minimal_state: State<&'static str, f64>,
     minimal_data: SineWave,
 
@@ -31,7 +31,9 @@ struct AxesShowcase {
 }
 
 #[derive(Debug, Clone)]
-pub enum Message {}
+pub enum Message {
+    ThemeChanged(Theme),
+}
 
 impl AxesShowcase {
     const X: &'static str = "x";
@@ -40,6 +42,7 @@ impl AxesShowcase {
     fn new() -> (Self, iced::Task<Message>) {
         (
             Self {
+                theme: iced::Theme::Dark,
                 minimal_state: setup_minimal_axes(),
                 minimal_data: SineWave::new(1.0, 0.8, 50),
 
@@ -53,37 +56,49 @@ impl AxesShowcase {
         )
     }
 
-    fn update(&mut self, _message: Message) -> iced::Task<Message> {
+    fn update(&mut self, message: Message) -> iced::Task<Message> {
+        match message {
+            Message::ThemeChanged(theme) => self.theme = theme,
+        }
         iced::Task::none()
     }
 
     fn view(&self) -> Element<'_, Message> {
-        row![
-            // self.panel(
-            //     "1. Minimal Layout",
-            //     "Hidden Y-axis. No Grid.",
-            //     Chart::new(&self.minimal_state)
-            //         .plot_data(&self.minimal_data, Self::X, Self::Y)
-            //         .style(Box::new(style_base))
-            // ),
-            self.panel(
-                "2. Engineering Layout",
-                "Custom Ruler Ticks. Monospace.",
-                Chart::new(&self.engineering_state)
-                    .plot_data(&self.engineering_data, Self::X, Self::Y)
-                    .style(Box::new(style_engineering))
-            ),
-            // self.panel(
-            //     "3. Custom Placement",
-            //     "Top & Right Axes. Badges.",
-            //     Chart::new(&self.custom_state)
-            //         .plot_data(&self.custom_data, Self::X, Self::Y)
-            //         .style(Box::new(style_base))
-            // ),
+        column![
+            row![
+                text("Theme: "),
+                pick_list(iced::Theme::ALL, Some(&self.theme), Message::ThemeChanged)
+            ],
+            row![
+                self.panel(
+                    "1. Minimal Layout",
+                    "Hidden Y-axis. No Grid.",
+                    Chart::new(&self.minimal_state).plot_data(&self.minimal_data, Self::X, Self::Y)
+                ),
+                self.panel(
+                    "2. Engineering Layout",
+                    "Custom Ruler Ticks. Monospace.",
+                    Chart::new(&self.engineering_state).plot_data(
+                        &self.engineering_data,
+                        Self::X,
+                        Self::Y
+                    )
+                ),
+                self.panel(
+                    "3. Custom Placement",
+                    "Top & Right Axes. Badges.",
+                    Chart::new(&self.custom_state).plot_data(&self.custom_data, Self::X, Self::Y)
+                ),
+            ]
+            .spacing(20)
+            .padding(20)
         ]
         .spacing(20)
-        .padding(20)
         .into()
+    }
+
+    fn theme(&self) -> iced::Theme {
+        self.theme.clone()
     }
 
     fn panel<'a>(
@@ -128,7 +143,7 @@ fn setup_minimal_axes() -> State<&'static str, f64> {
         Axis::new(Linear::new(0.0, 100.0), axis::Position::Bottom)
             .with_thickness(45.0)
             .without_grid()
-            .with_cursor_formatter(|v| Some(format!("{:.0}", v))),
+            .with_marker_renderer(|ctx| Some(ctx.marker(format!("{:.0}", ctx.value)))),
     );
 
     // Y-Axis: Invisible but active for scaling
@@ -153,22 +168,29 @@ fn setup_engineering_axes() -> State<&'static str, f64> {
             TickResult {
                 tick_line: Some(TickLine {
                     length: 8.0.into(),
-                    thickness: 1.5.into(),
+                    width: 1.5.into(),
+                    ..ctx.tickline()
                 }),
                 grid_line: Some(GridLine {
-                    thickness: 1.0.into(),
+                    width: 1.0.into(),
+                    ..ctx.gridline()
                 }),
-                label: Some(format!("{:.1}", ctx.tick.value)),
+                label: Some(Label {
+                    font: Some(Font::MONOSPACE),
+                    ..ctx.label(format!("{:.1}", ctx.tick.value))
+                }),
                 ..Default::default()
             }
         } else {
             TickResult {
                 tick_line: Some(TickLine {
                     length: 4.0.into(),
-                    thickness: 1.0.into(),
+                    width: 1.0.into(),
+                    ..ctx.tickline()
                 }),
                 grid_line: Some(GridLine {
-                    thickness: 0.5.into(),
+                    width: 0.5.into(),
+                    ..ctx.gridline()
                 }),
                 label: None,
                 ..Default::default()
@@ -205,7 +227,7 @@ fn setup_custom_axes() -> State<&'static str, f64> {
         AxesShowcase::X,
         Axis::new(Linear::new(0.0, 100.0), axis::Position::Top)
             .with_thickness(45.0)
-            .with_cursor_formatter(|v| Some(format!("T: {:.1}s", v))),
+            .with_marker_renderer(|ctx| Some(ctx.marker(format!("T: {:.1}s", ctx.value)))),
     );
 
     // Y-Axis on RIGHT
@@ -218,55 +240,26 @@ fn setup_custom_axes() -> State<&'static str, f64> {
                 let is_major = ctx.tick.level == 0;
                 TickResult {
                     grid_line: Some(GridLine {
-                        thickness: if is_major { 1.0.into() } else { 0.0.into() },
+                        width: if is_major { 1.0.into() } else { 0.0.into() },
+                        ..ctx.gridline()
                     }),
                     tick_line: Some(TickLine {
-                        thickness: 1.0.into(),
+                        width: 1.0.into(),
                         length: 4.0.into(),
+                        ..ctx.tickline()
                     }),
                     label: if is_major {
-                        Some(format!("{:.1}", ctx.tick.value))
+                        Some(ctx.label(format!("{:.1}", ctx.tick.value)))
                     } else {
                         None
                     },
                     ..Default::default()
                 }
             })
-            .with_cursor_formatter(|v| Some(format!("{:.3}", v))),
+            .with_marker_renderer(|ctx| Some(ctx.marker(format!("{:.3}", ctx.value)))),
     );
 
     state
-}
-
-// -----------------------------------------------------------------------------
-// STYLES
-// -----------------------------------------------------------------------------
-
-/// Base style that strictly adheres to the current Theme
-fn style_base(theme: &Theme) -> Style {
-    let palette = theme.extended_palette();
-    let mut style = iced_aksel::style::default(theme);
-
-    // Ensure we use the theme's text color
-    style.axis.label.color = palette.background.strong.text;
-    style.axis.ticks.color = palette.background.strong.text;
-
-    // Use primary color for interaction elements
-    style.axis.cursor.color = palette.primary.base.color;
-    style.axis.cursor.badge.background = palette.primary.base.color;
-    style.axis.cursor.text.color = palette.primary.base.text;
-
-    style
-}
-
-/// Engineering style: Monospace font, but same colors
-fn style_engineering(theme: &Theme) -> Style {
-    let mut style = style_base(theme);
-
-    style.axis.label.font = Font::MONOSPACE;
-    style.axis.cursor.text.font = Font::MONOSPACE;
-
-    style
 }
 
 // -----------------------------------------------------------------------------

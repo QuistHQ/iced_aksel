@@ -24,7 +24,13 @@ use iced_graphics::{color, mesh::SolidVertex2D};
 
 use crate::{
     plot,
-    render::MeshBuffer,
+    render::{
+        MeshBuffer,
+        tessellation::manual::linear::{
+            draw_horizontal_dashed_line, draw_horizontal_line, draw_vertical_dashed_line,
+            draw_vertical_line,
+        },
+    },
     style::{AxisStyle, Style},
 };
 
@@ -304,6 +310,7 @@ impl<D: Float> Axis<D> {
 
     // TODO: Collect arguments in a struct to avoid too_many_arguments lint and to better support
     // non-breaking changes in the future
+    // TODO: Slight refactor to make it more readable
     /// Draws the axis, including ticks, grid lines, labels, and the interactive marker.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn draw<Renderer>(
@@ -369,7 +376,7 @@ impl<D: Float> Axis<D> {
             if self.render_grid
                 && let Some(line) = grid_line
             {
-                self.draw_grid_line(line, plot_bounds, mesh_buffer, pos_norm);
+                self.draw_grid_line(line, &bounds, plot_bounds, mesh_buffer, pos_norm);
             }
 
             if self.invisible {
@@ -859,44 +866,71 @@ impl<D: Float> Axis<D> {
     fn draw_grid_line(
         &self,
         line: GridLine,
-        bounds: &Rectangle,
+        axis_bounds: &Rectangle,
+        plot_bounds: &Rectangle,
         mesh_buffer: &mut MeshBuffer,
         pos_norm: f32,
     ) {
         let orientation = self.orientation();
-        let (x0, y0, x1, y1) = match orientation {
+        let width = line.width.0;
+        let color = line.color;
+        let dash_len = 5.0;
+        let gap_len = 5.0;
+
+        match orientation {
             Orientation::Horizontal => {
-                let x = bounds.width.mul_add(pos_norm, bounds.x).round();
-                (x, bounds.y, x + line.width.0, bounds.y + bounds.height)
+                let x = axis_bounds.width.mul_add(pos_norm, axis_bounds.x);
+                if line.dashed {
+                    draw_vertical_dashed_line(
+                        mesh_buffer,
+                        x,
+                        plot_bounds.y,
+                        plot_bounds.y + plot_bounds.height,
+                        width,
+                        color,
+                        dash_len,
+                        gap_len,
+                        true,
+                    );
+                } else {
+                    draw_vertical_line(
+                        mesh_buffer,
+                        x,
+                        plot_bounds.y,
+                        plot_bounds.y + plot_bounds.height,
+                        width,
+                        color,
+                        true,
+                    );
+                }
             }
             Orientation::Vertical => {
-                let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y).round();
-                (bounds.x, y, bounds.x + bounds.width, y + line.width.0)
+                let y = axis_bounds.height.mul_add(1.0 - pos_norm, axis_bounds.y);
+                if line.dashed {
+                    draw_horizontal_dashed_line(
+                        mesh_buffer,
+                        plot_bounds.x,
+                        plot_bounds.x + plot_bounds.width,
+                        y,
+                        width,
+                        color,
+                        dash_len,
+                        gap_len,
+                        true,
+                    );
+                } else {
+                    draw_horizontal_line(
+                        mesh_buffer,
+                        plot_bounds.x,
+                        plot_bounds.x + plot_bounds.width,
+                        y,
+                        width,
+                        color,
+                        true,
+                    );
+                }
             }
-        };
-
-        let packed = color::pack(line.color);
-        mesh_buffer.add(
-            &[0, 1, 2, 2, 1, 3],
-            &[
-                SolidVertex2D {
-                    position: [x0, y0],
-                    color: packed,
-                },
-                SolidVertex2D {
-                    position: [x1, y0],
-                    color: packed,
-                },
-                SolidVertex2D {
-                    position: [x0, y1],
-                    color: packed,
-                },
-                SolidVertex2D {
-                    position: [x1, y1],
-                    color: packed,
-                },
-            ],
-        );
+        }
     }
 
     /// Collects ticks and sorts them so that "Center" ticks in minor intervals come before "Edge" ticks.

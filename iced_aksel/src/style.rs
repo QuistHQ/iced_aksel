@@ -136,7 +136,7 @@ pub fn default(theme: &Theme) -> Style {
                 dashed: false,
             },
             tick: TickLineStyle {
-                color: palette.background.strong.color,
+                color: palette.background.strong.text,
                 width: 1.0.into(),
             },
             marker: MarkerStyle {
@@ -146,7 +146,7 @@ pub fn default(theme: &Theme) -> Style {
                     gap: 4.0.into(),
                 },
                 label: LabelStyle {
-                    color: palette.primary.strong.text,
+                    color: palette.primary.base.text,
                     ..Default::default()
                 },
                 badge: BadgeStyle {
