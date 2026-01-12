@@ -15,7 +15,7 @@ pub struct GridLineStyle {
     pub color: Color,
     /// The thickness of the grid lines in pixels.
     pub width: Pixels,
-    /// Wether the gridline should have a dashed pattern
+    /// Whether the gridline should have a dashed pattern
     pub dashed: bool,
 }
 
