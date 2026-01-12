@@ -228,7 +228,7 @@ impl PlotData<f64> for ExponentialData {
 // Helpers
 // -----------------------------------------------------------------------------
 
-fn x_axis_tick_renderer(ctx: TickContext<f64>) -> TickResult {
+fn x_axis_tick_renderer(ctx: TickContext<f64, Theme>) -> TickResult {
     // Only show Major ticks
     if ctx.tick.level != 0 {
         return TickResult::default();
@@ -240,7 +240,7 @@ fn x_axis_tick_renderer(ctx: TickContext<f64>) -> TickResult {
     }
 }
 
-fn y_axis_tick_renderer(ctx: TickContext<f64>) -> TickResult {
+fn y_axis_tick_renderer(ctx: TickContext<f64, Theme>) -> TickResult {
     // Only show tick-lines and labels on Major ticks
     if ctx.tick.level != 0 {
         return TickResult::default();

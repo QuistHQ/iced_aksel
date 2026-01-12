@@ -4,10 +4,11 @@ use iced::{
 };
 use iced_aksel::{
     Axis, Chart, Measure, PlotPoint, State, Stroke,
-    axis::{self, GridLine, Label, TickLine, TickResult},
+    axis::{self, GridLine, Label, TickContext, TickLine, TickResult},
     plot::{Plot, PlotData},
     scale::Linear,
     shape::Polyline,
+    style::DashStyle,
 };
 
 pub fn main() -> iced::Result {
@@ -165,7 +166,7 @@ fn setup_engineering_axes() -> State<&'static str, f64> {
     let mut state = State::new();
 
     // Define a custom renderer for a technical "ruler" look
-    let ruler_renderer = |ctx: axis::TickContext<f64>| {
+    let ruler_renderer = |ctx: TickContext<f64>| {
         if ctx.tick.level == 0 {
             TickResult {
                 tick_line: Some(TickLine {
@@ -231,7 +232,10 @@ fn setup_custom_axes() -> State<&'static str, f64> {
             .with_thickness(45.0)
             .style(|style| {
                 // Override style to have dashed gridlines, without changing the renderer itself
-                style.grid.dashed = true;
+                style.grid.dashed = Some(DashStyle {
+                    gap_length: 5.0,
+                    dash_length: 5.0,
+                });
             })
             .with_marker_renderer(|ctx| Some(ctx.marker(format!("T: {:.1}s", ctx.value)))),
     );
@@ -247,7 +251,10 @@ fn setup_custom_axes() -> State<&'static str, f64> {
                 // Show grid only for major ticks
                 let grid_line = is_major.then(|| GridLine {
                     width: 1.0.into(),
-                    dashed: true,
+                    dashed: Some(DashStyle {
+                        gap_length: 5.0,
+                        dash_length: 5.0,
+                    }),
                     ..ctx.gridline()
                 });
                 // Show labels only for major ticks

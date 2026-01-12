@@ -232,7 +232,7 @@ pub struct Chart<
     Theme: Catalog,
     Renderer: plot::Renderer,
 {
-    state: &'a State<AxisId, Domain>,
+    state: &'a State<AxisId, Domain, Theme>,
     layers: Vec<Layer<'a, AxisId, Domain, Renderer, Theme>>,
     width: Length,
     height: Length,
@@ -274,7 +274,7 @@ where
     /// The `State` contains the configuration of all axes. It is separated from the
     /// `Chart` widget to allow persistence across frames and ease of manipulation
     /// (e.g., zooming/panning) from your update logic.
-    pub fn new(state: &'a State<AxisId, Domain>) -> Self {
+    pub fn new(state: &'a State<AxisId, Domain, Theme>) -> Self {
         Self {
             state,
             layers: vec![],
@@ -976,6 +976,7 @@ where
             let axis_layout = layout.children().nth(i).unwrap();
             axis.draw::<Renderer>(
                 renderer,
+                theme,
                 &style,
                 axis_layout,
                 cursor,
@@ -1062,9 +1063,9 @@ where
 }
 
 #[inline(always)]
-fn layout_horizontal_axis<Domain: Float>(
+fn layout_horizontal_axis<Domain: Float, Theme>(
     chart_width: f32,
-    axis: &Axis<Domain>,
+    axis: &Axis<Domain, Theme>,
     x: f32,
     y: f32,
     height: f32,
@@ -1077,9 +1078,9 @@ fn layout_horizontal_axis<Domain: Float>(
 }
 
 #[inline(always)]
-fn layout_vertical_axis<Domain: Float>(
+fn layout_vertical_axis<Domain: Float, Theme>(
     chart_height: f32,
-    axis: &Axis<Domain>,
+    axis: &Axis<Domain, Theme>,
     x: f32,
     y: f32,
     width: f32,
@@ -1094,7 +1095,7 @@ fn layout_vertical_axis<Domain: Float>(
 #[inline(always)]
 fn verify_layer<'a, AxisId: Hash + Eq + Clone, Domain: Float, Renderer, Theme>(
     layer: &Layer<'a, AxisId, Domain, Renderer, Theme>,
-    state: &'a State<AxisId, Domain>,
+    state: &'a State<AxisId, Domain, Theme>,
     errors: &mut Vec<Error<AxisId>>,
 ) -> bool {
     let x_id = &layer.horizontal_axis_id;

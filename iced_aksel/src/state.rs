@@ -31,11 +31,11 @@ use crate::Axis;
 /// ```
 #[derive(Default, Derivative)]
 #[derivative(Debug)]
-pub struct State<AxisId: Hash + Eq, Domain> {
-    axes: IndexMap<AxisId, Axis<Domain>>,
+pub struct State<AxisId: Hash + Eq, Domain, Theme = iced_core::Theme> {
+    axes: IndexMap<AxisId, Axis<Domain, Theme>>,
 }
 
-impl<AxisId, D> State<AxisId, D>
+impl<AxisId, D, Theme> State<AxisId, D, Theme>
 where
     AxisId: Hash + Eq + Clone,
     D: Float,
@@ -59,13 +59,13 @@ where
     ///     .with_axis("x", Axis::new(Linear::new(0.0, 100.0), axis::Position::Bottom))
     ///     .with_axis("y", Axis::new(Linear::new(0.0, 100.0), axis::Position::Left));
     /// ```
-    pub fn with_axis(mut self, id: impl Into<AxisId>, axis: Axis<D>) -> Self {
+    pub fn with_axis(mut self, id: impl Into<AxisId>, axis: Axis<D, Theme>) -> Self {
         self.axes.insert(id.into(), axis);
         self
     }
 
     /// Returns a reference to all axes in the state.
-    pub const fn axes(&self) -> &IndexMap<AxisId, Axis<D>> {
+    pub const fn axes(&self) -> &IndexMap<AxisId, Axis<D, Theme>> {
         &self.axes
     }
 
@@ -80,14 +80,18 @@ where
     /// let mut state: State<&str, f64> = State::new();
     /// state.set_axis("x", Axis::new(Linear::new(0.0, 100.0), axis::Position::Bottom));
     /// ```
-    pub fn set_axis(&mut self, id: impl Into<AxisId>, axis: Axis<D>) -> Option<Axis<D>> {
+    pub fn set_axis(
+        &mut self,
+        id: impl Into<AxisId>,
+        axis: Axis<D, Theme>,
+    ) -> Option<Axis<D, Theme>> {
         self.axes.insert(id.into(), axis)
     }
 
     /// Removes an axis from the state.
     ///
     /// Returns the removed axis if it existed.
-    pub fn remove_axis(&mut self, id: &AxisId) -> Option<Axis<D>> {
+    pub fn remove_axis(&mut self, id: &AxisId) -> Option<Axis<D, Theme>> {
         self.axes.swap_remove(id)
     }
 
@@ -122,14 +126,14 @@ where
     ///     let (min, max) = x_axis.domain();
     /// }
     /// ```
-    pub fn axis_opt(&self, id: &AxisId) -> Option<&Axis<D>> {
+    pub fn axis_opt(&self, id: &AxisId) -> Option<&Axis<D, Theme>> {
         self.axes.get(id)
     }
 
     /// Returns a reference to an axis by ID.
     ///
     /// Panics if the axis doesn't exist.
-    pub fn axis(&self, id: &AxisId) -> &Axis<D> {
+    pub fn axis(&self, id: &AxisId) -> &Axis<D, Theme> {
         self.axes.get(id).unwrap()
     }
 
@@ -145,21 +149,21 @@ where
     ///     x_axis.pan(0.1);
     /// }
     /// ```
-    pub fn axis_mut_opt(&mut self, id: &AxisId) -> Option<&mut Axis<D>> {
+    pub fn axis_mut_opt(&mut self, id: &AxisId) -> Option<&mut Axis<D, Theme>> {
         self.axes.get_mut(id)
     }
 
     /// Returns a mutable reference to an axis by ID.
     ///
     /// Panics if the axis doesn't exist.
-    pub fn axis_mut(&mut self, id: &AxisId) -> &mut Axis<D> {
+    pub fn axis_mut(&mut self, id: &AxisId) -> &mut Axis<D, Theme> {
         self.axes.get_mut(id).unwrap()
     }
 
     /// Returns an iterator over all axes mutably.
     ///
     /// Useful when you need to modify multiple axes simultaneously.
-    pub fn axes_iter_mut(&mut self) -> IterMut<'_, AxisId, Axis<D>> {
+    pub fn axes_iter_mut(&mut self) -> IterMut<'_, AxisId, Axis<D, Theme>> {
         self.axes.iter_mut()
     }
 
@@ -173,7 +177,7 @@ where
     }
 
     /// Returns a mutable reference to the internal axis map.
-    pub const fn axes_mut(&mut self) -> &mut IndexMap<AxisId, Axis<D>> {
+    pub const fn axes_mut(&mut self) -> &mut IndexMap<AxisId, Axis<D, Theme>> {
         &mut self.axes
     }
 
@@ -183,7 +187,7 @@ where
     }
 
     /// Returns an iterator over visible axes only.
-    pub fn visible_axes(&self) -> impl Iterator<Item = (&AxisId, &Axis<D>)> {
+    pub fn visible_axes(&self) -> impl Iterator<Item = (&AxisId, &Axis<D, Theme>)> {
         self.axes.iter().filter(|(_, axis)| axis.is_visible())
     }
 

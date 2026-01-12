@@ -46,8 +46,9 @@ pub use marker::*;
 pub use position::*;
 pub use tick::*;
 
-type TickRendererFn<D> = RefCell<Box<dyn FnMut(TickContext<D>) -> TickResult>>;
-type MarkerRendererFn<D> = RefCell<Box<dyn FnMut(MarkerContext<D>) -> Option<Marker>>>;
+type TickRendererFn<D, Theme> = RefCell<Box<dyn FnMut(TickContext<D, Theme>) -> TickResult>>;
+type MarkerRendererFn<D, Theme> =
+    RefCell<Box<dyn FnMut(MarkerContext<D, Theme>) -> Option<Marker>>>;
 type StyleOverrideFn = RefCell<Box<dyn FnMut(&mut AxisStyle)>>;
 
 /// An axis that maps data values to screen coordinates.
@@ -68,7 +69,7 @@ type StyleOverrideFn = RefCell<Box<dyn FnMut(&mut AxisStyle)>>;
 /// ```
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct Axis<D> {
+pub struct Axis<D, Theme = iced_core::Theme> {
     position: Position,
     thickness: Pixels,
     invisible: bool,
@@ -78,9 +79,9 @@ pub struct Axis<D> {
     #[derivative(Debug = "ignore")]
     scale: Box<dyn Scale<Domain = D, Normalized = f32>>,
     #[derivative(Debug = "ignore")]
-    tick_renderer: Option<TickRendererFn<D>>,
+    tick_renderer: Option<TickRendererFn<D, Theme>>,
     #[derivative(Debug = "ignore")]
-    marker_renderer: Option<MarkerRendererFn<D>>,
+    marker_renderer: Option<MarkerRendererFn<D, Theme>>,
     #[derivative(Debug = "ignore")]
     style_override: Option<StyleOverrideFn>,
 
@@ -88,7 +89,7 @@ pub struct Axis<D> {
     label_policy: LabelPolicy<D>,
 }
 
-impl<D: Float> Axis<D> {
+impl<D: Float, Theme> Axis<D, Theme> {
     /// Creates a new `Axis` with the given scale and position.
     ///
     /// By default, the axis will render:
@@ -100,7 +101,7 @@ impl<D: Float> Axis<D> {
         position: Position,
     ) -> Self {
         // Default tick renderer: major ticks get grid lines and long marks; minor ticks get short marks.
-        let tick_renderer = RefCell::new(Box::new(|ctx: TickContext<D>| {
+        let tick_renderer = RefCell::new(Box::new(|ctx: TickContext<D, Theme>| {
             let mut tickline = ctx.tickline();
             tickline.length = match ctx.tick.level {
                 0 => 10.0,
@@ -171,7 +172,7 @@ impl<D: Float> Axis<D> {
     /// ```
     pub fn with_tick_renderer<F>(mut self, renderer: F) -> Self
     where
-        F: FnMut(TickContext<D>) -> TickResult + 'static,
+        F: FnMut(TickContext<D, Theme>) -> TickResult + 'static,
     {
         self.tick_renderer = Some(RefCell::new(Box::new(renderer)));
         self
@@ -208,7 +209,7 @@ impl<D: Float> Axis<D> {
     /// The closure receives the data value at the marker position and returns the string to display.
     pub fn with_marker_renderer<F>(mut self, renderer: F) -> Self
     where
-        F: FnMut(MarkerContext<D>) -> Option<Marker> + 'static,
+        F: FnMut(MarkerContext<D, Theme>) -> Option<Marker> + 'static,
     {
         self.marker_renderer = Some(RefCell::new(Box::new(renderer)));
         self
@@ -226,7 +227,7 @@ impl<D: Float> Axis<D> {
     /// Updates the tick renderer in-place.
     pub fn set_tick_renderer<F>(&mut self, renderer: F)
     where
-        F: Fn(TickContext<D>) -> TickResult + 'static,
+        F: Fn(TickContext<D, Theme>) -> TickResult + 'static,
     {
         self.tick_renderer = Some(RefCell::new(Box::new(renderer)));
     }
@@ -316,6 +317,7 @@ impl<D: Float> Axis<D> {
     pub(crate) fn draw<Renderer>(
         &self,
         renderer: &mut Renderer,
+        theme: &Theme,
         style: &Style,
         layout: Layout<'_>,
         cursor: Cursor,
@@ -359,6 +361,7 @@ impl<D: Float> Axis<D> {
                     scale_domain: (d_max, d_min),
                     orientation: &orientation,
                     style: &style,
+                    theme,
                 })
             });
 
@@ -461,6 +464,7 @@ impl<D: Float> Axis<D> {
                 axis_bounds: &bounds,
                 scale_domain: (d_min, d_max),
                 style: &style.marker,
+                theme,
             })
         }) {
             self.draw_marker_overlay(
@@ -1006,7 +1010,7 @@ impl<D: Float> Axis<D> {
     }
 }
 
-impl<D: Float> Deref for Axis<D> {
+impl<D: Float, Theme> Deref for Axis<D, Theme> {
     type Target = dyn Scale<Domain = D, Normalized = f32>;
 
     fn deref(&self) -> &Self::Target {
@@ -1014,7 +1018,7 @@ impl<D: Float> Deref for Axis<D> {
     }
 }
 
-impl<D: Float> DerefMut for Axis<D> {
+impl<D: Float, Theme> DerefMut for Axis<D, Theme> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut *self.scale
     }

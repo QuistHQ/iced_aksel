@@ -5,7 +5,7 @@ use crate::style::{BadgeStyle, MarkerLineStyle, MarkerStyle};
 /// Context provided to marker renderers for creating styled markers.
 ///
 /// Contains the axis value at the marker position and the resolved marker style.
-pub struct MarkerContext<'a, D> {
+pub struct MarkerContext<'a, D, Theme = iced_core::Theme> {
     /// The axis value at the marker position.
     pub value: D,
     /// Normalized position (0.0-1.0) along the axis
@@ -14,11 +14,13 @@ pub struct MarkerContext<'a, D> {
     pub axis_bounds: &'a Rectangle,
     /// The domain (min, max) of the scale
     pub scale_domain: (D, D),
+    /// The theme of the application
+    pub theme: &'a Theme,
     /// The resolved style for the marker.
     pub(super) style: &'a MarkerStyle,
 }
 
-impl<D> MarkerContext<'_, D> {
+impl<D, Theme> MarkerContext<'_, D, Theme> {
     /// Creates a new [`Marker`] with applied styling.
     pub fn marker(&self, content: String) -> Marker {
         Marker {

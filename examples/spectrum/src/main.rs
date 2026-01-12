@@ -266,7 +266,7 @@ fn create_db_axis() -> Axis<f64> {
         .skip_overlapping_labels(8.0)
 }
 
-fn frequency_tick_renderer(ctx: TickContext<f64>) -> TickResult {
+fn frequency_tick_renderer(ctx: TickContext<f64, Theme>) -> TickResult {
     let line = TickLine {
         length: Pixels(if ctx.tick.level == 0 { 12.0 } else { 6.0 }),
         ..ctx.tickline()
@@ -277,7 +277,7 @@ fn frequency_tick_renderer(ctx: TickContext<f64>) -> TickResult {
         .grid_line(ctx.gridline())
 }
 
-fn db_tick_renderer(ctx: TickContext<f64>) -> TickResult {
+fn db_tick_renderer(ctx: TickContext<f64, Theme>) -> TickResult {
     let label = format_db_label(ctx.tick.value);
     TickResult::with_label(ctx.label(label))
         .tick_line(ctx.tickline())

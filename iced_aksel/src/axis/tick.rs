@@ -83,7 +83,7 @@ impl TickResult {
 ///
 /// Contains all the information needed to make decisions about how to render a tick.
 #[derive(Debug, Clone, Copy)]
-pub struct TickContext<'a, D> {
+pub struct TickContext<'a, D, Theme = iced_core::Theme> {
     /// The tick value and metadata from the scale.
     pub tick: Tick<D>,
     /// Normalized position (0.0-1.0) along the axis.
@@ -94,11 +94,13 @@ pub struct TickContext<'a, D> {
     pub scale_domain: (D, D),
     /// The orientation of the axis (horizontal or vertical).
     pub orientation: &'a Orientation,
+    /// The theme of the application
+    pub theme: &'a Theme,
     /// The default styling for this context
     pub(super) style: &'a AxisStyle,
 }
 
-impl<D: Float> TickContext<'_, D> {
+impl<D: Float, Theme> TickContext<'_, D, Theme> {
     /// Returns the total span of the axis in screen pixels.
     pub const fn axis_span(&self) -> f32 {
         match self.orientation {
