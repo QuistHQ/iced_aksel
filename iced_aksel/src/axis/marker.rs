@@ -1,4 +1,4 @@
-use iced_core::{Border, Color, Pixels, Shadow};
+use iced_core::{Border, Color, Pixels, Rectangle, Shadow};
 
 use crate::style::{BadgeStyle, MarkerLineStyle, MarkerStyle};
 
@@ -8,6 +8,12 @@ use crate::style::{BadgeStyle, MarkerLineStyle, MarkerStyle};
 pub struct MarkerContext<'a, D> {
     /// The axis value at the marker position.
     pub value: D,
+    /// Normalized position (0.0-1.0) along the axis
+    pub normalized_position: f32,
+    /// The bounds of the axis in screen coordinates
+    pub axis_bounds: &'a Rectangle,
+    /// The domain (min, max) of the scale
+    pub scale_domain: (D, D),
     /// The resolved style for the marker.
     pub style: &'a MarkerStyle,
 }

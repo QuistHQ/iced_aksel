@@ -454,8 +454,12 @@ impl<D: Float> Axis<D> {
         };
 
         if let Some(marker) = self.denormalize_opt(value_to_render).and_then(|value| {
+            let (&d_min, &d_max) = self.domain();
             marker_renderer.borrow_mut()(MarkerContext {
                 value,
+                normalized_position: self.normalize(&value),
+                axis_bounds: &bounds,
+                scale_domain: (d_min, d_max),
                 style: &style.marker,
             })
         }) {
