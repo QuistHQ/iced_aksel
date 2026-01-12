@@ -19,6 +19,7 @@ pub struct GridLineStyle {
     pub dashed: bool,
 }
 
+/// Style of tick lines on an axis.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TickLineStyle {
     /// The color of the tick-lines.
