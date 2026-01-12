@@ -52,9 +52,13 @@ impl From<MarkerLineStyle> for MarkerLine {
     }
 }
 
+/// Visual properties for the badge background behind the marker label.
 pub struct MarkerBadge {
+    /// The background color of the badge.
     pub background: Color,
+    /// The border styling of the badge.
     pub border: Border,
+    /// The shadow styling of the badge.
     pub shadow: Shadow,
 }
 
