@@ -32,6 +32,7 @@ strum.workspace = true
 strum_macros.workspace = true
 chrono.workspace = true
 iced.workspace = true
+iced_test.workspace = true
 
 [lints]
 workspace = true
