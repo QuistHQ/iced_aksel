@@ -1,7 +1,7 @@
 use iced::{Theme, time::Instant};
 use iced_aksel::{
     Axis, Chart, Measure, PlotPoint, Scale, State,
-    axis::{self, TickLine, TickResult},
+    axis::{self, TickResult},
     plot::{Plot, PlotData},
     scale::{Linear, Tick, TickIter},
     shape::Rectangle,
@@ -214,9 +214,14 @@ impl BarChart {
         state.set_axis(
             Self::VALUE_AXIS,
             Axis::new(value_scale, value_pos)
-                .with_tick_renderer(|tlc| match tlc.tick.level {
-                    0 => TickResult::default().label(format!("{:.2}", tlc.tick.value)),
-                    _ => TickResult::new(),
+                .with_tick_renderer(|ctx| match ctx.tick.level {
+                    0 => TickResult {
+                        label: Some(ctx.label(format!("{:.2}", ctx.tick.value))),
+                        tick_line: Some(ctx.tickline()),
+                        grid_line: Some(ctx.gridline()),
+                        ..Default::default()
+                    },
+                    _ => TickResult::empty(),
                 })
                 .skip_overlapping_labels(6.),
         );
@@ -234,23 +239,25 @@ impl BarChart {
             .axis_mut_opt(&Self::BAR_AXIS)
             .unwrap()
             .set_tick_renderer(move |ctx| {
-                let result = TickResult::new();
                 let idx = ctx.tick.value;
                 if idx <= 0. {
-                    return result;
+                    return TickResult::empty();
                 }
 
                 // Round to find nearest whole bar index
                 let index = idx.round() as usize;
                 if index == 0 {
-                    return result;
+                    return TickResult::empty();
                 }
 
-                if let Some(label) = labels.get(index - 1) {
-                    return result.label(label).tick_line(TickLine::default());
+                if let Some(text) = labels.get(index - 1) {
+                    return TickResult {
+                        label: Some(ctx.label(text.clone())),
+                        ..Default::default()
+                    };
                 }
 
-                result
+                TickResult::empty()
             });
     }
 }

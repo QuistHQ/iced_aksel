@@ -14,7 +14,7 @@ use iced::{
 };
 use iced_aksel::{
     Axis, Chart, Measure, Plot, PlotData, PlotPoint, State, Stroke,
-    axis::{GridLine, Position, TickContext, TickLine, TickResult},
+    axis::{Position, TickContext, TickLine, TickResult},
     scale, shape,
 };
 
@@ -253,14 +253,14 @@ fn create_frequency_axis() -> Axis<f64> {
         scale::Logarithmic::new(10.0, MIN_FREQ, MAX_FREQ),
         Position::Bottom,
     )
-    .with_cursor_formatter(|value| Some(format_frequency_label(value)))
+    .with_marker_renderer(|ctx| Some(ctx.marker(format_frequency_label(ctx.value))))
     .with_tick_renderer(frequency_tick_renderer)
     .skip_overlapping_labels(8.0)
 }
 
 fn create_db_axis() -> Axis<f64> {
     Axis::new(scale::Linear::new(MIN_DB, MAX_DB), Position::Left)
-        .with_cursor_formatter(|value| Some(format_db_label(value)))
+        .with_marker_renderer(|ctx| Some(ctx.marker(format_db_label(ctx.value))))
         .with_tick_renderer(db_tick_renderer)
         .with_thickness(80.0)
         .skip_overlapping_labels(8.0)
@@ -268,24 +268,20 @@ fn create_db_axis() -> Axis<f64> {
 
 fn frequency_tick_renderer(ctx: TickContext<f64>) -> TickResult {
     let line = TickLine {
-        thickness: Pixels(1.0),
         length: Pixels(if ctx.tick.level == 0 { 12.0 } else { 6.0 }),
+        ..ctx.tickline()
     };
     let label = format_frequency_label(ctx.tick.value);
-    TickResult::with_label(label)
+    TickResult::with_label(ctx.label(label))
         .tick_line(line)
-        .grid_line(GridLine::default())
+        .grid_line(ctx.gridline())
 }
 
 fn db_tick_renderer(ctx: TickContext<f64>) -> TickResult {
-    let line = TickLine {
-        thickness: Pixels(1.0),
-        ..Default::default()
-    };
     let label = format_db_label(ctx.tick.value);
-    TickResult::with_label(label)
-        .tick_line(line)
-        .grid_line(GridLine::default())
+    TickResult::with_label(ctx.label(label))
+        .tick_line(ctx.tickline())
+        .grid_line(ctx.gridline())
 }
 
 fn format_frequency_label(value: f64) -> String {

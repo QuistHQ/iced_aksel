@@ -70,13 +70,15 @@ impl Interactions {
             .skip_overlapping_labels(6.)
             .with_tick_renderer(|ctx| {
                 // If it's a Major tick (Level 0), show it.
-                return TickResult {
-                    label: Some(format!("{:.1}s", ctx.tick.value).into()),
-                    ..Default::default()
-                };
-
-                // Otherwise, hide everything (Line and Label).
-                TickResult::new()
+                if ctx.tick.level == 0 {
+                    TickResult {
+                        label: Some(ctx.label(format!("{:.1}s", ctx.tick.value))),
+                        tick_line: Some(ctx.tickline()),
+                        ..Default::default()
+                    }
+                } else {
+                    TickResult::empty()
+                }
             });
 
         // ---------------------------------------------------------------------
@@ -86,22 +88,19 @@ impl Interactions {
         // - Minor ticks: Small/Thin line + NO Text
         // ---------------------------------------------------------------------
         let axis_y = Axis::new(linear_y, axis::Position::Left).with_tick_renderer(|ctx| {
-            if ctx.tick.level == 0 {
-                // Major: Full visibility
-                return TickResult {
-                    tick_line: Some(TickLine::default()),
-                    label: Some(format!("{:.1}V", ctx.tick.value).into()),
-                    ..Default::default()
-                };
-            }
-
-            // Minor and below: Small tick line, no text
-            TickResult {
-                tick_line: Some(TickLine {
-                    thickness: 0.5.into(),
+            let is_major = ctx.tick.level == 0;
+            let label = is_major.then(|| ctx.label(format!("{:.1}V", ctx.tick.value)));
+            let tick_line = is_major.then(|| ctx.tickline()).or_else(|| {
+                Some(TickLine {
+                    width: 0.5.into(),
                     length: 2.5.into(),
-                }),
-                label: None, // Explicitly no label
+                    ..ctx.tickline()
+                })
+            });
+
+            TickResult {
+                tick_line,
+                label,
                 ..Default::default()
             }
         });

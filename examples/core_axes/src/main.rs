@@ -68,7 +68,8 @@ impl AxesShowcase {
             row![
                 text("Theme: "),
                 pick_list(iced::Theme::ALL, Some(&self.theme), Message::ThemeChanged)
-            ],
+            ]
+            .padding(20),
             row![
                 self.panel(
                     "1. Minimal Layout",
@@ -94,6 +95,7 @@ impl AxesShowcase {
             .padding(20)
         ]
         .spacing(20)
+        .padding(20)
         .into()
     }
 
@@ -227,6 +229,10 @@ fn setup_custom_axes() -> State<&'static str, f64> {
         AxesShowcase::X,
         Axis::new(Linear::new(0.0, 100.0), axis::Position::Top)
             .with_thickness(45.0)
+            .style(|style| {
+                // Override style to have dashed gridlines, without changing the renderer itself
+                style.grid.dashed = true;
+            })
             .with_marker_renderer(|ctx| Some(ctx.marker(format!("T: {:.1}s", ctx.value)))),
     );
 
@@ -236,23 +242,24 @@ fn setup_custom_axes() -> State<&'static str, f64> {
         Axis::new(Linear::new(-1.5, 1.5), axis::Position::Right)
             .with_thickness(55.0)
             .with_tick_renderer(|ctx| {
-                // Show grid only for major ticks
                 let is_major = ctx.tick.level == 0;
+
+                // Show grid only for major ticks
+                let grid_line = is_major.then(|| GridLine {
+                    width: 1.0.into(),
+                    dashed: true,
+                    ..ctx.gridline()
+                });
+                // Show labels only for major ticks
+                let label = is_major.then(|| ctx.label(format!("{:.1}", ctx.tick.value)));
                 TickResult {
-                    grid_line: Some(GridLine {
-                        width: if is_major { 1.0.into() } else { 0.0.into() },
-                        ..ctx.gridline()
-                    }),
+                    grid_line,
+                    label,
                     tick_line: Some(TickLine {
                         width: 1.0.into(),
                         length: 4.0.into(),
                         ..ctx.tickline()
                     }),
-                    label: if is_major {
-                        Some(ctx.label(format!("{:.1}", ctx.tick.value)))
-                    } else {
-                        None
-                    },
                     ..Default::default()
                 }
             })

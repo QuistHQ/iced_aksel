@@ -40,6 +40,47 @@ impl TickResult {
     pub fn empty() -> Self {
         Self::default()
     }
+
+    pub fn with_label(label: super::Label) -> Self {
+        Self {
+            label: Some(label),
+            ..Self::empty()
+        }
+    }
+
+    pub fn label(mut self, label: super::Label) -> Self {
+        self.label = Some(label);
+        self
+    }
+
+    pub fn with_tick_line(tick_line: TickLine) -> Self {
+        Self {
+            tick_line: Some(tick_line),
+            ..Self::empty()
+        }
+    }
+
+    pub const fn tick_line(mut self, tick_line: TickLine) -> Self {
+        self.tick_line = Some(tick_line);
+        self
+    }
+
+    pub fn with_grid_line(grid_line: super::GridLine) -> Self {
+        Self {
+            grid_line: Some(grid_line),
+            ..Self::empty()
+        }
+    }
+
+    pub const fn grid_line(mut self, grid_line: super::GridLine) -> Self {
+        self.grid_line = Some(grid_line);
+        self
+    }
+
+    pub const fn label_priority(mut self, priority: u8) -> Self {
+        self.label_priority = Some(priority);
+        self
+    }
 }
 
 /// Context provided to tick renderer functions.
@@ -137,7 +178,7 @@ pub struct PlacedLabelInfo<D> {
     pub bounds: LabelBounds,
 }
 
-pub(crate) struct PrioritizedTick<D> {
+pub struct PrioritizedTick<D> {
     pub tick: aksel::Tick<D>,
     /// 0.0 = Major Tick (Critical)
     /// 1.0 = Center of Interval (High Priority)

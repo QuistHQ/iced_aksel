@@ -10,7 +10,7 @@ use iced_aksel::{
     PlotPoint,
     State,
     Stroke,
-    axis::{self, TickLine, TickResult},
+    axis::{self, TickResult},
     plot::{Plot, PlotData},
     scale::Linear,
     // Added Zone to imports
@@ -503,19 +503,22 @@ impl LineChart {
         let x_axis = self.state.axis_mut(&Self::X.to_string());
 
         x_axis.set_tick_renderer(move |ctx| {
-            let mut result = TickResult::new();
             let idx = ctx.tick.value.round();
             if (ctx.tick.value - idx).abs() > 0.001 {
-                return result;
-            }
-            let idx = idx as usize;
-            if idx < labels.len() {
-                return result
-                    .label(labels[idx].clone())
-                    .tick_line(TickLine::default());
+                return TickResult::empty();
             }
 
-            result
+            let idx = idx as usize;
+            let valid_idx = idx < labels.len();
+
+            let label = valid_idx.then(|| ctx.label(labels[idx].clone()));
+            let tick_line = valid_idx.then(|| ctx.tickline());
+
+            TickResult {
+                label,
+                tick_line,
+                ..Default::default()
+            }
         });
     }
 
@@ -666,9 +669,15 @@ impl PlotData<f64> for LineChart {
 
 fn y_axis(min_y: f64, max_y: f64) -> Axis<f64> {
     Axis::new(Linear::new(min_y, max_y), axis::Position::Left).with_tick_renderer(|ctx| {
-        match ctx.tick.level {
-            0 => TickResult::default().label(format!("{:.2}", ctx.tick.value)),
-            _ => TickResult::new(),
+        if ctx.tick.level != 0 {
+            return TickResult::empty();
+        }
+
+        TickResult {
+            label: Some(ctx.label(format!("{:.2}", ctx.tick.value))),
+            tick_line: Some(ctx.tickline()),
+            grid_line: Some(ctx.gridline()),
+            ..Default::default()
         }
     })
 }

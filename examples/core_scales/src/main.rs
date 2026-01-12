@@ -231,27 +231,33 @@ impl PlotData<f64> for ExponentialData {
 fn x_axis_tick_renderer(ctx: TickContext<f64>) -> TickResult {
     // Only show Major ticks
     if ctx.tick.level != 0 {
-        return TickResult::new();
+        return TickResult::empty();
     }
-    TickResult::default().label(format!("{:.0}", ctx.tick.value))
+    TickResult {
+        label: Some(ctx.label(format!("{:.0}", ctx.tick.value))),
+        tick_line: Some(ctx.tickline()),
+        ..Default::default()
+    }
 }
 
 fn y_axis_tick_renderer(ctx: TickContext<f64>) -> TickResult {
-    let result = TickResult::default();
-
     // Only show tick-lines and labels on Major ticks
     if ctx.tick.level != 0 {
-        return result;
+        return TickResult::empty();
     }
 
     let val = ctx.tick.value;
-    let label = if val >= 1000.0 {
+    let label_text = if val >= 1000.0 {
         format!("{:.0}k", val / 1000.0)
     } else {
         format!("{:.0}", val)
     };
 
-    result.label(label)
+    TickResult {
+        label: Some(ctx.label(label_text)),
+        tick_line: Some(ctx.tickline()),
+        ..Default::default()
+    }
 }
 
 // ------------------------------------------------------------------------------

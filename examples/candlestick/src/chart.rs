@@ -4,7 +4,7 @@ use chrono::{Datelike, TimeZone, Timelike};
 use iced::mouse::ScrollDelta;
 use iced_aksel::{
     Axis, Chart, Measure, State,
-    axis::{self, GridLine, Position, TickContext, TickLine, TickResult},
+    axis::{Position, TickContext, TickResult},
     plot::DragDelta,
     scale::Linear,
 };
@@ -388,7 +388,7 @@ impl CandlestickChart {
         }
     }
 
-    // Factory for creating the main X-axis (with labels).
+    // Function for creating the main X-axis (with labels).
     fn create_x_axis(range: (f64, f64)) -> Axis<f64> {
         let scale = Linear::new(range.0, range.1);
         let mut current_month = u32::MAX;
@@ -399,7 +399,7 @@ impl CandlestickChart {
             let timestamp_seconds = ctx.tick.value as i64 * 60; // Assuming 1 unit = 1 minute
 
             let Some(datetime) = chrono::Utc.timestamp_opt(timestamp_seconds, 0).single() else {
-                return TickResult::new();
+                return TickResult::empty();
             };
 
             let text = match span {
@@ -423,7 +423,7 @@ impl CandlestickChart {
                     let is_midnight = datetime.minute() == 0 && datetime.hour() == 0;
 
                     if !is_midnight && datetime.minute() % step != 0 {
-                        return TickResult::new();
+                        return TickResult::empty();
                     }
 
                     // 3. Format the text
@@ -450,21 +450,10 @@ impl CandlestickChart {
             };
 
             // Standard label generation
-            let label = match ctx.tick.level {
-                0 => Some(text.into()),
-                1 => Some(text.into()),
-                _ => None,
-            };
-
-            let grid_line = match ctx.tick.level {
-                0 => Some(GridLine::default()),
-                _ => None,
-            };
-
-            let tick_line = match ctx.tick.level {
-                0 => Some(TickLine::default()),
-                _ => None,
-            };
+            let label = matches!(ctx.tick.level, 0..=1).then(|| ctx.label(text));
+            let is_major = ctx.tick.level == 0;
+            let grid_line = is_major.then(|| ctx.gridline());
+            let tick_line = is_major.then(|| ctx.tickline());
 
             TickResult {
                 label,
@@ -476,10 +465,10 @@ impl CandlestickChart {
 
         Axis::new(scale, Position::Bottom)
             .with_tick_renderer(tick_renderer)
-            .with_cursor_formatter(|x| {
-                let timestamp_seconds = x as i64 * 60;
+            .with_marker_renderer(|ctx| {
+                let timestamp_seconds = ctx.value as i64 * 60;
                 let datetime = chrono::Utc.timestamp_opt(timestamp_seconds, 0).single()?;
-                Some(datetime.format("%a %d %b '%g %H:%M").to_string())
+                Some(ctx.marker(datetime.format("%a %d %b '%g %H:%M").to_string()))
             })
             .skip_overlapping_labels(12.0)
     }
@@ -488,10 +477,14 @@ impl CandlestickChart {
     fn create_y_axis(range: (f64, f64)) -> Axis<f64> {
         let scale = Linear::new(range.0, range.1);
         Axis::new(scale, Position::Right)
-            .with_tick_renderer(|ctx: TickContext<f64>| -> TickResult {
-                TickResult::default().label(format!("{:.2}", ctx.tick.value))
+            .with_tick_renderer(|ctx| -> TickResult {
+                TickResult {
+                    label: Some(ctx.label(format!("{:.2}", ctx.tick.value))),
+                    tick_line: Some(ctx.tickline()),
+                    ..Default::default()
+                }
             })
-            .with_cursor_formatter(|x| Some(format!("{x:.2}")))
+            .with_marker_renderer(|ctx| Some(ctx.marker(format!("{:.2}", ctx.value))))
             .skip_overlapping_labels(8.0)
     }
 
