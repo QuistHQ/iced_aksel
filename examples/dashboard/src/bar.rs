@@ -253,6 +253,7 @@ impl BarChart {
                 if let Some(text) = labels.get(index - 1) {
                     return TickResult {
                         label: Some(ctx.label(text.clone())),
+                        tick_line: Some(ctx.tickline()),
                         ..Default::default()
                     };
                 }

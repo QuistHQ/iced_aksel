@@ -1,6 +1,8 @@
 mod buffer;
 pub(crate) mod tessellation;
+mod text;
 
 pub use buffer::MeshBuffer;
+pub use tessellation::Quality;
 pub use tessellation::Tessellator;
-pub use tessellation::Tessellator as Tessellators; // Alias for backward compatibility
+pub use text::Text;

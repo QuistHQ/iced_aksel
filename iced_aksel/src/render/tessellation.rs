@@ -1,27 +1,58 @@
+//! The core vector tessellation engine.
+//!
+//! This module is responsible for converting high-level geometric primitives (Circles,
+//! Arcs, Text, Polygons) into raw triangle meshes that the GPU can render.
+//!
+//! # Architecture
+//! The `Tessellator` acts as the central "Brain" of the rendering pipeline. It orchestrates
+//! two distinct strategies:
+//!
+//! 1.  **Fast Path (Manual):** Direct vertex generation for simple shapes.
+//!     * Used for: Rectangles, Circles, Triangles, Solid Lines.
+//!     * Benefit: Extremely fast (no heavy math libraries).
+//!
+//! 2.  **Robust Path (Complex):** Uses the `lyon` library for advanced geometry.
+//!     * Used for: Dashed lines, Bezier, Complex Polygons, Text.
+//!     * Benefit: Handles mathematically difficult edge cases (e.g., stroke miters, dash gaps).
+
 pub mod complex;
 pub mod manual;
 pub mod math;
+pub mod text;
 
-use crate::{Stroke, render::MeshBuffer, stroke::StrokeStyle};
+use crate::{
+    Stroke,
+    render::{MeshBuffer, text::Text},
+    stroke::StrokeStyle,
+};
 use complex::{ComplexTessellator, DashedPolyline, LyonAdapter, SolidVertexConstructor};
 use iced_core::{Color, Point, Rectangle};
 use iced_graphics::color::pack;
 use lyon_path::{LineCap, LineJoin, Path, PathEvent, iterator::FromPolyline, traits::PathIterator};
-use lyon_tessellation::{FillOptions, StrokeOptions};
+use lyon_tessellation::{StrokeOptions, VertexBuffers};
 use math::*;
+// Removed unused std::collections::HashMap import
+
+use crate::render::tessellation::text::{TextRenderContext, TextTessellationCache};
+pub use text::Quality;
 
 /// The central driver for the rendering engine.
 ///
-/// The `Tessellator` acts as the "Brain" of the graphics pipeline. It orchestrates the
-/// tessellation process by deciding which strategy to use for a given shape:
-///
-/// * **Fast Path (Manual):** Direct vertex generation for simple primitives (Rects, Circles, Lines).
-/// * **Robust Path (Complex):** Lyon-based tessellation for dashed lines, complex paths, and boolean operations.
-///
-/// It encapsulates the underlying sub-tessellators to ensure consistent state and optimizations.
+/// It encapsulates the underlying sub-tessellators and manages shared resources
+/// like the glyph cache and scratch buffers to minimize memory allocations.
 pub struct Tessellator {
+    /// Handles complex paths (dashes, curves) using Lyon.
     complex: ComplexTessellator,
+    /// Handles simple primitives (rects, circles) using direct math.
     manual: manual::ManualTessellator,
+
+    /// A reusable scratch buffer for intermediate tessellation (e.g., text glyphs).
+    /// Prevents re-allocating memory for every single character.
+    scratch_geometry: VertexBuffers<Point, u16>,
+
+    /// Cache for tessellated text glyphs to avoid re-tessellating the alphabet every frame.
+    glyph_cache: TextTessellationCache,
+
     /// Global quality multiplier.
     /// * 1.0 = Standard (Default).
     /// * 0.5 = High Performance (Lower vertex count for curves).
@@ -34,6 +65,8 @@ impl Default for Tessellator {
         Self {
             complex: ComplexTessellator::default(),
             manual: manual::ManualTessellator::default(),
+            scratch_geometry: VertexBuffers::new(),
+            glyph_cache: TextTessellationCache::new(),
             quality: 1.0,
         }
     }
@@ -47,19 +80,38 @@ impl Tessellator {
 
     /// Sets the rendering quality multiplier.
     ///
-    /// This value controls the Level of Detail (LOD) for curves, arcs, and circles.
+    /// This value controls the Level of Detail (LOD) for curves, arcs, circles, and text.
     /// * `1.0` is the default standard.
     /// * Values `< 1.0` reduce vertex count for higher performance.
     /// * Values `> 1.0` increase vertex count for smoother visuals.
     ///
-    /// The value is automatically clamped between `0.1` and `5.0`.
+    /// # Cache Invalidation
+    /// If the quality changes significantly, this method automatically clears the
+    /// text cache. This prevents the "Sticky Cache" problem where high-quality glyphs
+    /// persist even after the user requests lower quality (or vice versa).
     pub fn set_quality(&mut self, quality: f32) {
-        self.quality = quality.clamp(0.1, 5.0);
+        let new_quality = quality.clamp(0.1, 5.0);
+
+        // If the quality has changed significantly (more than float error)...
+        if (self.quality - new_quality).abs() > 0.001 {
+            self.quality = new_quality;
+
+            // ...invalidate the cache.
+            // This forces the engine to regenerate geometry at the new
+            // quality level.
+            self.glyph_cache.clear();
+        }
     }
 
     /// Returns the current quality multiplier.
     pub fn quality(&self) -> f32 {
         self.quality
+    }
+
+    /// Manually clears the text glyph cache.
+    /// Useful if you are changing fonts or handling memory pressure warnings.
+    pub fn clear_glyph_cache(&mut self) {
+        self.glyph_cache.clear();
     }
 
     // =========================================================================
@@ -68,7 +120,7 @@ impl Tessellator {
 
     /// Draws an axis-aligned rectangle.
     ///
-    /// # optimization
+    /// # Optimization
     /// If the stroke thickness is large enough to cover the entire rectangle (e.g. thickness >= width),
     /// the engine will automatically switch to drawing a simple filled rectangle to save vertices.
     #[allow(clippy::too_many_arguments)]
@@ -99,7 +151,7 @@ impl Tessellator {
         }
 
         if let Some(color) = fill {
-            // "Bleed fix": Overlap fill and stroke slightly to prevent sub-pixel gaps (anti-aliasing artifacts)
+            // "Bleed fix": Overlap fill and stroke slightly to prevent sub-pixel gaps (antialiasing artifacts)
             let overlap = if stroke.is_some() && width > 1.0 && height > 1.0 {
                 0.5
             } else {
@@ -441,11 +493,9 @@ impl Tessellator {
         let mut draw_end = raw_end;
         let is_infinite = extensions.0 || extensions.1;
 
-        // --- CHANGE START ---
         // 1. Resolve Infinite Geometry
         if is_infinite {
             let margin = width.max(1.0);
-            // Replace tuple with Bounds struct
             let bounds = Bounds::new(clip_bounds, margin);
 
             if let Some((edge_start, edge_end)) = clip_infinite_line(raw_start, raw_end, bounds) {
@@ -463,7 +513,6 @@ impl Tessellator {
         // 2. Resolve Finite Clipping
         if !is_infinite {
             let margin = width.max(1.0);
-            // Replace tuple with Bounds struct
             let bounds = Bounds::new(clip_bounds, margin);
 
             if let Some((clipped_p1, clipped_p2)) = clip_segment(draw_start, draw_end, bounds) {
@@ -546,11 +595,9 @@ impl Tessellator {
         let p0 = point_list[0];
         let pn = point_list[last_idx];
 
-        // --- CHANGE START ---
         // 1. Handle Infinite Extensions
         if extensions.0 || extensions.1 {
             let margin = width.max(1.0);
-            // Replace tuple with Bounds struct
             let bounds = Bounds::new(clip_bounds, margin);
 
             if extensions.0 {
@@ -781,7 +828,7 @@ impl Tessellator {
             let mut draw_in = radius_inner;
             let mut draw_out = radius_outer;
 
-            // Bleed fix for anti-aliasing
+            // Bleed fix for antialiasing
             if stroke.is_some() {
                 draw_out = (radius_outer - 0.5).max(draw_in);
                 draw_in = (radius_inner + 0.5).min(draw_out);
@@ -1061,21 +1108,41 @@ impl Tessellator {
         self.stroke_polyline(buffer, points, stroke, resolved_width, true);
     }
 
-    // TODO: This could be considered to be removed later. Kept for now to allow for lyon
-    /// Internal adapter for filling complex polygons using Lyon.
-    fn fill_polygon<I>(&mut self, buffer: &mut MeshBuffer, points: I, color: Color)
-    where
-        I: IntoIterator<Item = lyon_tessellation::math::Point>,
-    {
-        let options = FillOptions::default();
-        let mesh = buffer.get_mesh_mut();
-        let mut writer = LyonAdapter::new(mesh, SolidVertexConstructor { color: pack(color) });
-        let _ = self.complex.fill.tessellate(
-            FromPolyline::new(true, points.into_iter()),
-            &options,
-            &mut writer,
-        );
+    // =========================================================================
+    //  Text (Vector)
+    // =========================================================================
+
+    /// Draws text as a vector mesh using the tessellation engine.
+    ///
+    /// Unlike standard text, this method generates raw geometry (triangles) which can be
+    /// freely rotated and scaled without losing quality.
+    ///
+    /// **OBS:** Only use this if you need rotation or dynamic sizing text.
+    ///
+    /// This is more CPU intensive than its `Label` counterpart, so if you need thousands
+    /// of labels at the same time, ensure you set the Quality settings appropriately.
+    ///
+    /// **Internal Refactor:** This method now bundles the rendering context and request
+    /// parameters into structs to improve maintainability.
+    pub fn draw_text(&mut self, mesh_buffer: &mut MeshBuffer, text: Text) {
+        // Construct the context to hold heavy resources (caches, buffers)
+        let ctx = &mut TextRenderContext {
+            mesh_buffer,
+            tessellator: &mut self.complex.fill,
+            glyph_cache: &mut self.glyph_cache,
+            scratch_geometry: &mut self.scratch_geometry,
+
+            // Pass the global tessellator quality multiplier down to the text engine
+            quality_multiplier: self.quality,
+        };
+
+        // Delegate to the text engine
+        text::draw_geometric_text(ctx, text);
     }
+
+    // =========================================================================
+    //  Internal Helpers
+    // =========================================================================
 
     fn resolve_lod(&self, radius: f32) -> usize {
         let raw = radius * 2.0 * self.quality;

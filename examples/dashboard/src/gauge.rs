@@ -545,7 +545,7 @@ impl PlotData<f64> for Gauge {
             plot.add_shape(
                 Label::new(text, pos)
                     .fill(active_color)
-                    .size(32.0)
+                    .size(Measure::Screen(32.0))
                     .align(Horizontal::Center, vert),
             );
         }
@@ -557,7 +557,7 @@ impl PlotData<f64> for Gauge {
                         a: 0.7,
                         ..palette.text
                     })
-                    .size(16.0)
+                    .size(Measure::Screen(16.0))
                     .align(Horizontal::Center, vert),
             );
         }

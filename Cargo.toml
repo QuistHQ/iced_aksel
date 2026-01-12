@@ -13,10 +13,10 @@ readme = "README.md"
 keywords = ["iced", "chart", "canvas"]
 categories = ["gui"]
 exclude = [
-"flake.nix",
-"flake.lock",
-".github/*",
-"examples/*"
+    "flake.nix",
+    "flake.lock",
+    ".github/*",
+    "examples/*"
 ]
 
 [workspace.lints.clippy]
@@ -31,14 +31,15 @@ nursery = { level = "deny", priority = -1 }
 aksel = "0.2"
 chrono = "0.4"
 cpal = "0.17.0"
-derive_more = { version = "2.0", features = ["from", "error", "display", "into"]}
+derive_more = { version = "2.0", features = ["from", "error", "display", "into"] }
 derivative = "2.2"
-earcutr = "0.4"
+earcutr = "0.5"
 iced = "0.14.0"
 iced_core = "0.14.0"
 iced_graphics = "0.14.0"
 iced_renderer = { version = "0.14.0", features = ["wgpu", "wgpu-bare"] }
 indexmap = "2.12"
+lru = "0.16"
 lyon_tessellation = "1.0"
 lyon_path = "1.0"
 lyon = "1.0"

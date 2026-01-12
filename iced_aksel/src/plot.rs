@@ -4,12 +4,12 @@
 //! The main entry point is the [`PlotData`] trait, which you implement to draw your data.
 
 use crate::{
-    render::{MeshBuffer, Tessellators},
+    render::{MeshBuffer, Tessellator},
     shape::Shape,
 };
 
 use aksel::{Float, PlotRect, Transform};
-use iced_core::{Color, Point, Text};
+use iced_core::Font;
 
 /// Normalized drag delta for panning operations.
 ///
@@ -35,12 +35,16 @@ pub struct DragDelta {
 ///
 /// This trait is automatically implemented for any renderer that satisfies the requirements.
 pub trait Renderer:
-    iced_core::Renderer + iced_graphics::mesh::Renderer + iced_core::text::Renderer
+    iced_core::Renderer
+    + iced_graphics::mesh::Renderer
+    + iced_core::text::Renderer<Font = iced_core::Font>
 {
 }
 
 impl<T> Renderer for T where
-    T: iced_core::Renderer + iced_graphics::mesh::Renderer + iced_core::text::Renderer
+    T: iced_core::Renderer
+        + iced_graphics::mesh::Renderer
+        + iced_core::text::Renderer<Font = iced_core::Font>
 {
 }
 
@@ -81,35 +85,6 @@ where
     fn draw(&self, plot: &mut Plot<D, R>, theme: &Theme);
 }
 
-#[derive(Debug, Clone, Copy)]
-enum ShapeType {
-    Mesh,
-    Text,
-}
-
-/// A wrapper for rendering text on the plot.
-///
-/// Provides access to the renderer's text drawing capabilities.
-pub struct TextRenderer<'a, Renderer: iced_core::text::Renderer>(&'a mut Renderer);
-
-impl<Renderer: iced_core::text::Renderer> TextRenderer<'_, Renderer> {
-    /// Renders text at the specified position.
-    pub fn fill_text(
-        &mut self,
-        text: Text<String, Renderer::Font>,
-        position: Point,
-        color: Color,
-        clip_bounds: iced_core::Rectangle,
-    ) {
-        self.0.fill_text(text, position, color, clip_bounds);
-    }
-
-    /// Returns the default font for this renderer.
-    pub fn default_font(&self) -> Renderer::Font {
-        self.0.default_font()
-    }
-}
-
 /// Internal rendering context for shapes.
 ///
 /// Manages layer ordering and buffering for efficient rendering.
@@ -117,16 +92,15 @@ pub struct Context<'a, D: Float, Renderer: self::Renderer = iced_renderer::Rende
     transform: &'a Transform<'a, D, f32, f32>,
     clip_bounds: &'a iced_core::Rectangle,
     renderer: &'a mut Renderer,
-    tessellators: &'a mut Tessellators,
+    tessellators: &'a mut Tessellator,
     mesh_buffer: &'a mut MeshBuffer,
-    last_drawn: ShapeType,
 }
 
 impl<'a, D: Float, Renderer: self::Renderer> Context<'a, D, Renderer> {
+    /// Returns the default font of the underlying renderer
     #[inline(always)]
-    fn reset_layer(&mut self) {
-        self.renderer.end_layer();
-        self.renderer.start_layer(*self.clip_bounds);
+    pub fn default_font(&mut self) -> Font {
+        self.renderer.default_font()
     }
 
     /// Renders a mesh-based shape (lines, polygons, etc.).
@@ -134,15 +108,8 @@ impl<'a, D: Float, Renderer: self::Renderer> Context<'a, D, Renderer> {
     /// Used internally by shapes to add geometry to the mesh buffer.
     pub fn render_mesh<F>(&mut self, f: F)
     where
-        F: FnOnce(&Transform<'a, D, f32, f32>, &mut MeshBuffer, &mut Tessellators),
+        F: FnOnce(&Transform<'a, D, f32, f32>, &mut MeshBuffer, &mut Tessellator),
     {
-        if matches!(self.last_drawn, ShapeType::Text) {
-            // Since meshes are always drawn under text, we have to start a new layer in order to
-            // ensure Z-ordering
-            self.last_drawn = ShapeType::Mesh;
-            self.reset_layer();
-        }
-
         // Draw mesh
         f(self.transform, self.mesh_buffer, self.tessellators);
 
@@ -150,23 +117,6 @@ impl<'a, D: Float, Renderer: self::Renderer> Context<'a, D, Renderer> {
         if self.mesh_buffer.vertices_count() >= self.mesh_buffer.limit() {
             self.mesh_buffer.render(self.renderer, self.clip_bounds);
         }
-    }
-
-    /// Renders a text-based shape.
-    ///
-    /// Used internally by text shapes to render using the text renderer.
-    pub fn render_text<F>(&mut self, f: F)
-    where
-        F: FnOnce(&Transform<'a, D, f32, f32>, &mut TextRenderer<'_, Renderer>),
-    {
-        if matches!(self.last_drawn, ShapeType::Mesh) {
-            // Since text is always drawn over meshes, we don't **have** to start a new layer.
-            self.last_drawn = ShapeType::Text;
-        }
-
-        let mut renderer = TextRenderer(self.renderer);
-
-        f(self.transform, &mut renderer)
     }
 }
 
@@ -186,21 +136,19 @@ where
     /// Creates a new plot context.
     ///
     /// This is typically called internally by the Chart widget.
-    pub fn new(
-        tessellators: &'a mut Tessellators,
+    pub const fn new(
+        tessellators: &'a mut Tessellator,
         renderer: &'a mut R,
         clip_bounds: &'a iced_core::Rectangle,
         mesh_buffer: &'a mut MeshBuffer,
         transform: &'a Transform<'a, D, f32, f32>,
     ) -> Self {
-        renderer.start_layer(*clip_bounds);
         let context = Context {
             transform,
             clip_bounds,
             renderer,
             tessellators,
             mesh_buffer,
-            last_drawn: ShapeType::Mesh,
         };
         Self { context }
     }
@@ -244,41 +192,6 @@ where
     pub fn add_shape<S: Shape<D, R>>(&mut self, shape: S) {
         shape.render(&mut self.context)
     }
-
-    // OLD CODE: See Context now
-    // fn add_to_mesh(&mut self, shape: Shape<D>) {
-    //     shape.add_to_buffer(self.transform, self.tessellators, self.mesh_buffer);
-    //
-    //     if self.mesh_buffer.vertices_count() >= self.mesh_buffer.limit() {
-    //         self.mesh_buffer.render(self.renderer, self.bounds);
-    //         self.renderer.end_layer();
-    //         self.renderer.start_layer(*self.bounds);
-    //     }
-    // }
-    //
-    // fn render_text(&mut self, shape: Shape<D>) {
-    //     // --- CRITICAL FIX FOR Z-ORDERING ---
-    //     // This is an immediate-mode shape (like text).
-    //     // We MUST render all meshes that came before it *first*.
-    //
-    //     // 1. Render all meshes currently in the buffer.
-    //     self.mesh_buffer.render(self.renderer, self.bounds);
-    //
-    //     // 2. End the layer that contained those meshes.
-    //     self.renderer.end_layer();
-    //
-    //     // 3. Start a NEW layer just for this single immediate shape.
-    //     self.renderer.start_layer(*self.bounds);
-    //
-    //     // 4. Render the immediate shape (text, etc.).
-    //     shape.render(self.transform, self.renderer);
-    //
-    //     // 5. End the layer for the immediate shape.
-    //     self.renderer.end_layer();
-    //
-    //     // 6. Start another NEW layer for the *next* batch of meshes.
-    //     self.renderer.start_layer(*self.bounds);
-    // }
 }
 
 impl<'a, D, R> Drop for Plot<'a, D, R>
@@ -290,6 +203,5 @@ where
         self.context
             .mesh_buffer
             .render(self.context.renderer, self.context.clip_bounds);
-        self.context.renderer.end_layer()
     }
 }

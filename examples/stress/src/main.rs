@@ -393,6 +393,7 @@ struct StressLabels {
     colors: Vec<Color>,
     show_labels: bool,
     font_size: f32,
+    size_mode: LengthMode,
 }
 
 impl PlotData<f64> for StressLabels {
@@ -403,7 +404,10 @@ impl PlotData<f64> for StressLabels {
 
         for (base_label, &color) in self.geometry.iter().zip(self.colors.iter()) {
             let mut label = base_label.clone();
-            label = label.fill(color).size(self.font_size);
+            label = label.fill(color).size(match self.size_mode {
+                LengthMode::Screen => Measure::Screen(self.font_size),
+                LengthMode::Plot => Measure::Plot(self.font_size as f64),
+            });
             plot.add_shape(label);
         }
     }
@@ -541,6 +545,7 @@ impl StressTestApp {
                 colors: Vec::new(),
                 show_labels: true,
                 font_size: 12.0,
+                size_mode: LengthMode::Screen,
             },
             // Start with 0 for all shapes
             rectangle_count: 0,
@@ -1009,6 +1014,7 @@ impl StressTestApp {
             }
             Message::SizeModeChanged(mode) => {
                 self.size_mode = mode;
+                self.labels_layer.size_mode = mode;
                 self.generate_all();
                 Task::none()
             }

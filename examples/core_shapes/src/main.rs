@@ -34,7 +34,7 @@ impl ShapeGallery {
     pub fn new() -> (Self, iced::Task<Message>) {
         let mut state = State::new();
 
-        // Setup a coordinate system large enough for 10 rows of shapes
+        // Set up a coordinate system large enough for 10 rows of shapes
         // Y-axis: 0 to 300 (Top to Bottom layout logic)
         // X-axis: 0 to 140 (4 Columns)
         state.set_axis(
@@ -81,7 +81,7 @@ impl PlotData<f64> for ShapeGallery {
         let draw_header = |plot: &mut Plot<f64>, x: f64, text: &str| {
             plot.add_shape(
                 Label::new(text, PlotPoint::new(x, 310.0))
-                    .size(14.0)
+                    .size(Measure::Screen(14.0))
                     .fill(text_main)
                     .align(Horizontal::Center, Vertical::Bottom),
             );
@@ -98,7 +98,7 @@ impl PlotData<f64> for ShapeGallery {
             let current_y = y_cursor;
             plot.add_shape(
                 Label::new(title, PlotPoint::new(-15.0, current_y))
-                    .size(16.0)
+                    .size(Measure::Screen(16.0))
                     .fill(text_main)
                     .align(Horizontal::Left, Vertical::Center),
             );
@@ -154,7 +154,7 @@ impl PlotData<f64> for ShapeGallery {
         );
         plot.add_shape(
             Label::new("Screen Px", PlotPoint::new(col_3, y - 8.0))
-                .size(8.0)
+                .size(Measure::Screen(8.0))
                 .fill(text_dim),
         );
 
@@ -315,7 +315,7 @@ impl PlotData<f64> for ShapeGallery {
         );
         plot.add_shape(
             Label::new("Rotated", PlotPoint::new(col_4, y - 8.0))
-                .size(8.0)
+                .size(Measure::Screen(8.0))
                 .fill(text_dim),
         );
 
@@ -364,7 +364,7 @@ impl PlotData<f64> for ShapeGallery {
         );
         plot.add_shape(
             Label::new("Infinite", PlotPoint::new(col_4, y - 8.0))
-                .size(8.0)
+                .size(Measure::Screen(8.0))
                 .fill(text_dim),
         );
 
@@ -430,7 +430,7 @@ impl PlotData<f64> for ShapeGallery {
         );
         plot.add_shape(
             Label::new("Default (0.0)", PlotPoint::new(col_1, y - 8.0))
-                .size(8.0)
+                .size(Measure::Screen(8.0))
                 .fill(text_dim),
         );
 
@@ -442,7 +442,7 @@ impl PlotData<f64> for ShapeGallery {
         );
         plot.add_shape(
             Label::new("Tension 0.5", PlotPoint::new(col_2, y - 8.0))
-                .size(8.0)
+                .size(Measure::Screen(8.0))
                 .fill(text_dim),
         );
 
@@ -454,7 +454,7 @@ impl PlotData<f64> for ShapeGallery {
         );
         plot.add_shape(
             Label::new("Tension 1.0", PlotPoint::new(col_3, y - 8.0))
-                .size(8.0)
+                .size(Measure::Screen(8.0))
                 .fill(text_dim),
         );
 
@@ -471,7 +471,7 @@ impl PlotData<f64> for ShapeGallery {
         );
         plot.add_shape(
             Label::new("Loop", PlotPoint::new(col_4, y - 10.0))
-                .size(8.0)
+                .size(Measure::Screen(8.0))
                 .fill(text_dim),
         );
 
@@ -491,7 +491,7 @@ impl PlotData<f64> for ShapeGallery {
         );
         plot.add_shape(
             Label::new("Quadratic", PlotPoint::new(col_1, y - 8.0))
-                .size(8.0)
+                .size(Measure::Screen(8.0))
                 .fill(text_dim),
         );
 
@@ -507,7 +507,7 @@ impl PlotData<f64> for ShapeGallery {
         );
         plot.add_shape(
             Label::new("Cubic", PlotPoint::new(col_2, y - 8.0))
-                .size(8.0)
+                .size(Measure::Screen(8.0))
                 .fill(text_dim),
         );
 
@@ -523,7 +523,7 @@ impl PlotData<f64> for ShapeGallery {
         );
         plot.add_shape(
             Label::new("Loop", PlotPoint::new(col_3, y - 8.0))
-                .size(8.0)
+                .size(Measure::Screen(8.0))
                 .fill(text_dim),
         );
 

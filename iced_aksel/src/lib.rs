@@ -78,16 +78,16 @@
 //! - **[`PlotData`]**: A trait you implement for your own data types to define how they should be rendered.
 //! - **[`Shape`]**: Visual primitives (lines, circles, rectangles) used within `PlotData::draw`.
 
-use std::{cell::RefCell, fmt::Debug, hash::Hash, ops::Deref};
+use std::{fmt::Debug, hash::Hash, ops::Deref};
 
 use aksel::ScreenRect;
 use derive_more::{Display, Error};
 use iced_core::{
-    Clipboard, Color, Element, Event, Layout, Length, Padding, Point, Rectangle, Shell, Size,
+    Clipboard, Color, Element, Event, Font, Layout, Length, Padding, Point, Rectangle, Shell, Size,
     Widget,
     layout::{self, Limits, Node},
     mouse::{self, ScrollDelta},
-    renderer::{Quad, Style},
+    renderer::Style,
     text::{LineHeight, Shaping, Wrapping},
     touch,
     widget::{Tree, tree},
@@ -99,9 +99,10 @@ pub use aksel::{Float, Transform, scale, scale::Scale, transform, transform::Plo
 mod action;
 mod layer;
 mod measure;
+mod memory;
 mod render;
 mod state;
-// Export style module so users can define custom themes
+
 pub mod style;
 
 pub mod axis;
@@ -112,6 +113,7 @@ pub mod stroke;
 pub use axis::Axis;
 pub use measure::Measure;
 pub use plot::{Plot, PlotData};
+pub use render::Quality;
 pub use shape::Shape;
 pub use state::State;
 pub use stroke::Stroke;
@@ -120,6 +122,7 @@ pub use style::Catalog;
 use action::Action;
 use axis::{Orientation, Position};
 use layer::Layer;
+use memory::Memory;
 use plot::DragDelta;
 
 /// Default movement threshold (in pixels) to distinguish a click from a drag operation.
@@ -171,28 +174,6 @@ type AxisDragHandler<AxisId, Message> = Box<dyn Fn(AxisId, f32) -> Message>;
 type AxisHoverHandler<AxisId, Message> = Box<dyn Fn(AxisId, f32) -> Message>;
 type AxisScrollHandler<AxisId, Message> = Box<dyn Fn(AxisId, f32, ScrollDelta) -> Message>;
 
-/// Internal chart memory that persists across frames.
-///
-/// This struct tracks the current interaction state (e.g., dragging) and holds
-/// heavy resources like tessellators to avoid re-allocation.
-struct Memory<AxisId> {
-    action: Action<AxisId>,
-    previous_click: Option<mouse::Click>,
-    // Persistent tessellators are stored here to reuse internal buffers.
-    tessellators: RefCell<render::Tessellators>,
-}
-
-impl<AxisId> Default for Memory<AxisId> {
-    fn default() -> Self {
-        Self {
-            action: Action::default(),
-            previous_click: None,
-            // Initialize them once. Lyon will reuse the internal Vec capacities.
-            tessellators: RefCell::new(render::Tessellators::default()),
-        }
-    }
-}
-
 /// The main charting widget that renders axes and plot data.
 ///
 /// `Chart` manages the layout and rendering of axes, grid lines, and data layers.
@@ -240,6 +221,10 @@ pub struct Chart<
     errors: Vec<Error<AxisId>>,
     drag_deadband: f32,
     padding: Padding,
+    quality: f32,
+
+    // Fonts
+    axis_font: Option<Font>,
 
     // Interaction Handlers
     on_error: Option<ErrorHandler<AxisId, Message>>,
@@ -284,8 +269,10 @@ where
             errors: vec![],
             drag_deadband: DEFAULT_DRAG_DEADBAND,
             padding: Padding::new(0.),
+            quality: 1.0,
 
-            // Handlers default to None
+            // Handlers and fonts default to None
+            axis_font: None,
             on_error: None,
             on_click: None,
             on_double_click: None,
@@ -314,6 +301,23 @@ where
     /// vertex and index counts in the corner of the chart.
     pub const fn debug(mut self, debug: bool) -> Self {
         self.debug = debug;
+        self
+    }
+
+    /// Sets the global rendering quality multiplier.
+    ///
+    /// Controls the Level of Detail (LOD) for curves and text.
+    /// * `1.0`: Standard quality (Default).
+    /// * `< 1.0`: Lower quality, higher performance.
+    /// * `> 1.0`: Higher quality, smoother curves.
+    pub const fn quality(mut self, quality: f32) -> Self {
+        self.quality = quality;
+        self
+    }
+
+    /// Sets the font used to render the Axes labels and cursor
+    pub const fn axes_font(mut self, font: Font) -> Self {
+        self.axis_font = Some(font);
         self
     }
 
@@ -755,7 +759,7 @@ where
     }
 
     fn state(&self) -> tree::State {
-        tree::State::new(Memory::<AxisId>::default())
+        tree::State::new(Memory::<AxisId>::new())
     }
 
     fn children(&self) -> Vec<Tree> {
@@ -852,7 +856,8 @@ where
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
     ) {
-        // If there are errors (e.g. invalid axes), report them and stop processing events
+        let memory: &mut Memory<AxisId> = tree.state.downcast_mut();
+
         if !self.errors.is_empty()
             && let Some(handler) = &self.on_error
         {
@@ -868,9 +873,7 @@ where
             return;
         }
 
-        let memory: &mut Memory<AxisId> = tree.state.downcast_mut();
-
-        // Dispatch Input Events
+        // Handle input events
         match event {
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
             | Event::Touch(touch::Event::FingerPressed { .. }) => {
@@ -947,19 +950,14 @@ where
         let bounds = layout.bounds();
         let plot_bounds = self.get_plot_layout(layout).bounds();
 
-        // 1. Draw transparent background (helps with hit testing in some backends)
-        renderer.fill_quad(
-            Quad {
-                bounds,
-                ..Default::default()
-            },
-            Color::TRANSPARENT,
-        );
-
+        // 1. Retrieve the Memory from the Tree directly
         let memory = tree.state.downcast_ref::<Memory<AxisId>>();
 
         // Reuse tessellators from memory to avoid re-allocating them every frame
         let mut tessellators = memory.tessellators.borrow_mut();
+
+        // Pass the global quality setting to the tessellator
+        tessellators.set_quality(self.quality);
 
         // Create a new mesh buffer for this frame
         let mut mesh_buffer = render::MeshBuffer::new(100_000);

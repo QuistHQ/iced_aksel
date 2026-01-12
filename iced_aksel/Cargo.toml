@@ -23,6 +23,7 @@ lyon_tessellation.workspace = true
 lyon_path.workspace = true
 lyon.workspace = true
 earcutr.workspace = true
+lru.workspace = true
 
 [dev-dependencies]
 rand.workspace = true
