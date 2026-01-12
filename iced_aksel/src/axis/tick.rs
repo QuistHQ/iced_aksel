@@ -37,14 +37,10 @@ pub struct TickResult {
 }
 
 impl TickResult {
-    pub fn empty() -> Self {
-        Self::default()
-    }
-
     pub fn with_label(label: super::Label) -> Self {
         Self {
             label: Some(label),
-            ..Self::empty()
+            ..Self::default()
         }
     }
 
@@ -56,7 +52,7 @@ impl TickResult {
     pub fn with_tick_line(tick_line: TickLine) -> Self {
         Self {
             tick_line: Some(tick_line),
-            ..Self::empty()
+            ..Self::default()
         }
     }
 
@@ -68,7 +64,7 @@ impl TickResult {
     pub fn with_grid_line(grid_line: super::GridLine) -> Self {
         Self {
             grid_line: Some(grid_line),
-            ..Self::empty()
+            ..Self::default()
         }
     }
 
@@ -99,7 +95,7 @@ pub struct TickContext<'a, D> {
     /// The orientation of the axis (horizontal or vertical).
     pub orientation: &'a Orientation,
     /// The default styling for this context
-    pub style: &'a AxisStyle,
+    pub(super) style: &'a AxisStyle,
 }
 
 impl<D: Float> TickContext<'_, D> {

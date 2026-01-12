@@ -15,7 +15,7 @@ pub struct MarkerContext<'a, D> {
     /// The domain (min, max) of the scale
     pub scale_domain: (D, D),
     /// The resolved style for the marker.
-    pub style: &'a MarkerStyle,
+    pub(super) style: &'a MarkerStyle,
 }
 
 impl<D> MarkerContext<'_, D> {
