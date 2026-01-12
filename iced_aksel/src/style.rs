@@ -87,17 +87,6 @@ pub struct LabelStyle {
     pub padding: Padding,
 }
 
-impl Default for LabelStyle {
-    fn default() -> Self {
-        Self {
-            size: Pixels(12.0),
-            color: Color::BLACK,
-            line_height: LineHeight::Relative(1.2),
-            padding: Padding::new(2.0),
-        }
-    }
-}
-
 /// A trait for theming the appearance of a [`Chart`](crate::Chart).
 pub trait Catalog {
     type Class<'a>;
