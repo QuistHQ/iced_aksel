@@ -26,7 +26,7 @@ pub struct GridLine {
     pub width: Pixels,
     /// The color of the gridline
     pub color: Color,
-    /// Wether the Gridline should be dashed
+    /// Whether the gridline should be dashed
     pub dashed: bool,
 }
 
