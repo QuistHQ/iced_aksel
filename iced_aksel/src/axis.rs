@@ -607,7 +607,7 @@ impl<D: Float> Axis<D> {
                 bounds: marker_line_rect,
                 ..Default::default()
             },
-            marker.badge.background,
+            marker.line.color,
         );
 
         renderer.fill_quad(
