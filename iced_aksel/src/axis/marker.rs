@@ -2,8 +2,13 @@ use iced_core::{Border, Color, Pixels, Shadow};
 
 use crate::style::{BadgeStyle, MarkerLineStyle, MarkerStyle};
 
+/// Context provided to marker renderers for creating styled markers.
+///
+/// Contains the axis value at the marker position and the resolved marker style.
 pub struct MarkerContext<'a, D> {
+    /// The axis value at the marker position.
     pub value: D,
+    /// The resolved style for the marker.
     pub style: &'a MarkerStyle,
 }
 
