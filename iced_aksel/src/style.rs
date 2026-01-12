@@ -117,7 +117,9 @@ pub fn default(theme: &Theme) -> Style {
             text_offset: 12.0.into(),
             label: LabelStyle {
                 color: palette.background.strong.text,
-                ..Default::default()
+                size: Pixels(12.0),
+                line_height: LineHeight::Relative(1.2),
+                padding: Padding::new(2.0),
             },
             grid: GridLineStyle {
                 color: palette.background.strong.color,
@@ -136,7 +138,9 @@ pub fn default(theme: &Theme) -> Style {
                 },
                 label: LabelStyle {
                     color: palette.primary.base.text,
-                    ..Default::default()
+                    size: Pixels(12.0),
+                    line_height: LineHeight::Relative(1.2),
+                    padding: Padding::new(2.0),
                 },
                 badge: BadgeStyle {
                     background: palette.primary.base.color,
