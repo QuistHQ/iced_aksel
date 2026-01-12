@@ -31,7 +31,7 @@ use crate::{
             draw_vertical_line,
         },
     },
-    style::{AxisStyle, Style},
+    style::{AxisStyle, DashStyle, Style},
 };
 
 mod grid;
@@ -878,13 +878,15 @@ impl<D: Float> Axis<D> {
         let orientation = self.orientation();
         let width = line.width.0;
         let color = line.color;
-        let dash_len = 5.0;
-        let gap_len = 5.0;
 
         match orientation {
             Orientation::Horizontal => {
                 let x = axis_bounds.width.mul_add(pos_norm, axis_bounds.x);
-                if line.dashed {
+                if let Some(DashStyle {
+                    dash_length,
+                    gap_length,
+                }) = line.dashed
+                {
                     draw_vertical_dashed_line(
                         mesh_buffer,
                         x,
@@ -892,8 +894,8 @@ impl<D: Float> Axis<D> {
                         plot_bounds.y + plot_bounds.height,
                         width,
                         color,
-                        dash_len,
-                        gap_len,
+                        dash_length,
+                        gap_length,
                         true,
                     );
                 } else {
@@ -910,7 +912,11 @@ impl<D: Float> Axis<D> {
             }
             Orientation::Vertical => {
                 let y = axis_bounds.height.mul_add(1.0 - pos_norm, axis_bounds.y);
-                if line.dashed {
+                if let Some(DashStyle {
+                    dash_length,
+                    gap_length,
+                }) = line.dashed
+                {
                     draw_horizontal_dashed_line(
                         mesh_buffer,
                         plot_bounds.x,
@@ -918,8 +924,8 @@ impl<D: Float> Axis<D> {
                         y,
                         width,
                         color,
-                        dash_len,
-                        gap_len,
+                        dash_length,
+                        gap_length,
                         true,
                     );
                 } else {

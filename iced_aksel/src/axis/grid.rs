@@ -1,6 +1,6 @@
 use iced_core::{Color, Pixels};
 
-use crate::style::GridLineStyle;
+use crate::style::{DashStyle, GridLineStyle};
 
 /// Configuration for a single grid line on the chart.
 ///
@@ -27,7 +27,7 @@ pub struct GridLine {
     /// The color of the gridline
     pub color: Color,
     /// Whether the gridline should be dashed
-    pub dashed: bool,
+    pub dashed: Option<DashStyle>,
 }
 
 impl From<GridLineStyle> for GridLine {

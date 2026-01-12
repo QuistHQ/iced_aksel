@@ -8,6 +8,15 @@ pub struct Style {
     pub axis: AxisStyle,
 }
 
+/// Style of dashed lines
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DashStyle {
+    /// Length of the gap between dashes
+    pub gap_length: f32,
+    /// Length of the dashes
+    pub dash_length: f32,
+}
+
 /// Style of lines.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GridLineStyle {
@@ -15,8 +24,8 @@ pub struct GridLineStyle {
     pub color: Color,
     /// The thickness of the grid lines in pixels.
     pub width: Pixels,
-    /// Whether the gridline should have a dashed pattern
-    pub dashed: bool,
+    /// Whether the gridline should have a dashed pattern.
+    pub dashed: Option<DashStyle>,
 }
 
 /// Style of tick lines on an axis.
@@ -125,7 +134,7 @@ pub fn default(theme: &Theme) -> Style {
             grid: GridLineStyle {
                 color: palette.background.strong.color,
                 width: 1.0.into(),
-                dashed: false,
+                dashed: None,
             },
             tick: TickLineStyle {
                 color: palette.background.strong.text,
