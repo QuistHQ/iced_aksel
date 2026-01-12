@@ -221,7 +221,7 @@ impl BarChart {
                         grid_line: Some(ctx.gridline()),
                         ..Default::default()
                     },
-                    _ => TickResult::empty(),
+                    _ => TickResult::default(),
                 })
                 .skip_overlapping_labels(6.),
         );
@@ -241,13 +241,13 @@ impl BarChart {
             .set_tick_renderer(move |ctx| {
                 let idx = ctx.tick.value;
                 if idx <= 0. {
-                    return TickResult::empty();
+                    return TickResult::default();
                 }
 
                 // Round to find nearest whole bar index
                 let index = idx.round() as usize;
                 if index == 0 {
-                    return TickResult::empty();
+                    return TickResult::default();
                 }
 
                 if let Some(text) = labels.get(index - 1) {
@@ -257,7 +257,7 @@ impl BarChart {
                     };
                 }
 
-                TickResult::empty()
+                TickResult::default()
             });
     }
 }

@@ -77,7 +77,7 @@ impl Interactions {
                         ..Default::default()
                     }
                 } else {
-                    TickResult::empty()
+                    TickResult::default()
                 }
             });
 

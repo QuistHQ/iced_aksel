@@ -505,7 +505,7 @@ impl LineChart {
         x_axis.set_tick_renderer(move |ctx| {
             let idx = ctx.tick.value.round();
             if (ctx.tick.value - idx).abs() > 0.001 {
-                return TickResult::empty();
+                return TickResult::default();
             }
 
             let idx = idx as usize;
@@ -670,7 +670,7 @@ impl PlotData<f64> for LineChart {
 fn y_axis(min_y: f64, max_y: f64) -> Axis<f64> {
     Axis::new(Linear::new(min_y, max_y), axis::Position::Left).with_tick_renderer(|ctx| {
         if ctx.tick.level != 0 {
-            return TickResult::empty();
+            return TickResult::default();
         }
 
         TickResult {
