@@ -23,9 +23,16 @@ impl<D> MarkerContext<'_, D> {
     }
 }
 
+/// A marker displayed on an axis, typically showing the current cursor position.
+///
+/// Combines a line extending into the plot area, a label showing the value,
+/// and a badge background for the label.
 pub struct Marker {
+    /// The line extending from the axis into the plot.
     pub line: MarkerLine,
+    /// The label displaying the marker value.
     pub label: super::Label,
+    /// The badge background behind the label.
     pub badge: MarkerBadge,
 }
 
