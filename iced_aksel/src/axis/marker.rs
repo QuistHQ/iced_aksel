@@ -36,9 +36,13 @@ pub struct Marker {
     pub badge: MarkerBadge,
 }
 
+/// Visual properties for the line extending from the marker badge into the plot.
 pub struct MarkerLine {
+    /// The color of the line
     pub color: Color,
+    /// The width of the line
     pub width: Pixels,
+    /// The gap between the markerline and the badge
     pub gap: Pixels,
 }
 
