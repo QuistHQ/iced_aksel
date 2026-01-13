@@ -95,7 +95,6 @@ use iced_core::{
 
 // Re-export aksel core types for convenience
 pub use aksel::{Float, Transform, scale, scale::Scale, transform, transform::PlotPoint};
-use iced_core::renderer::Quad;
 
 mod action;
 mod layer;
@@ -121,7 +120,6 @@ pub use stroke::Stroke;
 pub use style::Catalog;
 
 use crate::render::tessellation::manual::basic::draw_fill_rect;
-use crate::style::SpineStyle;
 use action::Action;
 use axis::{Orientation, Position};
 use layer::Layer;
@@ -777,8 +775,9 @@ where
                 continue;
             }
 
+            let style = axis.create_style(style).spine;
             let bounds = layout.children().nth(i).unwrap().bounds();
-            let data = (style.axis.spine.width.0, style.axis.spine.color);
+            let data = (style.width.0, style.color);
 
             match axis.position() {
                 Position::Left => {
