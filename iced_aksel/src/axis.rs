@@ -15,7 +15,6 @@ use iced_core::{
     Layout, Pixels, Point, Rectangle, Size, Text,
     alignment::Vertical,
     layout::{Limits, Node},
-    mouse::Cursor,
     renderer::Quad,
     text::{Wrapping, paragraph::Plain},
     widget::text::Alignment,
@@ -71,7 +70,6 @@ pub struct Axis<D, Theme = iced_core::Theme> {
     position: Position,
     thickness: Pixels,
     invisible: bool,
-    render_marker: bool,
     render_grid: bool,
 
     #[derivative(Debug = "ignore")]
@@ -120,13 +118,11 @@ impl<D: Float, Theme> Axis<D, Theme> {
         Self {
             position,
             thickness: 50.0.into(),
-            render_marker: true,
             render_grid: true,
             invisible: false,
 
             scale: Box::new(scale),
             tick_renderer: Some(tick_renderer),
-            marker_renderer: None,
             style_override: None,
             label_policy: LabelPolicy::default(),
         }
@@ -196,18 +192,6 @@ impl<D: Float, Theme> Axis<D, Theme> {
         F: for<'a> Fn(LabelDecisionContext<'a, D>) -> LabelDecision + 'static,
     {
         self.label_policy = LabelPolicy::custom(policy);
-        self
-    }
-
-    /// Sets the formatter for the interactive marker badge.
-    ///
-    /// If not set, the marker badge will not be rendered.
-    /// The closure receives the data value at the marker position and returns the string to display.
-    pub fn with_marker_renderer<F>(mut self, renderer: F) -> Self
-    where
-        F: FnMut(MarkerContext<D, Theme>) -> Option<Marker> + 'static,
-    {
-        self.marker_renderer = Some(RefCell::new(Box::new(renderer)));
         self
     }
 
@@ -312,18 +296,14 @@ impl<D: Float, Theme> Axis<D, Theme> {
         Node::new(size)
     }
 
-    // TODO: Collect arguments in a struct to avoid too_many_arguments lint and to better support
-    // non-breaking changes in the future
     // TODO: Slight refactor to make it more readable
     /// Draws the axis, including ticks, grid lines, labels, and the interactive marker.
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn draw<Renderer>(
         &self,
         renderer: &mut Renderer,
         theme: &Theme,
         style: &Style,
         layout: Layout<'_>,
-        cursor: Cursor,
         plot_bounds: &Rectangle,
         mesh_buffer: &mut MeshBuffer,
         viewport: &Rectangle,
@@ -340,7 +320,6 @@ impl<D: Float, Theme> Axis<D, Theme> {
         };
 
         let bounds = layout.bounds();
-        let full_bounds = plot_bounds.union(&bounds);
         let orientation = Orientation::from(self.position());
         let (&d_min, &d_max) = self.scale.domain();
 
@@ -441,64 +420,34 @@ impl<D: Float, Theme> Axis<D, Theme> {
             label_candidates,
             viewport,
         );
-
-        // Make sure everything is available for drawing the marker
-        if !self.render_marker {
-            return;
-        };
-
-        let Some((cursor_pos, marker_renderer)) = cursor
-            .position_over(full_bounds)
-            .zip(self.marker_renderer.as_ref())
-        else {
-            return;
-        };
-
-        let value_to_render = match orientation {
-            Orientation::Horizontal => (cursor_pos.x - plot_bounds.x) / plot_bounds.width,
-            Orientation::Vertical => 1.0 - ((cursor_pos.y - plot_bounds.y) / plot_bounds.height),
-        };
-
-        if let Some(marker) = self.denormalize_opt(value_to_render).and_then(|value| {
-            let (&d_min, &d_max) = self.domain();
-            marker_renderer.borrow_mut()(MarkerContext {
-                value,
-                normalized_position: self.normalize(&value),
-                axis_bounds: &bounds,
-                scale_domain: (d_min, d_max),
-                style: &style.marker,
-                theme,
-            })
-        }) {
-            self.draw_marker_overlay(
-                renderer,
-                cursor_pos,
-                marker,
-                bounds,
-                viewport,
-                orientation,
-                style.text_offset,
-            );
-        }
     }
 
     /// Draws the interactive marker badge and line.
     ///
     /// This method ensures the badge stays within the viewport even if the mouse
     /// is at the extreme edges of the axis, preventing clipping.
+    ///
+    /// # Arguments
+    /// * `normalized_position` - A value in the range 0.0..=1.0 that matches the axis orientation
     #[allow(clippy::too_many_arguments)]
     pub(super) fn draw_marker_overlay<Renderer>(
         &self,
         renderer: &mut Renderer,
-        pos: Point,
+        normalized_position: f32,
         marker: Marker,
         bounds: Rectangle,
-        viewport: &Rectangle,
-        orientation: Orientation,
+        chart_bounds: &Rectangle,
         text_offset: Pixels,
     ) where
         Renderer: plot::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
     {
+        let orientation = self.orientation();
+
+        // Convert normalized position (0.0..=1.0) to screen coordinates
+        let pos = match orientation {
+            Orientation::Horizontal => bounds.x + bounds.width * normalized_position,
+            Orientation::Vertical => bounds.y + bounds.height * (1.0 - normalized_position),
+        };
         let paragraph = Plain::<Renderer::Paragraph>::new(Text {
             content: marker.label.content,
             bounds: bounds.size(),
@@ -520,7 +469,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
         // Calculate initial badge position
         let mut badge_rect = match orientation {
             Orientation::Horizontal => {
-                let x = pos.x - (badge_width / 2.0);
+                let x = pos - (badge_width / 2.0);
                 let y = match self.position {
                     Position::Top => rail_pos - padding.bottom - min_bounds.height - padding.top,
                     _ => rail_pos,
@@ -528,7 +477,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
                 Rectangle::new(Point::new(x, y), Size::new(badge_width, badge_height))
             }
             Orientation::Vertical => {
-                let y = pos.y - (badge_height / 2.0);
+                let y = pos - (badge_height / 2.0);
                 let x = match self.position {
                     Position::Right => rail_pos,
                     _ => rail_pos - badge_width, // badge_width already includes all padding
@@ -540,19 +489,19 @@ impl<D: Float, Theme> Axis<D, Theme> {
         // Clamp badge position to viewport (the fix for extremes)
         match orientation {
             Orientation::Horizontal => {
-                if badge_rect.x < viewport.x {
-                    badge_rect.x = viewport.x;
+                if badge_rect.x < chart_bounds.x {
+                    badge_rect.x = chart_bounds.x;
                 }
-                if badge_rect.x + badge_rect.width > viewport.x + viewport.width {
-                    badge_rect.x = viewport.x + viewport.width - badge_rect.width;
+                if badge_rect.x + badge_rect.width > chart_bounds.x + chart_bounds.width {
+                    badge_rect.x = chart_bounds.x + chart_bounds.width - badge_rect.width;
                 }
             }
             Orientation::Vertical => {
-                if badge_rect.y < viewport.y {
-                    badge_rect.y = viewport.y;
+                if badge_rect.y < chart_bounds.y {
+                    badge_rect.y = chart_bounds.y;
                 }
-                if badge_rect.y + badge_rect.height > viewport.y + viewport.height {
-                    badge_rect.y = viewport.y + viewport.height - badge_rect.height;
+                if badge_rect.y + badge_rect.height > chart_bounds.y + chart_bounds.height {
+                    badge_rect.y = chart_bounds.y + chart_bounds.height - badge_rect.height;
                 }
             }
         }
@@ -577,7 +526,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
                 };
 
                 Rectangle {
-                    x: pos.x - (line_width / 2.0),
+                    x: pos - (line_width / 2.0),
                     y: y_start.min(y_end),
                     width: line_width,
                     height: (y_end - y_start).abs(),
@@ -599,15 +548,15 @@ impl<D: Float, Theme> Axis<D, Theme> {
 
                 Rectangle {
                     x: x_start.min(x_end),
-                    y: pos.y - (line_width / 2.0),
+                    y: pos - (line_width / 2.0),
                     width: (x_end - x_start).abs(),
                     height: line_width,
                 }
             }
         };
 
-        // Render using the full viewport clip to allow the badge to "bleed" out of the axis bounds
-        renderer.start_layer(*viewport);
+        // Render using the full chart_bounds clip to allow the badge to "bleed" out of the axis bounds
+        renderer.start_layer(*chart_bounds);
 
         renderer.fill_quad(
             Quad {
@@ -635,7 +584,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
                 .with_content(paragraph.content().to_string()),
             text_pos,
             marker.label.color,
-            *viewport,
+            *chart_bounds,
         );
 
         renderer.end_layer();

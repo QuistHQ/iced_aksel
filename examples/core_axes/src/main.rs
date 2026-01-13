@@ -1,10 +1,13 @@
+use iced::Point;
 use iced::widget::checkbox;
 use iced::widget::text::LineHeight;
 use iced::{
     Border, Color, Element, Font, Length, Padding, Shadow, Theme,
     widget::{column, container, pick_list, row, text},
 };
-use iced_aksel::axis::{Marker, MarkerBadge, MarkerContext, MarkerLine, TickContext};
+use iced_aksel::axis::{
+    Marker, MarkerBadge, MarkerContext, MarkerLine, MarkerPosition, TickContext,
+};
 use iced_aksel::style::{DashStyle, LabelStyle};
 use iced_aksel::{
     Axis, Chart, State,
@@ -32,8 +35,8 @@ pub fn main() -> iced::Result {
 
 struct AxesShowcase {
     theme: Theme,
-
     state: State<&'static str, f64>,
+    cursor_positions: [Option<MarkerPosition<f64>>; 2],
 
     // Settings
     skip_label_overlapping: bool,
@@ -43,6 +46,8 @@ struct AxesShowcase {
 pub enum Message {
     ThemeChanged(Theme),
     SkipOverlappingToggle(bool),
+    PlotHovered(Point),
+    AxisHovered(&'static str, f32),
 }
 
 impl AxesShowcase {
@@ -53,8 +58,9 @@ impl AxesShowcase {
         let theme = Theme::Dark;
         (
             Self {
-                state: axes_setup(true), // <-- OBS: Inside this function is where the magic starts
                 theme,
+                state: axes_setup(true), // <-- OBS: Inside this function is where the magic starts
+                cursor_positions: [None, None],
 
                 skip_label_overlapping: false,
             },
@@ -72,6 +78,17 @@ impl AxesShowcase {
                 self.skip_label_overlapping = status;
                 self.state = axes_setup(self.skip_label_overlapping);
             }
+            Message::PlotHovered(point) => {
+                self.cursor_positions = [
+                    Some(MarkerPosition::Normalized(point.x)),
+                    Some(MarkerPosition::Normalized(point.y)),
+                ]
+            }
+            Message::AxisHovered(id, position) => match id {
+                Self::X => self.cursor_positions[0] = Some(MarkerPosition::Normalized(position)),
+                Self::Y => self.cursor_positions[1] = Some(MarkerPosition::Normalized(position)),
+                _ => unreachable!("Axis {id} not configured"),
+            },
         }
         iced::Task::none()
     }
@@ -92,7 +109,14 @@ impl AxesShowcase {
             row![skip_overlapping_title, skip_overlapping_checkbox,].spacing(16.);
 
         // Chart Section
-        let chart_panel = panel("Axes Showcase", Chart::new(&self.state));
+        let chart_panel = panel(
+            "Axes Showcase",
+            Chart::new(&self.state)
+                .on_hover(Message::PlotHovered)
+                .on_axis_hover(Message::AxisHovered)
+                .marker_maybe(&Self::X, self.cursor_positions[0], simple_dynamic_marker)
+                .marker_maybe(&Self::Y, self.cursor_positions[1], advanced_dynamic_marker),
+        );
 
         column![theme_section, skip_overlapping_section, chart_panel,]
             .spacing(20)
@@ -136,9 +160,7 @@ fn axes_setup(skip_overlapping_labels: bool) -> State<&'static str, f64> {
     let x_scale = Linear::new(0., 100.);
 
     // X-Axis dynamic settings
-    let mut x_axis = Axis::new(x_scale, x_placement)
-        .with_marker_renderer(simple_dynamic_marker())
-        .with_tick_renderer(simple_tick_result());
+    let mut x_axis = Axis::new(x_scale, x_placement).with_tick_renderer(simple_tick_result());
 
     if skip_overlapping_labels {
         x_axis.set_skip_overlapping_labels(6.) // <-- Automatically hides labels that would collide
@@ -152,12 +174,9 @@ fn axes_setup(skip_overlapping_labels: bool) -> State<&'static str, f64> {
     let y_axis = if skip_overlapping_labels {
         Axis::new(y_scale, y_placement)
             .skip_overlapping_labels(6.)
-            .with_marker_renderer(advanced_dynamic_marker())
             .with_tick_renderer(advanced_tick_result())
     } else {
-        Axis::new(y_scale, y_placement)
-            .with_marker_renderer(advanced_dynamic_marker())
-            .with_tick_renderer(advanced_tick_result())
+        Axis::new(y_scale, y_placement).with_tick_renderer(advanced_tick_result())
     };
 
     state.set_axis(AxesShowcase::X, x_axis);
@@ -165,74 +184,76 @@ fn axes_setup(skip_overlapping_labels: bool) -> State<&'static str, f64> {
 
     state
 }
-fn simple_dynamic_marker() -> impl Fn(MarkerContext<f64>) -> Option<Marker> + 'static {
-    move |ctx: MarkerContext<f64>| {
-        // Example: Change color based on data thresholds
-        let badge_color = if ctx.value <= 50.0 {
-            ctx.theme.palette().warning
-        } else {
-            ctx.theme.palette().danger
-        };
 
-        // --- THE EASY WAY ---
-        // We use `ctx.marker(String)` to generate a fully populated default Marker.
-        // This allows us to use Rust's struct update syntax (default) to
-        // only override the specific fields we want to change.
-
-        let default_marker = ctx.marker(format!("{:.2}", ctx.value));
-
-        let marker = Marker {
-            badge: MarkerBadge {
-                background: badge_color, // Override only the background color
-                ..default_marker.badge   // Keep the rest (border, shadow, radius) default
-            },
-            ..default_marker // Keep the label and line styles default
-        };
-
-        Some(marker)
+fn simple_dynamic_marker(ctx: MarkerContext<f64>) -> Option<Marker> {
+    if !ctx.cursor_on_plot && !ctx.cursor_on_axis {
+        // Never render markers if cursor isn't on plot or axis
+        return None;
     }
+
+    // Example: Change color based on data thresholds
+    let badge_color = if ctx.value <= 50.0 {
+        ctx.theme.palette().warning
+    } else {
+        ctx.theme.palette().danger
+    };
+
+    // --- THE EASY WAY ---
+    // We use `ctx.marker(String)` to generate a fully populated default Marker.
+    // This allows us to use Rust's struct update syntax (default) to
+    // only override the specific fields we want to change.
+
+    let default_marker = ctx.marker(format!("{:.2}", ctx.value));
+
+    Some(Marker {
+        badge: MarkerBadge {
+            background: badge_color, // Override only the background color
+            ..default_marker.badge   // Keep the rest (border, shadow, radius) default
+        },
+        ..default_marker // Keep the label and line styles default
+    })
 }
 
-fn advanced_dynamic_marker() -> impl Fn(MarkerContext<f64>) -> Option<Marker> + 'static {
-    move |ctx: MarkerContext<f64>| {
-        // --- THE MANUAL WAY ---
-        // For full control, we define every aspect of the marker manually.
-        // A marker consists of 3 parts: Label, Badge, and Line.
-
-        let lerp_color = color_lerped(
-            &ctx.theme.palette().danger,
-            &ctx.theme.palette().warning,
-            ctx.normalized_position,
-        );
-
-        // 1. Label: The text content and its font styling
-        let label_text = format!("{:.2}", ctx.value);
-        let label_style = LabelStyle {
-            size: 12.into(),
-            color: ctx.theme.palette().text,
-            padding: 4.into(),
-            line_height: LineHeight::Relative(1.0),
-        };
-        let label = Label::from_style(label_text, label_style);
-
-        // 2. Line: The visual connector between the plot data and the badge
-        let line = MarkerLine {
-            color: lerp_color,
-            width: 1.into(),
-            gap: 4.into(),
-        };
-
-        // 3. Badge: The container/box surrounding the text
-        let badge = MarkerBadge {
-            background: lerp_color,
-            border: Border::default().rounded(4.),
-            shadow: Shadow::default(),
-        };
-
-        let marker = Marker { label, badge, line };
-
-        Some(marker)
+fn advanced_dynamic_marker(ctx: MarkerContext<f64>) -> Option<Marker> {
+    // --- THE MANUAL WAY ---
+    // For full control, we define every aspect of the marker manually.
+    // A marker consists of 3 parts: Label, Badge, and Line.
+    if !ctx.cursor_on_plot && !ctx.cursor_on_axis {
+        // Never render markers if cursor isn't on plot or axis
+        return None;
     }
+
+    let lerp_color = color_lerped(
+        &ctx.theme.palette().danger,
+        &ctx.theme.palette().warning,
+        ctx.normalized_position,
+    );
+
+    // 1. Label: The text content and its font styling
+    let label_text = format!("{:.2}", ctx.value);
+    let label_style = LabelStyle {
+        size: 12.into(),
+        color: ctx.theme.palette().text,
+        padding: 4.into(),
+        line_height: LineHeight::Relative(1.0),
+    };
+    let label = Label::from_style(label_text, label_style);
+
+    // 2. Line: The visual connector between the plot data and the badge
+    let line = MarkerLine {
+        color: lerp_color,
+        width: 1.into(),
+        gap: 4.into(),
+    };
+
+    // 3. Badge: The container/box surrounding the text
+    let badge = MarkerBadge {
+        background: lerp_color,
+        border: Border::default().rounded(4.),
+        shadow: Shadow::default(),
+    };
+
+    Some(Marker { label, badge, line })
 }
 
 fn simple_tick_result() -> impl Fn(TickContext<f64>) -> TickResult + 'static {

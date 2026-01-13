@@ -224,7 +224,7 @@ pub struct Chart<
     drag_deadband: f32,
     padding: Padding,
     quality: f32,
-    markers: Vec<MarkerRequest<'a, AxisId, Domain>>,
+    markers: Vec<MarkerRequest<'a, AxisId, Domain, Theme>>,
 
     // Fonts
     axis_font: Option<Font>,
@@ -371,6 +371,27 @@ where
         self
     }
 
+    /// Sets a marker to be drawn on the given axis, at the given position, if the position is Some
+    pub fn marker_maybe<F>(
+        mut self,
+        axis_id: &'a AxisId,
+        position: Option<MarkerPosition<Domain>>,
+        renderer: F,
+    ) -> Self
+    where
+        F: for<'ctx> Fn(MarkerContext<'ctx, Domain, Theme>) -> Option<axis::Marker> + 'static,
+    {
+        if let Some(position) = position {
+            self.markers.push(MarkerRequest {
+                axis_id,
+                position,
+                renderer: Box::new(renderer),
+            });
+        }
+        self
+    }
+
+    /// Sets a marker to be drawn on the given axis, at the given position
     pub fn marker<F>(
         mut self,
         axis_id: &'a AxisId,
@@ -378,7 +399,7 @@ where
         renderer: F,
     ) -> Self
     where
-        F: FnOnce(MarkerContext<'a, Domain, Theme>) -> axis::Marker + 'static,
+        F: for<'ctx> Fn(MarkerContext<'ctx, Domain, Theme>) -> Option<axis::Marker> + 'static,
     {
         self.markers.push(MarkerRequest {
             axis_id,
@@ -998,7 +1019,6 @@ where
                 theme,
                 &style,
                 axis_layout,
-                cursor,
                 &plot_bounds,
                 &mut mesh_buffer,
                 &bounds,
@@ -1031,19 +1051,31 @@ where
         mesh_buffer.render(renderer, &bounds);
 
         // 4. Render markers
-        for marker_request in self.markers {
-            let Some(axis) = self.state.axis_opt(marker_request.axis_id) else {
+        for marker_request in &self.markers {
+            let Some((idx, _, axis)) = self.state.axes().get_full(marker_request.axis_id) else {
+                continue;
+            };
+
+            let axis_bounds = layout.child(idx).bounds();
+
+            let Some((marker, normalized_position)) = marker_request.create_marker(
+                axis,
+                &axis_bounds,
+                &plot_bounds,
+                cursor,
+                &style.axis,
+                theme,
+            ) else {
                 continue;
             };
 
             axis.draw_marker_overlay(
                 renderer,
-                pos,
+                normalized_position,
                 marker,
-                bounds,
-                viewport,
-                orientation,
-                text_offset,
+                axis_bounds,
+                &bounds,
+                style.axis.text_offset,
             );
         }
 
