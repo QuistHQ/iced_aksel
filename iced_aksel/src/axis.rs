@@ -157,16 +157,6 @@ impl<D: Float, Theme> Axis<D, Theme> {
         self
     }
 
-    /// Gets the SpineStyle for the axis. Represents the line drawn as a separator for
-    /// axis and plot
-    pub fn spine_style(&self, base_style: &AxisStyle) -> SpineStyle {
-        let mut style = *base_style;
-        if let Some(override_fn) = &self.style_override {
-            override_fn.borrow_mut()(&mut style)
-        };
-        style.spine
-    }
-
     /// Sets a custom renderer for ticks.
     ///
     /// This function gives you full control over which ticks render lines, grids, or labels.

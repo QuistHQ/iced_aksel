@@ -29,6 +29,7 @@ impl DashStyle {
     }
 }
 
+/// Style of the axis spine (the line separating the axis from the plot area).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SpineStyle {
     /// The color of the spine line.
@@ -70,7 +71,7 @@ pub struct AxisStyle {
     pub marker: MarkerStyle,
     /// Style of the grid lines.
     pub grid: GridLineStyle,
-
+    /// Style of the line that is drawn along the axis
     pub spine: SpineStyle,
 }
 

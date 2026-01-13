@@ -46,9 +46,9 @@ impl AxesShowcase {
         let theme = Theme::Dark;
         (
             Self {
-                state: axes_setup(false),
+                state: axes_setup(true),
                 theme,
-                skip_label_overlapping: false,
+                skip_label_overlapping: true,
             },
             iced::Task::none(),
         )
@@ -119,12 +119,12 @@ fn axes_setup(skip_overlapping_labels: bool) -> State<&'static str, f64> {
     let mut state = State::new();
 
     // --------------------------------------------------------
-    // 1. Bottom Main Axis (Standard)
+    // 1. Top Axis
     // --------------------------------------------------------
     let x_scale_1 = Linear::new(0., 100.);
     let mut x_main = Axis::new(x_scale_1, axis::Position::Top)
         .with_thickness(50.0)
-        .with_tick_renderer(simple_tick_result())
+        .with_tick_renderer(advanced_tick_result())
         .style(|style| {
             style.spine.width = 2.into();
         });
@@ -134,14 +134,14 @@ fn axes_setup(skip_overlapping_labels: bool) -> State<&'static str, f64> {
     }
 
     // --------------------------------------------------------
-    // 2. Bottom Secondary Axis (Stacked below Main)
+    // 2. Bottom Axis
     // --------------------------------------------------------
     // This axis uses a different scale and "advanced" styling
     // to distinguish it from the main axis.
     let x_scale_2 = Linear::new(0., 1000.);
     let mut x_secondary = Axis::new(x_scale_2, axis::Position::Bottom)
         .with_thickness(50.0)
-        .with_tick_renderer(simple_tick_result()) // Uses gradients
+        .with_tick_renderer(advanced_tick_result()) // Uses gradients
         .style(|style| {
             style.spine.width = 1.into();
         }); // Avoid grid clutter
@@ -151,7 +151,7 @@ fn axes_setup(skip_overlapping_labels: bool) -> State<&'static str, f64> {
     }
 
     // --------------------------------------------------------
-    // 3. Left Axis (Standard Y)
+    // 3. Left Axis
     // --------------------------------------------------------
     let y_scale_1 = Linear::new(0., 100.);
     let mut y_left = Axis::new(y_scale_1, axis::Position::Left)
@@ -165,13 +165,13 @@ fn axes_setup(skip_overlapping_labels: bool) -> State<&'static str, f64> {
         y_left.set_skip_overlapping_labels(6.);
     }
     // --------------------------------------------------------
-    // 4. Right Axis (Alternative Y)
+    // 4. Right Axis
     // --------------------------------------------------------
     let y_scale_2 = Linear::new(-50., 50.);
     let mut y_right = Axis::new(y_scale_2, axis::Position::Right)
         .with_thickness(50.0)
-        .with_tick_renderer(simple_tick_result()) // Fancy ticks on right
-        .with_marker_renderer(advanced_dynamic_marker())
+        .with_tick_renderer(simple_tick_result())
+        .with_marker_renderer(simple_dynamic_marker())
         .style(|style| {
             style.spine.width = 10.into();
         });

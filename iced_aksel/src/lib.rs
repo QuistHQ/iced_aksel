@@ -773,13 +773,12 @@ where
                 continue;
             }
 
-            let spine = axis.spine_style(&style.axis);
-            if spine.width.0 <= 0.0 {
+            if style.axis.spine.width.0 <= 0.0 {
                 continue;
             }
 
             let bounds = layout.children().nth(i).unwrap().bounds();
-            let data = (spine.width.0, spine.color);
+            let data = (style.axis.spine.width.0, style.axis.spine.color);
 
             match axis.position() {
                 Position::Left => {
@@ -1090,10 +1089,6 @@ where
         };
 
         for (i, (_, axis)) in self.state.axes().iter().enumerate() {
-            if !axis.is_visible() {
-                continue;
-            }
-
             // We only care about layout bounds here to determine position
             let axis_layout = layout.children().nth(i).unwrap();
 
