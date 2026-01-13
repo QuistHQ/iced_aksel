@@ -6,16 +6,6 @@ use iced_core::{Border, Color, Padding, Pixels, Shadow, Theme};
 pub struct Style {
     /// Style of the axes.
     pub axis: AxisStyle,
-
-    pub plot_border_style: PlotBorderStyle,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct PlotBorderStyle {
-    /// The color of the plot border.
-    pub color: Color,
-    /// The width of the plot border in pixels.
-    pub width: Pixels,
 }
 
 /// Style of dashed lines
@@ -37,6 +27,14 @@ impl DashStyle {
             gap_length,
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SpineStyle {
+    /// The color of the spine line.
+    pub color: Color,
+    /// The thickness of the spine line.
+    pub width: Pixels,
 }
 
 /// Style of lines.
@@ -72,6 +70,8 @@ pub struct AxisStyle {
     pub marker: MarkerStyle,
     /// Style of the grid lines.
     pub grid: GridLineStyle,
+
+    pub spine: SpineStyle,
 }
 
 /// Style of a `Chart`'s interactive axis marker.
@@ -158,6 +158,10 @@ pub fn default(theme: &Theme) -> Style {
                 width: 1.0.into(),
                 dashed: None,
             },
+            spine: SpineStyle {
+                color: palette.background.strong.text,
+                width: 1.0.into(),
+            },
             tick: TickLineStyle {
                 color: palette.background.strong.text,
                 width: 1.0.into(),
@@ -185,9 +189,5 @@ pub fn default(theme: &Theme) -> Style {
                 },
             },
         },
-        plot_border_style: PlotBorderStyle{
-            width: 1.into(),
-            color: palette.background.strong.text,
-        }
     }
 }
