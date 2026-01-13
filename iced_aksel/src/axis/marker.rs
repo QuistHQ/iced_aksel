@@ -2,6 +2,19 @@ use iced_core::{Border, Color, Pixels, Rectangle, Shadow};
 
 use crate::style::{BadgeStyle, MarkerLineStyle, MarkerStyle};
 
+pub enum MarkerPosition<D> {
+    Value(D),
+    Normalized(f32),
+}
+
+pub type MarkerRendererFn<D, Theme> = Box<dyn FnOnce(MarkerContext<D, Theme>) -> Marker>;
+
+pub struct MarkerRequest<'a, AxisId, D, Theme = iced_core::Theme> {
+    pub(crate) position: MarkerPosition<D>,
+    pub(crate) axis_id: &'a AxisId,
+    pub(crate) renderer: MarkerRendererFn<D, Theme>,
+}
+
 /// Context provided to marker renderers for creating styled markers.
 ///
 /// Contains the axis value at the marker position and the resolved marker style.

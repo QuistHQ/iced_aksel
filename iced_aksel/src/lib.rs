@@ -125,6 +125,8 @@ use layer::Layer;
 use memory::Memory;
 use plot::DragDelta;
 
+use crate::axis::{MarkerContext, MarkerPosition, MarkerRequest};
+
 /// Default movement threshold (in pixels) to distinguish a click from a drag operation.
 const DEFAULT_DRAG_DEADBAND: f32 = 10.0;
 
@@ -222,6 +224,7 @@ pub struct Chart<
     drag_deadband: f32,
     padding: Padding,
     quality: f32,
+    markers: Vec<MarkerRequest<'a, AxisId, Domain>>,
 
     // Fonts
     axis_font: Option<Font>,
@@ -270,6 +273,7 @@ where
             drag_deadband: DEFAULT_DRAG_DEADBAND,
             padding: Padding::new(0.),
             quality: 1.0,
+            markers: Vec::with_capacity(state.axes().len()),
 
             // Handlers and fonts default to None
             axis_font: None,
@@ -364,6 +368,23 @@ where
     /// Default is 10 pixels. This helps prevent accidental drags when the user intended to click.
     pub const fn drag_deadband(mut self, distance: f32) -> Self {
         self.drag_deadband = distance;
+        self
+    }
+
+    pub fn marker<F>(
+        mut self,
+        axis_id: &'a AxisId,
+        position: MarkerPosition<Domain>,
+        renderer: F,
+    ) -> Self
+    where
+        F: FnOnce(MarkerContext<'a, Domain, Theme>) -> axis::Marker + 'static,
+    {
+        self.markers.push(MarkerRequest {
+            axis_id,
+            position,
+            renderer: Box::new(renderer),
+        });
         self
     }
 
@@ -1004,6 +1025,26 @@ where
 
             // User code draws shapes into the plot here
             layer.items.draw(&mut plot, theme);
+        }
+
+        // Flush the mesh buffer once more
+        mesh_buffer.render(renderer, &bounds);
+
+        // 4. Render markers
+        for marker_request in self.markers {
+            let Some(axis) = self.state.axis_opt(marker_request.axis_id) else {
+                continue;
+            };
+
+            axis.draw_marker_overlay(
+                renderer,
+                pos,
+                marker,
+                bounds,
+                viewport,
+                orientation,
+                text_offset,
+            );
         }
 
         // 4. Draw Debug Overlay (if enabled)

@@ -47,8 +47,6 @@ pub use position::*;
 pub use tick::*;
 
 type TickRendererFn<D, Theme> = RefCell<Box<dyn FnMut(TickContext<D, Theme>) -> TickResult>>;
-type MarkerRendererFn<D, Theme> =
-    RefCell<Box<dyn FnMut(MarkerContext<D, Theme>) -> Option<Marker>>>;
 type StyleOverrideFn = RefCell<Box<dyn FnMut(&mut AxisStyle)>>;
 
 /// An axis that maps data values to screen coordinates.
@@ -80,8 +78,6 @@ pub struct Axis<D, Theme = iced_core::Theme> {
     scale: Box<dyn Scale<Domain = D, Normalized = f32>>,
     #[derivative(Debug = "ignore")]
     tick_renderer: Option<TickRendererFn<D, Theme>>,
-    #[derivative(Debug = "ignore")]
-    marker_renderer: Option<MarkerRendererFn<D, Theme>>,
     #[derivative(Debug = "ignore")]
     style_override: Option<StyleOverrideFn>,
 
@@ -491,7 +487,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
     /// This method ensures the badge stays within the viewport even if the mouse
     /// is at the extreme edges of the axis, preventing clipping.
     #[allow(clippy::too_many_arguments)]
-    fn draw_marker_overlay<Renderer>(
+    pub(super) fn draw_marker_overlay<Renderer>(
         &self,
         renderer: &mut Renderer,
         pos: Point,
