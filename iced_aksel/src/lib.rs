@@ -640,7 +640,7 @@ where
                         let cursor_pos = cursor.position().unwrap();
                         let normalized = Point::new(
                             (cursor_pos.x - plot_bounds.x) / plot_bounds.width,
-                            (cursor_pos.y - plot_bounds.y) / plot_bounds.height,
+                            1.0 - ((cursor_pos.y - plot_bounds.y) / plot_bounds.height),
                         );
                         shell.publish(handler(normalized));
                     }
