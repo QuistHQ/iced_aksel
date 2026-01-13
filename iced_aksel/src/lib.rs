@@ -986,7 +986,7 @@ where
         _style: &Style,
         layout: Layout<'_>,
         cursor: mouse::Cursor,
-        _viewport: &Rectangle,
+        viewport: &Rectangle,
     ) {
         let style = theme.style(&self.class);
         let bounds = layout.bounds();

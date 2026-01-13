@@ -114,8 +114,8 @@ impl AxesShowcase {
             Chart::new(&self.state)
                 .on_hover(Message::PlotHovered)
                 .on_axis_hover(Message::AxisHovered)
-                .marker_maybe(&Self::X, self.cursor_positions[0], simple_dynamic_marker)
-                .marker_maybe(&Self::Y, self.cursor_positions[1], advanced_dynamic_marker),
+                .marker(&Self::X, MarkerPosition::Cursor, simple_dynamic_marker)
+                .marker(&Self::Y, MarkerPosition::Cursor, advanced_dynamic_marker),
         );
 
         column![theme_section, skip_overlapping_section, chart_panel,]

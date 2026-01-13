@@ -1,7 +1,10 @@
 use aksel::Float;
 use iced_core::{Border, Color, Pixels, Rectangle, Shadow};
 
-use crate::style::{AxisStyle, BadgeStyle, MarkerLineStyle, MarkerStyle};
+use crate::{
+    axis::Orientation,
+    style::{AxisStyle, BadgeStyle, MarkerLineStyle, MarkerStyle},
+};
 
 /// A position of a marker
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
@@ -11,6 +14,8 @@ pub enum MarkerPosition<D> {
     Value(D),
     /// A normalized value (percentage) of the axis
     Normalized(f32),
+    /// Follow the cursor
+    Cursor,
 }
 
 pub type MarkerRendererFn<D, Theme> = Box<dyn Fn(MarkerContext<D, Theme>) -> Option<Marker>>;
@@ -38,11 +43,26 @@ impl<AxisId: std::hash::Hash + Eq + Clone, D: Float, Theme> MarkerRequest<'_, Ax
             style_override.borrow_mut()(&mut style)
         };
 
+        let cursor_on_plot = cursor.position_over(*plot_bounds);
+        let cursor_on_axis = cursor.position_over(*axis_bounds);
+
         let (value, normalized_position) = match self.position {
             MarkerPosition::Value(v) if (domain_min..=domain_max).contains(&v) => {
                 (v, axis.normalize(&v))
             }
             MarkerPosition::Normalized(n) if ((0.)..=1.).contains(&n) => (axis.denormalize(n), n),
+            MarkerPosition::Cursor => {
+                let point = cursor_on_plot.or(cursor_on_axis)?;
+
+                let pos = match axis.orientation() {
+                    Orientation::Horizontal => point.x,
+                    Orientation::Vertical => point.y,
+                };
+
+                let normalized = axis.screen_to_normalized(pos, axis_bounds);
+                let value = axis.denormalize(normalized);
+                (value, normalized)
+            }
             _ => return None, // We can't render - Outside of bounds
         };
 
@@ -52,8 +72,8 @@ impl<AxisId: std::hash::Hash + Eq + Clone, D: Float, Theme> MarkerRequest<'_, Ax
             scale_domain: (domain_min, domain_max),
             style: &style.marker,
             axis_bounds,
-            cursor_on_plot: cursor.is_over(*plot_bounds),
-            cursor_on_axis: cursor.is_over(*axis_bounds),
+            cursor_on_plot: cursor_on_plot.is_some(),
+            cursor_on_axis: cursor_on_axis.is_some(),
             theme,
         };
 
