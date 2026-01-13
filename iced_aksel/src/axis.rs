@@ -507,41 +507,53 @@ impl<D: Float, Theme> Axis<D, Theme> {
 
         let width = style.width.0;
         let color = style.color;
+
+        // Tessellators draw lines centered on the coordinate.
+        // To draw "inwards" from the absolute edge of the axis, we offset the center by half the width.
         let half_width = width / 2.0;
 
         match self.position {
             Position::Top => {
-                // Draw below the axis bottom (y + height).
-                // Shift down by half_width so the top edge of the stroke hits the boundary.
+                // Absolute Edge: Bottom of the axis (y + height).
+                // Inwards Direction: Up (negative Y).
+                // Center: Edge - half_width.
+                let y_center = bounds.y + bounds.height - half_width;
+
                 draw_horizontal_line(
                     mesh_buffer,
                     bounds.x,
                     bounds.x + bounds.width,
-                    bounds.y + bounds.height + half_width,
+                    y_center,
                     width,
                     color,
                     true,
                 );
             }
             Position::Bottom => {
-                // Draw above the axis top (y).
-                // Shift up by half_width so the bottom edge of the stroke hits the boundary.
+                // Absolute Edge: Top of the axis (y).
+                // Inwards Direction: Down (positive Y).
+                // Center: Edge + half_width.
+                let y_center = bounds.y + half_width;
+
                 draw_horizontal_line(
                     mesh_buffer,
                     bounds.x,
                     bounds.x + bounds.width,
-                    bounds.y,
+                    y_center,
                     width,
                     color,
                     true,
                 );
             }
             Position::Left => {
-                // Draw to the right of the axis (x + width).
-                // Shift right by half_width.
+                // Absolute Edge: Right of the axis (x + width).
+                // Inwards Direction: Left (negative X).
+                // Center: Edge - half_width.
+                let x_center = bounds.x + bounds.width - half_width;
+
                 draw_vertical_line(
                     mesh_buffer,
-                    bounds.x + bounds.width + half_width,
+                    x_center,
                     bounds.y,
                     bounds.y + bounds.height,
                     width,
@@ -550,11 +562,14 @@ impl<D: Float, Theme> Axis<D, Theme> {
                 );
             }
             Position::Right => {
-                // Draw to the left of the axis (x).
-                // Shift left by half_width.
+                // Absolute Edge: Left of the axis (x).
+                // Inwards Direction: Right (positive X).
+                // Center: Edge + half_width.
+                let x_center = bounds.x + half_width;
+
                 draw_vertical_line(
                     mesh_buffer,
-                    bounds.x,
+                    x_center,
                     bounds.y,
                     bounds.y + bounds.height,
                     width,
@@ -894,8 +909,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
             color: label.color,
         })
     }
-
-    /// Renders a single tick mark into the mesh buffer.
+    /// Renders a single tick mark into the mesh buffer using linear tessellators.
     fn draw_tick_line(
         &self,
         line: TickLine,
@@ -903,57 +917,60 @@ impl<D: Float, Theme> Axis<D, Theme> {
         mesh_buffer: &mut MeshBuffer,
         pos_norm: f32,
     ) {
-        let (x0, y0, x1, y1) = match self.position {
+        let width = line.width.0;
+        let length = line.length.0;
+        let color = line.color;
+
+        match self.position {
             Position::Bottom => {
-                let x = bounds.width.mul_add(pos_norm, bounds.x).round();
-                (x, bounds.y, x + line.width.0, bounds.y + line.length.0)
+                let x = bounds.width.mul_add(pos_norm, bounds.x);
+                draw_vertical_line(
+                    mesh_buffer,
+                    x,
+                    bounds.y,
+                    bounds.y + length,
+                    width,
+                    color,
+                    true,
+                );
             }
             Position::Top => {
-                let x = bounds.width.mul_add(pos_norm, bounds.x).round();
-                (
+                let x = bounds.width.mul_add(pos_norm, bounds.x);
+                draw_vertical_line(
+                    mesh_buffer,
                     x,
-                    bounds.y + bounds.height - line.length.0,
-                    x + line.width.0,
+                    bounds.y + bounds.height - length,
                     bounds.y + bounds.height,
-                )
+                    width,
+                    color,
+                    true,
+                );
             }
             Position::Right => {
-                let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y).round();
-                (bounds.x, y, bounds.x + line.length.0, y + line.width.0)
+                let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y);
+                draw_horizontal_line(
+                    mesh_buffer,
+                    bounds.x,
+                    bounds.x + length,
+                    y,
+                    width,
+                    color,
+                    true,
+                );
             }
             Position::Left => {
-                let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y).round();
-                (
-                    bounds.x + bounds.width - line.length.0,
-                    y,
+                let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y);
+                draw_horizontal_line(
+                    mesh_buffer,
+                    bounds.x + bounds.width - length,
                     bounds.x + bounds.width,
-                    y + line.width.0,
-                )
+                    y,
+                    width,
+                    color,
+                    true,
+                );
             }
-        };
-
-        let color = color::pack(line.color);
-        mesh_buffer.add(
-            &[0, 1, 2, 2, 1, 3],
-            &[
-                SolidVertex2D {
-                    position: [x0, y0],
-                    color,
-                },
-                SolidVertex2D {
-                    position: [x1, y0],
-                    color,
-                },
-                SolidVertex2D {
-                    position: [x0, y1],
-                    color,
-                },
-                SolidVertex2D {
-                    position: [x1, y1],
-                    color,
-                },
-            ],
-        );
+        }
     }
 
     /// Renders a single grid line into the mesh buffer.
