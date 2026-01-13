@@ -157,6 +157,15 @@ impl<D: Float, Theme> Axis<D, Theme> {
         self
     }
 
+    /// Creates the final style of this axis (overrides applied)
+    pub(crate) fn create_style(&self, style: &Style) -> AxisStyle {
+        let mut style = style.axis;
+        if let Some(override_fn) = &self.style_override {
+            (override_fn.borrow_mut())(&mut style)
+        }
+        style
+    }
+
     /// Sets a custom renderer for ticks.
     ///
     /// This function gives you full control over which ticks render lines, grids, or labels.
@@ -339,11 +348,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
             return;
         }
 
-        let mut style = style.axis;
-        if let Some(style_override) = self.style_override.as_ref() {
-            style_override.borrow_mut()(&mut style)
-        };
-
+        let style = self.create_style(style);
         let bounds = layout.bounds();
         let full_bounds = plot_bounds.union(&bounds);
         let orientation = Orientation::from(self.position());
