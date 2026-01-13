@@ -40,6 +40,7 @@ mod marker;
 mod position;
 mod tick;
 
+use crate::style::SpineStyle;
 pub use grid::*;
 pub use label::*;
 pub use marker::*;
@@ -154,6 +155,16 @@ impl<D: Float, Theme> Axis<D, Theme> {
     {
         self.style_override = Some(RefCell::new(Box::new(style_fn)));
         self
+    }
+
+    /// Gets the SpineStyle for the axis. Represents the line drawn as a separator for
+    /// axis and plot
+    pub fn spine_style(&self, base_style: &AxisStyle) -> SpineStyle {
+        let mut style = *base_style;
+        if let Some(override_fn) = &self.style_override {
+            override_fn.borrow_mut()(&mut style)
+        };
+        style.spine
     }
 
     /// Sets a custom renderer for ticks.
@@ -428,6 +439,8 @@ impl<D: Float, Theme> Axis<D, Theme> {
             if let Some(line) = tick_line {
                 self.draw_tick_line(line, &bounds, mesh_buffer, pos_norm);
             }
+
+            self.draw_spine(&bounds, mesh_buffer, &style.spine);
         }
 
         if self.invisible {
@@ -483,6 +496,72 @@ impl<D: Float, Theme> Axis<D, Theme> {
                 orientation,
                 style.text_offset,
             );
+        }
+    }
+
+    /// Renders the axis spine (the continuous line along the axis) directly into the mesh buffer.
+    fn draw_spine(&self, bounds: &Rectangle, mesh_buffer: &mut MeshBuffer, style: &SpineStyle) {
+        if style.width.0 <= 0.0 {
+            return;
+        }
+
+        let width = style.width.0;
+        let color = style.color;
+        let half_width = width / 2.0;
+
+        match self.position {
+            Position::Top => {
+                // Draw below the axis bottom (y + height).
+                // Shift down by half_width so the top edge of the stroke hits the boundary.
+                draw_horizontal_line(
+                    mesh_buffer,
+                    bounds.x,
+                    bounds.x + bounds.width,
+                    bounds.y + bounds.height + half_width,
+                    width,
+                    color,
+                    true,
+                );
+            }
+            Position::Bottom => {
+                // Draw above the axis top (y).
+                // Shift up by half_width so the bottom edge of the stroke hits the boundary.
+                draw_horizontal_line(
+                    mesh_buffer,
+                    bounds.x,
+                    bounds.x + bounds.width,
+                    bounds.y,
+                    width,
+                    color,
+                    true,
+                );
+            }
+            Position::Left => {
+                // Draw to the right of the axis (x + width).
+                // Shift right by half_width.
+                draw_vertical_line(
+                    mesh_buffer,
+                    bounds.x + bounds.width + half_width,
+                    bounds.y,
+                    bounds.y + bounds.height,
+                    width,
+                    color,
+                    true,
+                );
+            }
+            Position::Right => {
+                // Draw to the left of the axis (x).
+                // Shift left by half_width.
+                draw_vertical_line(
+                    mesh_buffer,
+                    bounds.x,
+                    bounds.y,
+                    bounds.y + bounds.height,
+                    width,
+                    color,
+                    true,
+                );
+            }
         }
     }
 

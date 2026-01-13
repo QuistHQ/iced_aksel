@@ -138,7 +138,8 @@ fn axes_setup(skip_overlapping_labels: bool) -> State<&'static str, f64> {
     // X-Axis dynamic settings
     let mut x_axis = Axis::new(x_scale, x_placement)
         .with_marker_renderer(simple_dynamic_marker())
-        .with_tick_renderer(simple_tick_result());
+        .with_tick_renderer(simple_tick_result())
+        .without_grid();
 
     if skip_overlapping_labels {
         x_axis.set_skip_overlapping_labels(6.) // <-- Automatically hides labels that would collide
@@ -154,10 +155,12 @@ fn axes_setup(skip_overlapping_labels: bool) -> State<&'static str, f64> {
             .skip_overlapping_labels(6.)
             .with_marker_renderer(advanced_dynamic_marker())
             .with_tick_renderer(advanced_tick_result())
+            .without_grid()
     } else {
         Axis::new(y_scale, y_placement)
             .with_marker_renderer(advanced_dynamic_marker())
             .with_tick_renderer(advanced_tick_result())
+            .without_grid()
     };
 
     state.set_axis(AxesShowcase::X, x_axis);
