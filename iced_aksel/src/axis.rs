@@ -441,7 +441,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
             }
         }
 
-        self.draw_spine(&bounds, mesh_buffer, &style.spine);
+        self.draw_spine(renderer, &bounds, &style.spine, viewport);
 
         if self.invisible {
             return;
@@ -499,8 +499,16 @@ impl<D: Float, Theme> Axis<D, Theme> {
         }
     }
 
-    /// Renders the axis spine (the continuous line along the axis) directly into the mesh buffer.
-    fn draw_spine(&self, bounds: &Rectangle, mesh_buffer: &mut MeshBuffer, style: &SpineStyle) {
+    /// Renders the axis spine (the continuous line along the axis) as a Quad in a separate layer.
+    fn draw_spine<Renderer>(
+        &self,
+        renderer: &mut Renderer,
+        bounds: &Rectangle,
+        style: &SpineStyle,
+        viewport: &Rectangle,
+    ) where
+        Renderer: plot::Renderer,
+    {
         if style.width.0 <= 0.0 {
             return;
         }
@@ -508,76 +516,55 @@ impl<D: Float, Theme> Axis<D, Theme> {
         let width = style.width.0;
         let color = style.color;
 
-        // Tessellators draw lines centered on the coordinate.
-        // To draw "inwards" from the absolute edge of the axis, we offset the center by half the width.
-        let half_width = width / 2.0;
-
-        match self.position {
+        let spine_rect = match self.position {
             Position::Top => {
-                // Absolute Edge: Bottom of the axis (y + height).
-                // Inwards Direction: Up (negative Y).
-                // Center: Edge - half_width.
-                let y_center = bounds.y + bounds.height - half_width;
-
-                draw_horizontal_line(
-                    mesh_buffer,
-                    bounds.x,
-                    bounds.x + bounds.width,
-                    y_center,
-                    width,
-                    color,
-                    true,
-                );
+                // Spine at bottom edge of top axis
+                Rectangle {
+                    x: bounds.x,
+                    y: bounds.y + bounds.height - width,
+                    width: bounds.width,
+                    height: width,
+                }
             }
             Position::Bottom => {
-                // Absolute Edge: Top of the axis (y).
-                // Inwards Direction: Down (positive Y).
-                // Center: Edge + half_width.
-                let y_center = bounds.y + half_width;
-
-                draw_horizontal_line(
-                    mesh_buffer,
-                    bounds.x,
-                    bounds.x + bounds.width,
-                    y_center,
-                    width,
-                    color,
-                    true,
-                );
+                // Spine at top edge of bottom axis
+                Rectangle {
+                    x: bounds.x,
+                    y: bounds.y,
+                    width: bounds.width,
+                    height: width,
+                }
             }
             Position::Left => {
-                // Absolute Edge: Right of the axis (x + width).
-                // Inwards Direction: Left (negative X).
-                // Center: Edge - half_width.
-                let x_center = bounds.x + bounds.width - half_width;
-
-                draw_vertical_line(
-                    mesh_buffer,
-                    x_center,
-                    bounds.y,
-                    bounds.y + bounds.height,
-                    width,
-                    color,
-                    true,
-                );
+                // Spine at right edge of left axis
+                Rectangle {
+                    x: bounds.x + bounds.width - width,
+                    y: bounds.y,
+                    width: width,
+                    height: bounds.height,
+                }
             }
             Position::Right => {
-                // Absolute Edge: Left of the axis (x).
-                // Inwards Direction: Right (positive X).
-                // Center: Edge + half_width.
-                let x_center = bounds.x + half_width;
-
-                draw_vertical_line(
-                    mesh_buffer,
-                    x_center,
-                    bounds.y,
-                    bounds.y + bounds.height,
-                    width,
-                    color,
-                    true,
-                );
+                // Spine at left edge of right axis
+                Rectangle {
+                    x: bounds.x,
+                    y: bounds.y,
+                    width: width,
+                    height: bounds.height,
+                }
             }
-        }
+        };
+
+        // Render spine in a separate layer to ensure it's always on top
+        renderer.start_layer(*viewport);
+        renderer.fill_quad(
+            Quad {
+                bounds: spine_rect,
+                ..Default::default()
+            },
+            color,
+        );
+        renderer.end_layer();
     }
 
     /// Draws the interactive marker badge and line.
