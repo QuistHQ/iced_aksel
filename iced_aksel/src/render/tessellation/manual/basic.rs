@@ -12,15 +12,23 @@ use iced_graphics::{color::pack, mesh::SolidVertex2D};
 #[inline]
 pub fn draw_fill_rect(
     buffer: &mut MeshBuffer,
-    x_min: f32,
-    y_min: f32,
-    x_max: f32,
-    y_max: f32,
+    mut x_min: f32,
+    mut y_min: f32,
+    mut x_max: f32,
+    mut y_max: f32,
     color: Color,
+    snap: bool,
 ) {
     let packed_color = pack(color);
     let mesh = buffer.get_mesh_mut();
     let start_index = mesh.vertices.len() as u32;
+
+    if snap {
+        x_min = x_min.round();
+        y_min = y_min.round();
+        x_max = x_max.round();
+        y_max = y_max.round();
+    }
 
     mesh.vertices.extend_from_slice(&[
         SolidVertex2D {

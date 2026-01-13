@@ -145,7 +145,7 @@ impl Tessellator {
         if is_consumed {
             if let Some((style, _, _)) = stroke {
                 self.manual
-                    .draw_fill_rect(buffer, x_min, y_min, x_max, y_max, style.fill);
+                    .draw_fill_rect(buffer, x_min, y_min, x_max, y_max, style.fill, true);
             }
             return;
         }
@@ -165,6 +165,7 @@ impl Tessellator {
                 x_max - overlap,
                 y_max - overlap,
                 color,
+                true,
             );
         }
 

@@ -822,6 +822,7 @@ where
                 plot.x,                    // x_max
                 plot.y + plot.height + bw, // y_max
                 lc,
+                true,
             );
         }
 
@@ -834,6 +835,7 @@ where
                 plot.x,      // x_max
                 plot.y,      // y_max
                 lc,
+                true,
             );
         }
 
@@ -846,6 +848,7 @@ where
                 plot.x + plot.width + rw,  // x_max
                 plot.y + plot.height + bw, // y_max
                 rc,
+                true,
             );
         }
 
@@ -858,6 +861,7 @@ where
                 plot.x + plot.width + rw, // x_max
                 plot.y,                   // y_max
                 rc,
+                true,
             );
         }
     }
