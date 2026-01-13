@@ -6,6 +6,16 @@ use iced_core::{Border, Color, Padding, Pixels, Shadow, Theme};
 pub struct Style {
     /// Style of the axes.
     pub axis: AxisStyle,
+
+    pub plot_border_style: PlotBorderStyle,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PlotBorderStyle {
+    /// The color of the plot border.
+    pub color: Color,
+    /// The width of the plot border in pixels.
+    pub width: Pixels,
 }
 
 /// Style of dashed lines
@@ -175,5 +185,9 @@ pub fn default(theme: &Theme) -> Style {
                 },
             },
         },
+        plot_border_style: PlotBorderStyle{
+            width: 1.into(),
+            color: palette.background.strong.text,
+        }
     }
 }
