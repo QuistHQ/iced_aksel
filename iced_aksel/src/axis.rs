@@ -439,9 +439,9 @@ impl<D: Float, Theme> Axis<D, Theme> {
             if let Some(line) = tick_line {
                 self.draw_tick_line(line, &bounds, mesh_buffer, pos_norm);
             }
-
-            self.draw_spine(&bounds, mesh_buffer, &style.spine);
         }
+
+        self.draw_spine(&bounds, mesh_buffer, &style.spine);
 
         if self.invisible {
             return;
