@@ -1207,7 +1207,7 @@ where
             );
         }
 
-        // 4. Draw Debug Overlay (if enabled)
+        // 5. Draw Debug Overlay (if enabled)
         if self.debug {
             renderer.start_layer(bounds);
 
