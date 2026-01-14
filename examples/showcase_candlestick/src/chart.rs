@@ -4,7 +4,7 @@ use chrono::{Datelike, TimeZone, Timelike};
 use iced::mouse::ScrollDelta;
 use iced_aksel::{
     Axis, Chart, Measure, State,
-    axis::{Position, TickContext, TickResult},
+    axis::{MarkerPosition, Position, TickContext, TickResult},
     plot::DragDelta,
     scale::Linear,
 };
@@ -176,6 +176,14 @@ impl CandlestickChart {
             .on_scroll(|anchor, delta| Message::OnPlotScroll(anchor, delta).into())
             .on_axis_drag(|axis, delta| Message::OnAxisDrag(axis, delta).into())
             .on_axis_double_click(|id, _| Message::OnAxisDoubleClick(id).into())
+            .marker(&X_AXIS_ID, MarkerPosition::Cursor, |ctx| {
+                let timestamp_seconds = ctx.value as i64 * 60;
+                let datetime = chrono::Utc.timestamp_opt(timestamp_seconds, 0).single()?;
+                Some(ctx.marker(datetime.format("%a %d %b '%g %H:%M").to_string()))
+            })
+            .marker(&Y_AXIS_ID, MarkerPosition::Cursor, |ctx| {
+                Some(ctx.marker(format!("{:.2}", ctx.value)))
+            })
     }
 
     /// Handles incoming messages and updates the chart state.
@@ -465,11 +473,6 @@ impl CandlestickChart {
 
         Axis::new(scale, Position::Bottom)
             .with_tick_renderer(tick_renderer)
-            .with_marker_renderer(|ctx| {
-                let timestamp_seconds = ctx.value as i64 * 60;
-                let datetime = chrono::Utc.timestamp_opt(timestamp_seconds, 0).single()?;
-                Some(ctx.marker(datetime.format("%a %d %b '%g %H:%M").to_string()))
-            })
             .skip_overlapping_labels(12.0)
     }
 
@@ -484,7 +487,6 @@ impl CandlestickChart {
                     ..Default::default()
                 }
             })
-            .with_marker_renderer(|ctx| Some(ctx.marker(format!("{:.2}", ctx.value))))
             .skip_overlapping_labels(8.0)
     }
 

@@ -35,8 +35,9 @@ impl ManualTessellator {
         x_max: f32,
         y_max: f32,
         color: Color,
+        snap: bool,
     ) {
-        basic::draw_fill_rect(buffer, x_min, y_min, x_max, y_max, color);
+        basic::draw_fill_rect(buffer, x_min, y_min, x_max, y_max, color, snap);
     }
 
     #[inline]

@@ -14,7 +14,7 @@ use iced::{
 };
 use iced_aksel::{
     Axis, Chart, Measure, Plot, PlotData, PlotPoint, State, Stroke,
-    axis::{Position, TickContext, TickLine, TickResult},
+    axis::{MarkerPosition, Position, TickContext, TickLine, TickResult},
     scale, shape,
 };
 
@@ -163,8 +163,14 @@ impl AnalyzerApp {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let chart =
-            Chart::new(&self.state).plot_data(&self.spectrum_layer, FREQ_AXIS_ID, DB_AXIS_ID);
+        let chart = Chart::new(&self.state)
+            .plot_data(&self.spectrum_layer, FREQ_AXIS_ID, DB_AXIS_ID)
+            .marker(&FREQ_AXIS_ID, MarkerPosition::Cursor, |ctx| {
+                Some(ctx.marker(format_frequency_label(ctx.value)))
+            })
+            .marker(&DB_AXIS_ID, MarkerPosition::Cursor, |ctx| {
+                Some(ctx.marker(format_db_label(ctx.value)))
+            });
 
         let pick_row = row![
             text("Audio Input: "),
@@ -253,14 +259,12 @@ fn create_frequency_axis() -> Axis<f64> {
         scale::Logarithmic::new(10.0, MIN_FREQ, MAX_FREQ),
         Position::Bottom,
     )
-    .with_marker_renderer(|ctx| Some(ctx.marker(format_frequency_label(ctx.value))))
     .with_tick_renderer(frequency_tick_renderer)
     .skip_overlapping_labels(8.0)
 }
 
 fn create_db_axis() -> Axis<f64> {
     Axis::new(scale::Linear::new(MIN_DB, MAX_DB), Position::Left)
-        .with_marker_renderer(|ctx| Some(ctx.marker(format_db_label(ctx.value))))
         .with_tick_renderer(db_tick_renderer)
         .with_thickness(80.0)
         .skip_overlapping_labels(8.0)

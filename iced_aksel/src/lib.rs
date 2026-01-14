@@ -119,6 +119,7 @@ pub use state::State;
 pub use stroke::Stroke;
 pub use style::Catalog;
 
+use crate::render::tessellation::manual::basic::draw_fill_rect;
 use action::Action;
 use axis::{Orientation, Position};
 use layer::Layer;
@@ -785,6 +786,127 @@ where
         // The plot area is always the last child in the layout list
         layout.children().last().unwrap()
     }
+
+    /// Iterates over axes to find the inner-most spines and draws connecting squares at the corners.
+    fn draw_spine_corners(
+        &self,
+        layout: Layout<'_>,
+        style: &style::Style,
+        plot: Rectangle,
+        mesh: &mut render::MeshBuffer,
+    ) {
+        // Track the "inner-most" spine properties for each side
+        let mut left: Option<(f32, Color)> = None;
+        let mut right: Option<(f32, Color)> = None;
+        let mut top: Option<(f32, Color)> = None;
+        let mut bottom: Option<(f32, Color)> = None;
+
+        // Track the edge coordinates to determine closeness to the plot
+        let mut max_left_edge = f32::MIN;
+        let mut min_right_edge = f32::MAX;
+        let mut max_top_edge = f32::MIN;
+        let mut min_bottom_edge = f32::MAX;
+
+        // 1. Find the winners
+        for (i, (_, axis)) in self.state.axes().iter().enumerate() {
+            if !axis.is_visible() {
+                continue;
+            }
+
+            if style.axis.spine.width.0 <= 0.0 {
+                continue;
+            }
+
+            let style = axis.create_style(style).spine;
+            let bounds = layout.children().nth(i).unwrap().bounds();
+            let data = (style.width.0, style.color);
+
+            match axis.position() {
+                Position::Left => {
+                    let edge = bounds.x + bounds.width;
+                    if edge >= max_left_edge {
+                        max_left_edge = edge;
+                        left = Some(data);
+                    }
+                }
+                Position::Right => {
+                    let edge = bounds.x;
+                    if edge <= min_right_edge {
+                        min_right_edge = edge;
+                        right = Some(data);
+                    }
+                }
+                Position::Top => {
+                    let edge = bounds.y + bounds.height;
+                    if edge >= max_top_edge {
+                        max_top_edge = edge;
+                        top = Some(data);
+                    }
+                }
+                Position::Bottom => {
+                    let edge = bounds.y;
+                    if edge <= min_bottom_edge {
+                        min_bottom_edge = edge;
+                        bottom = Some(data);
+                    }
+                }
+            }
+        }
+
+        // 2. Render the corners
+
+        // Bottom-Left
+        if let (Some((lw, lc)), Some((bw, _))) = (left, bottom) {
+            draw_fill_rect(
+                mesh,
+                plot.x - lw,               // x_min
+                plot.y + plot.height,      // y_min
+                plot.x,                    // x_max
+                plot.y + plot.height + bw, // y_max
+                lc,
+                true,
+            );
+        }
+
+        // Top-Left
+        if let (Some((lw, lc)), Some((tw, _))) = (left, top) {
+            draw_fill_rect(
+                mesh,
+                plot.x - lw, // x_min
+                plot.y - tw, // y_min
+                plot.x,      // x_max
+                plot.y,      // y_max
+                lc,
+                true,
+            );
+        }
+
+        // Bottom-Right
+        if let (Some((rw, rc)), Some((bw, _))) = (right, bottom) {
+            draw_fill_rect(
+                mesh,
+                plot.x + plot.width,       // x_min
+                plot.y + plot.height,      // y_min
+                plot.x + plot.width + rw,  // x_max
+                plot.y + plot.height + bw, // y_max
+                rc,
+                true,
+            );
+        }
+
+        // Top-Right
+        if let (Some((rw, rc)), Some((tw, _))) = (right, top) {
+            draw_fill_rect(
+                mesh,
+                plot.x + plot.width,      // x_min
+                plot.y - tw,              // y_min
+                plot.x + plot.width + rw, // x_max
+                plot.y,                   // y_max
+                rc,
+                true,
+            );
+        }
+    }
 }
 
 impl<AxisId, Domain, Message, Theme, Renderer> Widget<Message, Theme, Renderer>
@@ -1011,9 +1133,11 @@ where
             height: plot_bounds.height,
         };
 
-        // 2. Render axes and grids
         for (i, (_, axis)) in self.state.axes().iter().enumerate() {
+            // We only care about layout bounds here to determine position
             let axis_layout = layout.children().nth(i).unwrap();
+
+            // Draw the axis itself (Standard draw call)
             axis.draw::<Renderer>(
                 renderer,
                 theme,
@@ -1024,6 +1148,9 @@ where
                 &bounds,
             );
         }
+
+        // 2. Draw Spine Corners (Self-contained logic)
+        self.draw_spine_corners(layout, &style, plot_bounds, &mut mesh_buffer);
 
         // Flush the mesh buffer (draws all the lines/ticks aggregated so far)
         mesh_buffer.render(renderer, &bounds);

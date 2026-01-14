@@ -39,6 +39,7 @@ mod marker;
 mod position;
 mod tick;
 
+use crate::style::SpineStyle;
 pub use grid::*;
 pub use label::*;
 pub use marker::*;
@@ -146,6 +147,15 @@ impl<D: Float, Theme> Axis<D, Theme> {
     {
         self.style_override = Some(RefCell::new(Box::new(style_fn)));
         self
+    }
+
+    /// Creates the final style of this axis (overrides applied)
+    pub(crate) fn create_style(&self, style: &Style) -> AxisStyle {
+        let mut style = style.axis;
+        if let Some(override_fn) = &self.style_override {
+            (override_fn.borrow_mut())(&mut style)
+        }
+        style
     }
 
     /// Sets a custom renderer for ticks.
@@ -314,11 +324,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
             return;
         }
 
-        let mut style = style.axis;
-        if let Some(style_override) = self.style_override.as_ref() {
-            style_override.borrow_mut()(&mut style)
-        };
-
+        let style = self.create_style(style);
         let bounds = layout.bounds();
         let orientation = Orientation::from(self.position());
         let (&d_min, &d_max) = self.scale.domain();
@@ -405,6 +411,8 @@ impl<D: Float, Theme> Axis<D, Theme> {
             }
         }
 
+        self.draw_spine(renderer, &bounds, &style.spine, viewport);
+
         if self.invisible {
             return;
         }
@@ -418,8 +426,77 @@ impl<D: Float, Theme> Axis<D, Theme> {
             &bounds,
             orientation,
             label_candidates,
+            candidate_max_size,
             viewport,
         );
+    }
+
+    /// Renders the axis spine (the continuous line along the axis) as a Quad in a separate layer.
+    fn draw_spine<Renderer>(
+        &self,
+        renderer: &mut Renderer,
+        bounds: &Rectangle,
+        style: &SpineStyle,
+        viewport: &Rectangle,
+    ) where
+        Renderer: plot::Renderer,
+    {
+        if style.width.0 <= 0.0 {
+            return;
+        }
+
+        let width = style.width.0;
+        let color = style.color;
+
+        let spine_rect = match self.position {
+            Position::Top => {
+                // Spine at bottom edge of top axis
+                Rectangle {
+                    x: bounds.x,
+                    y: bounds.y + bounds.height - width,
+                    width: bounds.width,
+                    height: width,
+                }
+            }
+            Position::Bottom => {
+                // Spine at top edge of bottom axis
+                Rectangle {
+                    x: bounds.x,
+                    y: bounds.y,
+                    width: bounds.width,
+                    height: width,
+                }
+            }
+            Position::Left => {
+                // Spine at right edge of left axis
+                Rectangle {
+                    x: bounds.x + bounds.width - width,
+                    y: bounds.y,
+                    width: width,
+                    height: bounds.height,
+                }
+            }
+            Position::Right => {
+                // Spine at left edge of right axis
+                Rectangle {
+                    x: bounds.x,
+                    y: bounds.y,
+                    width: width,
+                    height: bounds.height,
+                }
+            }
+        };
+
+        // Render spine in a separate layer to ensure it's always on top
+        renderer.start_layer(*viewport);
+        renderer.fill_quad(
+            Quad {
+                bounds: spine_rect,
+                ..Default::default()
+            },
+            color,
+        );
+        renderer.end_layer();
     }
 
     /// Draws the interactive marker badge and line.
@@ -613,6 +690,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
         bounds: &Rectangle,
         orientation: Orientation,
         label_candidates: Vec<LabelCandidate<D>>,
+        candidate_max_size: Size,
         viewport: &Rectangle,
     ) where
         Renderer: plot::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
@@ -622,6 +700,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
         for candidate in label_candidates {
             let Some(resolved) = self.resolve_label_candidate(
                 candidate,
+                &candidate_max_size,
                 renderer,
                 bounds,
                 orientation,
@@ -670,6 +749,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
     fn resolve_label_candidate<Renderer>(
         &self,
         candidate: LabelCandidate<D>,
+        candidate_max_size: &Size,
         renderer: &Renderer,
         bounds: &Rectangle,
         orientation: Orientation,
@@ -701,36 +781,33 @@ impl<D: Float, Theme> Axis<D, Theme> {
 
         let rail_pos = self.calculate_rail_position(bounds, orientation, offset);
 
+        let text_width = paragraph.min_bounds().width;
+        let text_height = paragraph.min_bounds().height;
+
         let position = match self.position {
             Position::Top => {
                 let center_x = bounds
                     .width
                     .mul_add(candidate.normalized_position, bounds.x);
-                Point::new(
-                    center_x - (paragraph.min_bounds().width / 2.0),
-                    rail_pos - paragraph.min_bounds().height,
-                )
+                Point::new(center_x - (text_width / 2.0), rail_pos - text_height)
             }
             Position::Bottom => {
                 let center_x = bounds
                     .width
                     .mul_add(candidate.normalized_position, bounds.x);
-                Point::new(center_x - (paragraph.min_bounds().width / 2.0), rail_pos)
+                Point::new(center_x - (text_width / 2.0), rail_pos)
             }
             Position::Left => {
                 let center_y = bounds
                     .height
                     .mul_add(1.0 - candidate.normalized_position, bounds.y);
-                Point::new(
-                    rail_pos - paragraph.min_bounds().width,
-                    center_y - (paragraph.min_bounds().height / 2.0),
-                )
+                Point::new(rail_pos - text_width, center_y - (text_height / 2.0))
             }
             Position::Right => {
                 let center_y = bounds
                     .height
                     .mul_add(1.0 - candidate.normalized_position, bounds.y);
-                Point::new(rail_pos, center_y - (paragraph.min_bounds().height / 2.0))
+                Point::new(rail_pos, center_y - (text_height / 2.0))
             }
         };
 
@@ -739,14 +816,14 @@ impl<D: Float, Theme> Axis<D, Theme> {
                 let center = bounds
                     .width
                     .mul_add(candidate.normalized_position, bounds.x);
-                let half = paragraph.min_bounds().width / 2.0;
+                let half = candidate_max_size.width / 2.0;
                 (center - half, center + half)
             }
             Orientation::Vertical => {
                 let center = bounds
                     .height
                     .mul_add(1.0 - candidate.normalized_position, bounds.y);
-                let half = paragraph.min_bounds().height / 2.0;
+                let half = candidate_max_size.height / 2.0;
                 (center - half, center + half)
             }
         };
@@ -760,8 +837,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
             color: label.color,
         })
     }
-
-    /// Renders a single tick mark into the mesh buffer.
+    /// Renders a single tick mark into the mesh buffer using linear tessellators.
     fn draw_tick_line(
         &self,
         line: TickLine,
@@ -769,57 +845,60 @@ impl<D: Float, Theme> Axis<D, Theme> {
         mesh_buffer: &mut MeshBuffer,
         pos_norm: f32,
     ) {
-        let (x0, y0, x1, y1) = match self.position {
+        let width = line.width.0;
+        let length = line.length.0;
+        let color = line.color;
+
+        match self.position {
             Position::Bottom => {
-                let x = bounds.width.mul_add(pos_norm, bounds.x).round();
-                (x, bounds.y, x + line.width.0, bounds.y + line.length.0)
+                let x = bounds.width.mul_add(pos_norm, bounds.x);
+                draw_vertical_line(
+                    mesh_buffer,
+                    x,
+                    bounds.y,
+                    bounds.y + length,
+                    width,
+                    color,
+                    true,
+                );
             }
             Position::Top => {
-                let x = bounds.width.mul_add(pos_norm, bounds.x).round();
-                (
+                let x = bounds.width.mul_add(pos_norm, bounds.x);
+                draw_vertical_line(
+                    mesh_buffer,
                     x,
-                    bounds.y + bounds.height - line.length.0,
-                    x + line.width.0,
+                    bounds.y + bounds.height - length,
                     bounds.y + bounds.height,
-                )
+                    width,
+                    color,
+                    true,
+                );
             }
             Position::Right => {
-                let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y).round();
-                (bounds.x, y, bounds.x + line.length.0, y + line.width.0)
+                let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y);
+                draw_horizontal_line(
+                    mesh_buffer,
+                    bounds.x,
+                    bounds.x + length,
+                    y,
+                    width,
+                    color,
+                    true,
+                );
             }
             Position::Left => {
-                let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y).round();
-                (
-                    bounds.x + bounds.width - line.length.0,
-                    y,
+                let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y);
+                draw_horizontal_line(
+                    mesh_buffer,
+                    bounds.x + bounds.width - length,
                     bounds.x + bounds.width,
-                    y + line.width.0,
-                )
+                    y,
+                    width,
+                    color,
+                    true,
+                );
             }
-        };
-
-        let color = color::pack(line.color);
-        mesh_buffer.add(
-            &[0, 1, 2, 2, 1, 3],
-            &[
-                SolidVertex2D {
-                    position: [x0, y0],
-                    color,
-                },
-                SolidVertex2D {
-                    position: [x1, y0],
-                    color,
-                },
-                SolidVertex2D {
-                    position: [x0, y1],
-                    color,
-                },
-                SolidVertex2D {
-                    position: [x1, y1],
-                    color,
-                },
-            ],
-        );
+        }
     }
 
     /// Renders a single grid line into the mesh buffer.

@@ -29,6 +29,15 @@ impl DashStyle {
     }
 }
 
+/// Style of the axis spine (the line separating the axis from the plot area).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SpineStyle {
+    /// The color of the spine line.
+    pub color: Color,
+    /// The thickness of the spine line.
+    pub width: Pixels,
+}
+
 /// Style of lines.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GridLineStyle {
@@ -62,6 +71,8 @@ pub struct AxisStyle {
     pub marker: MarkerStyle,
     /// Style of the grid lines.
     pub grid: GridLineStyle,
+    /// Style of the line that is drawn along the axis
+    pub spine: SpineStyle,
 }
 
 /// Style of a `Chart`'s interactive axis marker.
@@ -147,6 +158,10 @@ pub fn default(theme: &Theme) -> Style {
                 color: palette.background.strong.color,
                 width: 1.0.into(),
                 dashed: None,
+            },
+            spine: SpineStyle {
+                color: palette.background.strong.text,
+                width: 1.0.into(),
             },
             tick: TickLineStyle {
                 color: palette.background.strong.text,
