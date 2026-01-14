@@ -1,11 +1,11 @@
-use crate::style::{AxisStyle, TickLineStyle};
+use crate::style::{AxisStyle, BadgeStyle, TickLineStyle};
 
 use super::{Orientation, label::LabelBounds};
 
 use aksel::{Float, Tick};
 use derivative::Derivative;
 use iced_core::{
-    Color, Pixels, Point, Rectangle,
+    Border, Color, Padding, Pixels, Point, Rectangle, Shadow,
     text::{self, paragraph::Plain},
 };
 
@@ -32,6 +32,8 @@ pub struct TickResult {
     pub grid_line: Option<super::GridLine>,
     /// Optional text label for this tick.
     pub label: Option<super::Label>,
+    /// Optional badge to render behind the label.
+    pub label_badge: Option<LabelBadge>,
     /// Optional label rendering-priority (lower is higher priority).
     pub label_priority: Option<u8>,
 }
@@ -76,6 +78,20 @@ impl TickResult {
     /// Adds a background grid line extending from this tick.
     pub const fn grid_line(mut self, grid_line: super::GridLine) -> Self {
         self.grid_line = Some(grid_line);
+        self
+    }
+
+    /// Creates a new result containing only the specified badge.
+    pub fn with_badge(badge: LabelBadge) -> Self {
+        Self {
+            label_badge: Some(badge),
+            ..Self::default()
+        }
+    }
+
+    /// Adds a badge to this result.
+    pub const fn badge(mut self, badge: LabelBadge) -> Self {
+        self.label_badge = Some(badge);
         self
     }
 
@@ -144,6 +160,33 @@ impl<D: Float, Theme> TickContext<'_, D, Theme> {
     /// [`TickResult`]
     pub fn label_empty(&self) -> super::Label {
         super::Label::from_style("".to_string(), self.style.label)
+    }
+
+    /// Creates a new [`LabelBadge`] with applied styling. Only one [`LabelBadge`] can be returned in the
+    /// [`TickResult`]
+    pub fn label_badge(&self) -> super::LabelBadge {
+        super::LabelBadge::from(self.style.label_badge)
+    }
+}
+
+/// Visual properties for the badge background behind the tick label.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LabelBadge {
+    /// The background color of the badge.
+    pub background: Color,
+    /// The border styling of the badge.
+    pub border: Border,
+    /// The shadow styling of the badge.
+    pub shadow: Shadow,
+}
+
+impl From<BadgeStyle> for LabelBadge {
+    fn from(value: BadgeStyle) -> Self {
+        Self {
+            background: value.background,
+            border: value.border,
+            shadow: value.shadow,
+        }
     }
 }
 
@@ -251,6 +294,8 @@ pub struct LabelCandidate<D> {
     pub normalized_position: f32,
     /// The style and content of the label.
     pub label: super::Label,
+    /// Optional badge
+    pub badge: Option<LabelBadge>,
     /// Collision priority (lower is better).
     pub priority: u8,
 }
@@ -276,6 +321,10 @@ where
     pub position: Point,
     /// The resolved color.
     pub color: Color,
+    /// Badge for the label
+    pub badge: Option<LabelBadge>,
+    /// The bounds of the whole badge
+    pub badge_bounds: Rectangle,
 }
 
 /// Context provided to custom label policy functions.

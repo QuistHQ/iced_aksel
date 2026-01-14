@@ -335,7 +335,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
         let prioritized_ticks = self.collect_prioritized_ticks();
 
         let mut label_candidates = Vec::new();
-        let mut candidate_max_size = Size::ZERO;
+        let mut candidate_max_bounds = Size::ZERO;
 
         // Iterate through the PRE-SORTED ticks
         for wrapper in prioritized_ticks {
@@ -358,6 +358,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
                 tick_line,
                 grid_line,
                 label,
+                label_badge: badge,
                 label_priority,
             }) = tick_result
             else {
@@ -381,6 +382,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
                     tick,
                     normalized_position: pos_norm,
                     label: label.clone(),
+                    badge, // <--- Pass badge here
                     priority: label_priority.unwrap_or(tick.level),
                 });
 
@@ -398,11 +400,15 @@ impl<D: Float, Theme> Axis<D, Theme> {
                     wrapping: Wrapping::None,
                 });
 
-                if paragraph.min_bounds().width > candidate_max_size.width {
-                    candidate_max_size.width = paragraph.min_bounds().width;
+                let width = paragraph.min_bounds().width + label.padding.left + label.padding.right;
+                let height =
+                    paragraph.min_bounds().height + label.padding.top + label.padding.bottom;
+
+                if width > candidate_max_bounds.width {
+                    candidate_max_bounds.width = width;
                 }
-                if paragraph.min_bounds().height > candidate_max_size.height {
-                    candidate_max_size.height = paragraph.min_bounds().height;
+                if height > candidate_max_bounds.height {
+                    candidate_max_bounds.height = height;
                 }
             }
 
@@ -427,7 +433,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
             &bounds,
             orientation,
             label_candidates,
-            candidate_max_size,
+            candidate_max_bounds,
             viewport,
         );
     }
@@ -717,6 +723,8 @@ impl<D: Float, Theme> Axis<D, Theme> {
                 bounds: label_bounds,
                 paragraph,
                 position,
+                badge,
+                badge_bounds,
                 color,
             }: ResolvedLabelCandidate<Renderer, _> = resolved;
 
@@ -729,6 +737,20 @@ impl<D: Float, Theme> Axis<D, Theme> {
             };
 
             if self.label_policy.should_render(context) {
+                // 1. Render Badge (Background)
+                if let Some(badge) = badge {
+                    renderer.fill_quad(
+                        Quad {
+                            bounds: badge_bounds,
+                            border: badge.border,
+                            shadow: badge.shadow,
+                            ..Default::default()
+                        },
+                        badge.background,
+                    );
+                }
+
+                // 2. Render Text
                 renderer.fill_text(
                     paragraph
                         .as_text()
@@ -786,30 +808,51 @@ impl<D: Float, Theme> Axis<D, Theme> {
         let text_width = paragraph.min_bounds().width;
         let text_height = paragraph.min_bounds().height;
 
+        let padding = label.padding;
+
         let position = match self.position {
             Position::Top => {
                 let center_x = bounds
                     .width
                     .mul_add(candidate.normalized_position, bounds.x);
-                Point::new(center_x - (text_width / 2.0), rail_pos - text_height)
+                let total_width = text_width + padding.left + padding.right;
+                let x = center_x - (total_width / 2.0) + padding.left;
+
+                let y = rail_pos - text_height - padding.bottom;
+                Point::new(x, y)
             }
             Position::Bottom => {
                 let center_x = bounds
                     .width
                     .mul_add(candidate.normalized_position, bounds.x);
-                Point::new(center_x - (text_width / 2.0), rail_pos)
+
+                let total_width = text_width + padding.left + padding.right;
+                let x = center_x - (total_width / 2.0) + padding.left;
+
+                let y = rail_pos + padding.top;
+                Point::new(x, y)
             }
             Position::Left => {
                 let center_y = bounds
                     .height
                     .mul_add(1.0 - candidate.normalized_position, bounds.y);
-                Point::new(rail_pos - text_width, center_y - (text_height / 2.0))
+
+                let total_height = text_height + padding.top + padding.bottom;
+                let y = center_y - (total_height / 2.0) + padding.top;
+
+                let x = rail_pos - text_width - padding.right;
+                Point::new(x, y)
             }
             Position::Right => {
                 let center_y = bounds
                     .height
                     .mul_add(1.0 - candidate.normalized_position, bounds.y);
-                Point::new(rail_pos, center_y - (text_height / 2.0))
+
+                let total_height = text_height + padding.top + padding.bottom;
+                let y = center_y - (total_height / 2.0) + padding.top;
+
+                let x = rail_pos + padding.left;
+                Point::new(x, y)
             }
         };
 
@@ -830,12 +873,22 @@ impl<D: Float, Theme> Axis<D, Theme> {
             }
         };
 
+        // NEW: Calculate the full 2D badge rectangle
+        let badge_bounds = Rectangle {
+            x: position.x - padding.left,
+            y: position.y - padding.top,
+            width: text_width + padding.left + padding.right,
+            height: text_height + padding.top + padding.bottom,
+        };
+
         Some(ResolvedLabelCandidate {
             tick: candidate.tick,
             normalized_position: candidate.normalized_position,
             bounds: LabelBounds::new(start, end),
             paragraph,
             position,
+            badge_bounds,
+            badge: candidate.badge,
             color: label.color,
         })
     }

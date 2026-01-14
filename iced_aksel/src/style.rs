@@ -19,6 +19,7 @@
 //! trait for your application's `Theme` to define custom distinct styles (classes) and switch
 //! between them at runtime.
 
+use crate::axis::LabelBadge;
 use iced_core::text::LineHeight;
 use iced_core::{Border, Color, Padding, Pixels, Shadow, Theme};
 
@@ -88,6 +89,8 @@ pub struct AxisStyle {
     pub label: LabelStyle,
     /// Style of the ticks (lines).
     pub tick: TickLineStyle,
+    /// Style of tick badge
+    pub label_badge: LabelBadge,
     /// Style of the marker badge and line on the axis.
     pub marker: MarkerStyle,
     /// Style of the grid lines.
@@ -197,6 +200,11 @@ pub fn default(theme: &Theme) -> Style {
             tick: TickLineStyle {
                 color: palette.background.strong.text,
                 width: 1.0.into(),
+            },
+            label_badge: LabelBadge {
+                background: Color::TRANSPARENT,
+                shadow: Shadow::default(),
+                border: Border::default(),
             },
             marker: MarkerStyle {
                 line: MarkerLineStyle {

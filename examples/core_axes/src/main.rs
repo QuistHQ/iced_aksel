@@ -13,7 +13,7 @@ use iced::{
     widget::{column, container, pick_list, row, text},
 };
 use iced_aksel::axis::{
-    Marker, MarkerBadge, MarkerContext, MarkerLine, MarkerPosition, TickContext,
+    LabelBadge, Marker, MarkerBadge, MarkerContext, MarkerLine, MarkerPosition, TickContext,
 };
 use iced_aksel::style::{DashStyle, LabelStyle};
 use iced_aksel::{
@@ -189,6 +189,12 @@ fn advanced_tick_result() -> impl Fn(TickContext<f64>) -> TickResult + 'static {
             dashed: Some(DashStyle::new(6., 2.)),
         };
 
+        let label_badge = LabelBadge {
+            background: ctx.theme.extended_palette().background.neutral.color,
+            border: Border::default().rounded(4.),
+            shadow: Shadow::default(),
+        };
+
         // Conditional Rendering:
         // We only generate a Label if this is a Major tick.
         let label = if is_major_tick {
@@ -196,7 +202,7 @@ fn advanced_tick_result() -> impl Fn(TickContext<f64>) -> TickResult + 'static {
                 format!("{:.2}", ctx.tick.value),
                 LabelStyle {
                     color: lerp_color,
-                    padding: 4.into(),
+                    padding: 4.into(), // Set it to the same as `Marker` for the text to align
                     size: 12.into(),
                     line_height: LineHeight::Relative(1.0),
                 },
@@ -207,6 +213,7 @@ fn advanced_tick_result() -> impl Fn(TickContext<f64>) -> TickResult + 'static {
 
         TickResult {
             label,
+            label_badge: Some(label_badge),
             tick_line: Some(tick_line),
             grid_line: Some(grid_line),
             label_priority: None,
@@ -316,6 +323,7 @@ fn simple_tick_result() -> impl Fn(TickContext<f64>) -> TickResult + 'static {
 
         TickResult {
             label: Some(label),
+            label_badge: Some(ctx.label_badge()),
             tick_line: Some(ctx.tickline()),
             grid_line: Some(ctx.gridline()),
             label_priority: None,
