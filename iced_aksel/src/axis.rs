@@ -390,7 +390,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
                     tick,
                     normalized_position: pos_norm,
                     label: label.clone(),
-                    badge, // <--- Pass badge here
+                    badge,
                     priority: label_priority.unwrap_or(tick.level),
                 });
 
