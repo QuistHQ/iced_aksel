@@ -46,8 +46,6 @@ struct AxesShowcase {
 pub enum Message {
     ThemeChanged(Theme),
     SkipOverlappingToggle(bool),
-    PlotHovered(Point),
-    AxisHovered(&'static str, f32),
 }
 
 impl AxesShowcase {
@@ -78,17 +76,6 @@ impl AxesShowcase {
                 self.skip_label_overlapping = status;
                 self.state = axes_setup(self.skip_label_overlapping);
             }
-            Message::PlotHovered(point) => {
-                self.cursor_positions = [
-                    Some(MarkerPosition::Normalized(point.x)),
-                    Some(MarkerPosition::Normalized(point.y)),
-                ]
-            }
-            Message::AxisHovered(id, position) => match id {
-                Self::X => self.cursor_positions[0] = Some(MarkerPosition::Normalized(position)),
-                Self::Y => self.cursor_positions[1] = Some(MarkerPosition::Normalized(position)),
-                _ => unreachable!("Axis {id} not configured"),
-            },
         }
         iced::Task::none()
     }
@@ -112,8 +99,6 @@ impl AxesShowcase {
         let chart_panel = panel(
             "Axes Showcase",
             Chart::new(&self.state)
-                .on_hover(Message::PlotHovered)
-                .on_axis_hover(Message::AxisHovered)
                 .marker(&Self::X, MarkerPosition::Cursor, simple_dynamic_marker)
                 .marker(&Self::Y, MarkerPosition::Cursor, advanced_dynamic_marker),
         );
