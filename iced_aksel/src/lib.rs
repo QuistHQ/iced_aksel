@@ -77,8 +77,7 @@
 //! - **[`Axis`]**: Configures scales (Linear, Log), ticks, grid lines, and labels.
 //! - **[`PlotData`]**: A trait you implement for your own data types to define how they should be rendered.
 //! - **[`Shape`]**: Visual primitives (lines, circles, rectangles) used within `PlotData::draw`.
-
-use std::{fmt::Debug, hash::Hash, ops::Deref};
+#![deny(missing_docs)]
 
 use aksel::ScreenRect;
 use derive_more::{Display, Error};
@@ -92,7 +91,9 @@ use iced_core::{
     touch,
     widget::{Tree, tree},
 };
-
+use std::fmt::Debug;
+use std::hash::Hash;
+use std::ops::Deref;
 // Re-export aksel core types for convenience
 pub use aksel::{Float, Transform, scale, scale::Scale, transform, transform::PlotPoint};
 

@@ -37,6 +37,7 @@ pub struct TickResult {
 }
 
 impl TickResult {
+    /// Creates a new result containing only the specified text label.
     pub fn with_label(label: super::Label) -> Self {
         Self {
             label: Some(label),
@@ -44,11 +45,13 @@ impl TickResult {
         }
     }
 
+    /// Attaches a text label to this result.
     pub fn label(mut self, label: super::Label) -> Self {
         self.label = Some(label);
         self
     }
 
+    /// Creates a new result containing only the specified axis tick mark.
     pub fn with_tick_line(tick_line: TickLine) -> Self {
         Self {
             tick_line: Some(tick_line),
@@ -56,11 +59,13 @@ impl TickResult {
         }
     }
 
+    /// Adds an axis tick mark to this result.
     pub const fn tick_line(mut self, tick_line: TickLine) -> Self {
         self.tick_line = Some(tick_line);
         self
     }
 
+    /// Creates a new result containing only the specified grid line.
     pub fn with_grid_line(grid_line: super::GridLine) -> Self {
         Self {
             grid_line: Some(grid_line),
@@ -68,11 +73,13 @@ impl TickResult {
         }
     }
 
+    /// Adds a background grid line extending from this tick.
     pub const fn grid_line(mut self, grid_line: super::GridLine) -> Self {
         self.grid_line = Some(grid_line);
         self
     }
 
+    /// Sets the collision priority for the label (lower values are less likely to be hidden).
     pub const fn label_priority(mut self, priority: u8) -> Self {
         self.label_priority = Some(priority);
         self
@@ -176,45 +183,98 @@ pub struct PlacedLabelInfo<D> {
     pub bounds: LabelBounds,
 }
 
+/// A tick wrapper used to filter ticks based on visual importance.
+///
+/// This is used during "Level of Detail" calculations to ensure that critical
+/// ticks (like zero-lines or round numbers) are preserved when zooming out,
+/// while less important intermediate ticks are dropped.
 pub struct PrioritizedTick<D> {
+    /// The underlying tick data containing the value and hierarchy level.
+    ///
+    /// The internal `level` field defines the hierarchical depth of this tick.
+    /// This is used to style ticks differently (e.g., longer lines for major ticks)
+    /// or to filter them out when the chart is zoomed out.
+    ///
+    /// # Level Examples
+    /// * `0`: **Major Tick** (Critical).
+    ///   * *Example:* "10", "20"
+    /// * `1`: **Minor Tick** (Intermediate).
+    ///   * *Example:* "15", "25"
+    /// * `2+`: **Sub-minor Tick** (Detail).
+    ///   * *Example:* ""
+    ///
+    /// This will vary based on the [`aksel::Scale`] you use.
     pub tick: aksel::Tick<D>,
-    /// 0.0 = Major Tick (Critical)
-    /// 1.0 = Center of Interval (High Priority)
-    /// 1.5 = Edge of Interval (Low Priority)
+
+    /// The importance of this tick (lower values are higher priority).
+    ///
+    /// * `0.0` - Major Tick (Critical, e.g., Axis Zero)
+    /// * `1.0` - Center of Interval (High Priority)
+    /// * `1.5` - Edge of Interval (Low Priority)
     pub score: f32,
 }
 
 /// A decision on whether to render or skip a tick label.
+///
+/// This is the output of the collision detection pass.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LabelDecision {
-    /// Render this label at its position.
+    /// The label does not overlap others and should be drawn.
     Render,
-    /// Skip rendering this label (e.g., due to overlap).
+    /// The label overlaps a higher-priority label and should be hidden.
     Skip,
 }
 
-/// A candidate label that may or may not be rendered.
+/// A label that intends to be drawn, but hasn't been measured yet.
 ///
-/// Used internally during the label layout process.
+/// This struct holds the *logical* data for a label (the text, the data position,
+/// the priority) before the text engine has calculated how many pixels wide/tall
+/// it actually is.
 pub struct LabelCandidate<D> {
+    /// The underlying tick data containing the value and hierarchy level.
+    ///
+    /// The internal `level` field defines the hierarchical depth of this tick.
+    /// This is used to style ticks differently (e.g., longer lines for major ticks)
+    /// or to filter them out when the chart is zoomed out.
+    ///
+    /// # Level Examples
+    /// * `0`: **Major Tick** (Critical).
+    ///   * *Example:* "10", "20"
+    /// * `1`: **Minor Tick** (Intermediate).
+    ///   * *Example:* "15", "25"
+    /// * `2+`: **Sub-minor Tick** (Detail).
+    ///   * *Example:* ""
+    ///
+    /// This will vary based on the [`aksel::Scale`] you use.
     pub tick: Tick<D>,
+    /// The position on the axis (0.0 to 1.0).
     pub normalized_position: f32,
+    /// The style and content of the label.
     pub label: super::Label,
+    /// Collision priority (lower is better).
     pub priority: u8,
 }
 
-/// A label candidate that has been laid out and measured.
+/// A label that has been fully measured and positioned by the text engine.
 ///
-/// Used internally during the label rendering process.
+/// Unlike `LabelCandidate`, this struct contains specific physical dimensions (`bounds`)
+/// and backend-specific resources (`paragraph`). It represents the final state
+/// ready for rendering to the screen.
 pub struct ResolvedLabelCandidate<Renderer, D>
 where
     Renderer: text::Renderer,
 {
+    /// The original source tick.
     pub tick: Tick<D>,
+    /// The position on the axis (0.0 to 1.0).
     pub normalized_position: f32,
+    /// The physical bounding box of the text in screen coordinates.
     pub bounds: LabelBounds,
+    /// The backend-specific text object (ready to draw).
     pub paragraph: Plain<Renderer::Paragraph>,
+    /// The final screen coordinates for the top-left of the text.
     pub position: Point,
+    /// The resolved color.
     pub color: Color,
 }
 

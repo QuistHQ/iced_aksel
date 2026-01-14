@@ -1,11 +1,11 @@
 use iced::{
     Color, Length, Theme,
     alignment::Horizontal,
-    widget::{column, container, row, text},
+    widget::{column, container, text},
 };
 use iced_aksel::{
-    Axis, Chart, PlotPoint, State, Stroke,
-    axis::{self, TickContext, TickResult},
+    Axis, Chart, Measure, PlotPoint, State, Stroke,
+    axis::{self, Label, TickContext, TickResult},
     plot::{Plot, PlotData},
     scale::{Linear, Logarithmic},
     shape::{Ellipse, Polyline},
@@ -21,7 +21,7 @@ pub fn main() -> iced::Result {
         ScalesExample::update,
         ScalesExample::view,
     )
-    .title("Comparison: Linear vs Logarithmic")
+    .title("Multi-Axis: Linear vs Logarithmic")
     .antialiasing(true)
     .run()
 }
@@ -31,12 +31,11 @@ pub fn main() -> iced::Result {
 // -----------------------------------------------------------------------------
 
 pub struct ScalesExample {
-    // We use two chart states to view the SAME data differently
-    linear_view: State<&'static str, f64>,
-    log_view: State<&'static str, f64>,
+    chart_state: State<&'static str, f64>,
 
-    // The data model (shared between both charts)
-    data: ExponentialData,
+    // We wrap the data to give them distinct colors
+    linear_representation: StyleableData,
+    log_representation: StyleableData,
 }
 
 #[derive(Debug, Clone)]
@@ -44,53 +43,60 @@ pub enum Message {}
 
 impl ScalesExample {
     const AXIS_X: &'static str = "x";
-    const AXIS_Y: &'static str = "y";
+    const AXIS_Y_LIN: &'static str = "y_linear";
+    const AXIS_Y_LOG: &'static str = "y_log";
 
     pub fn new() -> (Self, iced::Task<Message>) {
-        // Range: 0 to 5 on X, 1 to 100,000 on Y
+        // Range: 0 to 100 on X
         let x_min = 0.0;
-        let x_max = 5.0;
+        let x_max = 100.0;
+
+        // Range: 1 to 100,000 on Y
         let y_min = 1.0;
         let y_max = 100_000.0;
 
-        // --- Chart 1: The Linear View ---
-        // This will look like a sharp vertical wall
-        let mut linear_view = State::new();
-        linear_view.set_axis(
+        let mut chart_state = State::new();
+
+        // 1. Setup Bottom X Axis
+        chart_state.set_axis(
             Self::AXIS_X,
             Axis::new(Linear::new(x_min, x_max), axis::Position::Bottom)
                 .with_tick_renderer(x_axis_tick_renderer)
-                .skip_overlapping_labels(6.0),
-        );
-        linear_view.set_axis(
-            Self::AXIS_Y,
-            Axis::new(Linear::new(y_min, y_max), axis::Position::Left)
-                .with_tick_renderer(y_axis_tick_renderer)
                 .skip_overlapping_labels(6.0),
         );
 
-        // --- Chart 2: The Logarithmic View ---
-        // This will look like a straight line (Log(10^x) = x * Log(10))
-        let mut log_view = State::new();
-        log_view.set_axis(
-            Self::AXIS_X,
-            Axis::new(Linear::new(x_min, x_max), axis::Position::Bottom)
-                .with_tick_renderer(x_axis_tick_renderer)
-                .skip_overlapping_labels(6.0),
+        // 2. Setup Left Linear Axis (Blue)
+        chart_state.set_axis(
+            Self::AXIS_Y_LIN,
+            Axis::new(Linear::new(y_min, y_max), axis::Position::Left)
+                .with_tick_renderer(linear_axis_tick_renderer),
         );
-        log_view.set_axis(
-            Self::AXIS_Y,
-            // Notice: Logarithmic scale here
+
+        // 3. Setup Left Log Axis (Red) - Added to the same side!
+        chart_state.set_axis(
+            Self::AXIS_Y_LOG,
             Axis::new(Logarithmic::new(10.0, y_min, y_max), axis::Position::Left)
-                .with_tick_renderer(y_axis_tick_renderer)
-                .skip_overlapping_labels(6.0),
+                .with_tick_renderer(log_axis_tick_renderer),
         );
+
+        // Prepare data (Linear growth)
+        let (points, markers) = generate_linear_data();
 
         (
             Self {
-                linear_view,
-                log_view,
-                data: ExponentialData::new(),
+                chart_state,
+                // Assign Blue to Linear Axis representation
+                linear_representation: StyleableData {
+                    line: points.clone(),
+                    markers: markers.clone(),
+                    color: |t| t.palette().primary,
+                },
+                // Assign Red to Log Axis representation
+                log_representation: StyleableData {
+                    line: points,
+                    markers,
+                    color: |t| t.palette().danger,
+                },
             },
             iced::Task::none(),
         )
@@ -101,64 +107,45 @@ impl ScalesExample {
     }
 
     pub fn view(&self) -> iced::Element<'_, Message> {
-        column![
-            // Row of Charts
-            row![
-                self.view_linear_chart(),
-                self.view_log_chart()
-            ]
-            .spacing(20)
-            .height(Length::Fill),
+        // We create the chart and attach the same data twice,
+        // mapping it to different Y-axes.
+        let chart = Chart::new(&self.chart_state)
+            // Draw Blue line against Linear Axis
+            .plot_data(&self.linear_representation, Self::AXIS_X, Self::AXIS_Y_LIN)
+            // Draw Red line against Log Axis
+            .plot_data(&self.log_representation, Self::AXIS_X, Self::AXIS_Y_LOG);
 
-            // Footer Information
-            container(
-                text("Scales are fully customizable. You can even implement your own scale via the `aksel::scale::Scale` trait.")
-                    .size(14)
-                    .color(Color::from_rgb(0.5, 0.5, 0.5))
-            )
+        // Layout construction
+        let header = column![
+            text("Multi-Axis Comparison").size(24),
+            text("Both lines represent the exact same linear data (y = 1000x).")
+                .size(14)
+                .color(Color::from_rgb(0.5, 0.5, 0.5)),
+        ]
+        .spacing(5);
+
+        let chart_container = container(chart)
+            .height(Length::Fill)
             .width(Length::Fill)
-            .align_x(Horizontal::Center)
-        ]
-        .spacing(20)
-        .padding(20)
-        .into()
+            .padding(20)
+            .style(|t: &Theme| {
+                container::Style::default().border(iced::border::color(t.palette().text).width(1.0))
+            });
+
+        column![header, chart_container, self.view_legend()]
+            .spacing(20)
+            .padding(20)
+            .into()
     }
 
-    fn view_linear_chart(&self) -> iced::Element<'_, Message> {
-        let chart = Chart::new(&self.linear_view).plot_data(&self.data, Self::AXIS_X, Self::AXIS_Y);
-
-        column![
-            text("Linear Scale").size(20),
-            text("Same data. Notice how small values are squashed at the bottom.")
+    fn view_legend(&self) -> iced::Element<'_, Message> {
+        container(
+            text("Blue: Linear Axis (Outer Left)  |  Red: Logarithmic Axis (Inner Left)")
                 .size(14)
-                .color(Color::from_rgb(0.4, 0.4, 0.4)),
-            container(chart)
-                .height(Length::Fill)
-                .width(Length::Fill)
-                .padding(10)
-                .style(style_container)
-        ]
-        .width(Length::FillPortion(1))
-        .spacing(10)
-        .into()
-    }
-
-    fn view_log_chart(&self) -> iced::Element<'_, Message> {
-        let chart = Chart::new(&self.log_view).plot_data(&self.data, Self::AXIS_X, Self::AXIS_Y);
-
-        column![
-            text("Logarithmic Scale").size(20),
-            text("Same data. Constant growth rate appears as a straight line.")
-                .size(14)
-                .color(Color::from_rgb(0.4, 0.4, 0.4)),
-            container(chart)
-                .height(Length::Fill)
-                .width(Length::Fill)
-                .padding(10)
-                .style(style_container)
-        ]
-        .width(Length::FillPortion(1))
-        .spacing(10)
+                .color(Color::from_rgb(0.5, 0.5, 0.5)),
+        )
+        .width(Length::Fill)
+        .align_x(Horizontal::Center)
         .into()
     }
 }
@@ -167,72 +154,65 @@ impl ScalesExample {
 // Data Layer
 // -----------------------------------------------------------------------------
 
-struct ExponentialData {
+struct StyleableData {
     line: Vec<PlotPoint<f64>>,
     markers: Vec<PlotPoint<f64>>,
+    color: fn(&Theme) -> Color,
 }
 
-impl ExponentialData {
-    fn new() -> Self {
-        // Simple Math: y = 10^x
-        // We plot points from x=0 to x=5
-        // x=0 -> y=1
-        // x=1 -> y=10
-        // ...
-        // x=5 -> y=100,000
-
-        let line = (0..=50)
-            .map(|i| {
-                let x = i as f64 / 10.0;
-                let y = 10.0f64.powf(x);
-                PlotPoint::new(x, y)
-            })
-            .collect();
-
-        // Markers at integer steps to make reading the grid easier
-        let markers = (0..=5)
-            .map(|i| {
-                let x = i as f64;
-                let y = 10.0f64.powf(x);
-                PlotPoint::new(x, y)
-            })
-            .collect();
-
-        Self { line, markers }
-    }
-}
-
-impl PlotData<f64> for ExponentialData {
+impl PlotData<f64> for StyleableData {
     fn draw(&self, plot: &mut Plot<f64>, theme: &Theme) {
-        // Draw the line
-        plot.add_shape(Polyline::new(self.line.clone()).stroke(Stroke::new(
-            theme.palette().primary,
-            iced_aksel::Measure::Screen(2.5),
-        )));
+        let color = (self.color)(theme);
 
-        // Draw dots at 1, 10, 100, 1000...
+        // Draw the line
+        plot.add_shape(
+            Polyline::new(self.line.clone()).stroke(Stroke::new(color, Measure::Screen(2.5))),
+        );
+
+        // Draw markers
         for point in &self.markers {
             plot.add_shape(
-                Ellipse::new(
-                    *point,
-                    iced_aksel::Measure::Screen(5.0),
-                    iced_aksel::Measure::Screen(5.0),
-                )
-                .fill(theme.palette().danger),
+                Ellipse::new(*point, Measure::Screen(4.0), Measure::Screen(4.0)).fill(color),
             );
         }
     }
 }
 
+fn generate_linear_data() -> (Vec<PlotPoint<f64>>, Vec<PlotPoint<f64>>) {
+    // Generate linear data: y = 1000 * x
+    // We start x at 1.0 to ensure y >= 1000.0, avoiding Log(0) issues on the log axis.
+
+    let line = (1..=100)
+        .map(|i| {
+            let x = i as f64;
+            let y = 1000.0 * x;
+            PlotPoint::new(x, y)
+        })
+        .collect();
+
+    let markers = (0..=10)
+        .map(|i| {
+            let x = (i * 10) as f64;
+            // Handle 0 explicitly for safety, though the loop above skips it.
+            // If x is 0, we can't plot it on log, so we plot min value or skip.
+            let safe_x = if x < 1.0 { 1.0 } else { x };
+            let y = 1000.0 * safe_x;
+            PlotPoint::new(safe_x, y)
+        })
+        .collect();
+
+    (line, markers)
+}
+
 // -----------------------------------------------------------------------------
-// Helpers
+// Tick Renderers
 // -----------------------------------------------------------------------------
 
 fn x_axis_tick_renderer(ctx: TickContext<f64, Theme>) -> TickResult {
-    // Only show Major ticks
     if ctx.tick.level != 0 {
         return TickResult::default();
     }
+
     TickResult {
         label: Some(ctx.label(format!("{:.0}", ctx.tick.value))),
         tick_line: Some(ctx.tickline()),
@@ -240,25 +220,53 @@ fn x_axis_tick_renderer(ctx: TickContext<f64, Theme>) -> TickResult {
     }
 }
 
-fn y_axis_tick_renderer(ctx: TickContext<f64, Theme>) -> TickResult {
-    // Only show tick-lines and labels on Major ticks
+// Blue ticks for Linear Scale
+fn linear_axis_tick_renderer(ctx: TickContext<f64, Theme>) -> TickResult {
     if ctx.tick.level != 0 {
         return TickResult::default();
     }
 
-    let label_text = format!("{:.0}", ctx.tick.value);
+    // Initialize values from context
+    let mut label = ctx.label(format!("{:.0}", ctx.tick.value));
+    let mut tick_line = ctx.tickline();
+
+    // Overwrite colors (Primary Blue)
+    tick_line.color = ctx.theme.palette().primary;
+    label.color = ctx.theme.palette().primary;
 
     TickResult {
-        label: Some(ctx.label(label_text)),
-        tick_line: Some(ctx.tickline()),
+        label: Some(label),
+        tick_line: Some(tick_line),
         ..Default::default()
     }
 }
 
-// ------------------------------------------------------------------------------
-// Styles
-// -----------------------------------------------------------------------------
+// Red ticks for Log Scale
+fn log_axis_tick_renderer(ctx: TickContext<f64, Theme>) -> TickResult {
+    // 1. Early exit for details too small to matter
+    if ctx.tick.level > 1 {
+        return TickResult::default();
+    }
 
-fn style_container(theme: &Theme) -> container::Style {
-    container::Style::default().border(iced::border::color(theme.palette().text).width(1.0))
+    // 2. Prepare the line (We need this for both Level 0 and Level 1)
+    let mut tick_line = ctx.tickline();
+    tick_line.color = ctx.theme.palette().danger;
+
+    // 3. Prepare the label (ONLY for Level 0)
+    let label = if ctx.tick.level == 0 {
+        let mut label = ctx.label(format!("{:.0}", ctx.tick.value));
+        label.color = ctx.theme.palette().danger;
+        Some(label)
+    } else {
+        // Optional: You can make minor tick lines shorter or thinner here if you want
+        tick_line.width = 1.into();
+        tick_line.length = 4.into();
+        None
+    };
+
+    TickResult {
+        label,
+        tick_line: Some(tick_line),
+        ..Default::default()
+    }
 }

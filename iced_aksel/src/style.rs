@@ -1,5 +1,28 @@
+//! Styling configuration and theming for Charts.
+//!
+//! This module defines the visual language of the chart. It separates *data* (what is shown)
+//! from *presentation* (how it looks).
+//!
+//! # Overview
+//! The styling system is hierarchical. The root [`Style`] struct contains configuration for
+//! the axes, which in turn contain configuration for:
+//!
+//! * **[Spines](SpineStyle)**: The solid lines bordering the plot area.
+//! * **[Ticks](TickLineStyle)**: The small markers along the axis.
+//! * **[Grids](GridLineStyle)**: The lines extending across the plot background.
+//! * **[Markers](MarkerStyle)**: The interactive badges shown when hovering.
+//!
+//!
+//!
+//! # Theming
+//! This module follows the standard `iced` [Catalog] pattern. You can implement the [`Catalog`]
+//! trait for your application's `Theme` to define custom distinct styles (classes) and switch
+//! between them at runtime.
+
 use iced_core::text::LineHeight;
 use iced_core::{Border, Color, Padding, Pixels, Shadow, Theme};
+
+
 
 /// Global style of a `Chart`.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -78,6 +101,7 @@ pub struct AxisStyle {
 /// Style of a `Chart`'s interactive axis marker.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MarkerStyle {
+    /// Style of the line between the Plot to the Badge
     pub line: MarkerLineStyle,
     /// Style of the label inside the badge.
     pub label: LabelStyle,
@@ -122,11 +146,20 @@ pub struct LabelStyle {
 
 /// A trait for theming the appearance of a [`Chart`](crate::Chart).
 pub trait Catalog {
+    /// The classification of the chart style.
+    ///
+    /// This is typically an `enum` where each variant represents a distinct visual
+    /// look (e.g., `Class::Default`, `Class::Danger`, `Class::DarkGraph`).
     type Class<'a>;
+
+    /// The default style class to use if none is specified.
     fn default<'a>() -> <Self as Catalog>::Class<'a>;
+
+    /// resolves the specific [`Style`] for a given style `class`.
     fn style(&self, class: &<Self as Catalog>::Class<'_>) -> Style;
 }
 
+/// Alias for Fn closure creating a style
 pub type StyleFn<'a, Theme> = Box<dyn Fn(&Theme) -> Style + 'a>;
 
 impl Catalog for Theme {
