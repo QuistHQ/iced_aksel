@@ -5,7 +5,7 @@ use super::{Orientation, label::LabelBounds};
 use aksel::{Float, Tick};
 use derivative::Derivative;
 use iced_core::{
-    Border, Color, Padding, Pixels, Point, Rectangle, Shadow,
+    Border, Color, Pixels, Point, Rectangle, Shadow,
     text::{self, paragraph::Plain},
 };
 
