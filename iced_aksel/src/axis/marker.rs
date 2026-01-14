@@ -93,9 +93,9 @@ pub struct MarkerContext<'a, D, Theme = iced_core::Theme> {
     pub axis_bounds: &'a Rectangle,
     /// The domain (min, max) of the scale
     pub scale_domain: (D, D),
-    /// Wether the cursor is within the chart bounds
+    /// Whether the cursor is within the chart bounds
     pub cursor_on_plot: bool,
-    /// Wether the cursor is within the axis bounds
+    /// Whether the cursor is within the axis bounds
     pub cursor_on_axis: bool,
     /// The theme of the application
     pub theme: &'a Theme,
