@@ -11,15 +11,22 @@ use crate::{
 /// Used when setting markers for an axis on a chart via. [`crate::Chart::marker`] or
 /// [`crate::Chart::marker_maybe`]
 ///
-/// ```rust,no_run
-/// # use iced_aksel::{Chart, MarkerPosition};
-/// Chart::new(&self.state)
+/// ```rust,no_run,ignore
+/// # use iced_aksel::{Chart, State, axis::{MarkerPosition, MarkerContext}};
+/// # let state: State<&'static str, f64> = State::new();
+/// Chart::new(&state)
 ///     // Set marker to follow cursor
-///     .marker("axis_id", MarkerPosition::Cursor, |ctx| { Some(ctx.marker()) })
+///     .marker(&"axis_id", MarkerPosition::Cursor, |ctx: MarkerContext<f64>| {
+///         Some(ctx.marker(ctx.value.to_string()))
+///     })
 ///     // Set marker at domain value 100.0
-///     .marker("axis_id", MarkerPosition::Value(100.0), |ctx| { Some(ctx.marker()) })
+///     .marker(&"axis_id", MarkerPosition::Value(100.0), |ctx: MarkerContext<f64>| {
+///         Some(ctx.marker("100".to_string()))
+///     })
 ///     // Set marker in the middle of the axis
-///     .marker("axis_id", MarkerPosition::Normalized(0.5), |ctx| { Some(ctx.marker()) })
+///     .marker(&"axis_id", MarkerPosition::Normalized(0.5), |ctx: MarkerContext<f64>| {
+///         Some(ctx.marker("Middle".to_string()))
+///     });
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub enum MarkerPosition<D> {

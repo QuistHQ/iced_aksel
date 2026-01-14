@@ -58,11 +58,16 @@ type StyleOverrideFn = RefCell<Box<dyn FnMut(&mut AxisStyle)>>;
 /// # Example
 ///
 /// ```rust
-/// use iced_aksel::{Axis, axis::{Position, TickResult}, scale::Linear};
+/// use iced_aksel::{Axis, axis::{Position, TickResult, TickContext}, scale::Linear};
 ///
 /// let axis = Axis::new(Linear::new(0.0, 100.0), Position::Bottom)
 ///     .with_thickness(40.0)
-///     .with_marker_formatter(|val| Some(format!("{:.1}", val)));
+///     .with_tick_renderer(|ctx: TickContext<f64>| TickResult {
+///         tick_line: Some(ctx.tickline()),
+///         grid_line: Some(ctx.gridline()),
+///         label: Some(ctx.label(format!("{:.2}", ctx.tick.value))),
+///         ..Default::default()
+///     });
 /// ```
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -162,14 +167,17 @@ impl<D: Float, Theme> Axis<D, Theme> {
     /// This function gives you full control over which ticks render lines, grids, or labels.
     ///
     /// # Example
-    /// ```rust,ignore
-    /// axis.with_tick_renderer(|ctx| {
+    /// ```rust
+    /// # use iced_aksel::axis::{TickContext, TickResult};
+    /// # let axis = iced_aksel::Axis::new(iced_aksel::scale::Linear::new(0.0, 10.0),
+    /// iced_aksel::axis::Position::Bottom);
+    /// axis.with_tick_renderer(|ctx: TickContext<f64>| {
     ///     if ctx.tick.level == 0 {
-    ///         TickResult::with_label(format!("{:.1}", ctx.tick.value))
+    ///         TickResult::with_label(ctx.label(format!("{:.1}", ctx.tick.value)))
     ///     } else {
-    ///         TickResult::default() // Just a line
+    ///         TickResult::default() // Empty tick result
     ///     }
-    /// })
+    /// });
     /// ```
     pub fn with_tick_renderer<F>(mut self, renderer: F) -> Self
     where

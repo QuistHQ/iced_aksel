@@ -3,7 +3,7 @@
 //! This module provides various geometric shapes that can be drawn on charts:
 //!
 //! - **[`Arc`]**: Circular arcs and annular sectors
-//! - **[`Circle`]**: Filled or stroked circles
+//! - **[`Ellipse`]**: Filled or stroked ellipses
 //! - **[`Label`]**: Text labels
 //! - **[`Line`]**: Straight lines between two points
 //! - **[`Polygon`]**: Closed filled or stroked polygons
@@ -16,22 +16,23 @@
 //! # Example
 //!
 //! ```rust
-//! use iced_aksel::{PlotPoint, Measure, shape::{Circle, Line, Rectangle}, Stroke};
+//! use iced_aksel::{PlotPoint, Measure, shape::{Ellipse, Line, Rectangle}, Stroke};
 //! use iced::Color;
 //!
 //! // Circle at (10, 20) with radius 5 pixels
-//! let circle = Circle::new(PlotPoint::new(10.0, 20.0), Measure::Screen(5.0))
+//! let circle = Ellipse::new(PlotPoint::new(10.0, 20.0), Measure::Screen(5.0), Measure::Screen(5.0))
 //!     .fill(Color::from_rgb(1.0, 0.0, 0.0));
 //!
 //! // Line from (0, 0) to (10, 10)
 //! let line = Line::new(
 //!     PlotPoint::new(0.0, 0.0),
 //!     PlotPoint::new(10.0, 10.0),
+//! ).stroke(
 //!     Stroke::new(Color::from_rgb(0.0, 0.0, 1.0), Measure::Screen(2.0))
 //! );
 //!
 //! // Rectangle with plot-space dimensions
-//! let rect = Rectangle::new(
+//! let rect = Rectangle::centered(
 //!     PlotPoint::new(5.0, 5.0),
 //!     Measure::Plot(10.0),
 //!     Measure::Plot(20.0)

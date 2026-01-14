@@ -13,12 +13,13 @@ use iced_core::Point;
 /// # Usage
 /// ```rust
 /// use iced_aksel::shape::Polyline;
-/// use iced_aksel::Stroke;
+/// use iced_aksel::{Measure, Stroke};
+/// use iced::Color;
 /// use aksel::PlotPoint;
 ///
 /// let data = vec![PlotPoint::new(0.0, 0.0), PlotPoint::new(1.0, 5.0)];
 /// let series = Polyline::new(data)
-///     .stroke(Stroke::default()); // Essential!
+///     .stroke(Stroke::new(Color::BLACK, Measure::Screen(2.0)));
 /// ```
 #[derive(Debug, Clone)]
 pub struct Polyline<D> {

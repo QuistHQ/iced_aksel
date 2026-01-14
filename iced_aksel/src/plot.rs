@@ -56,7 +56,7 @@ impl<T> Renderer for T where
 /// # Example
 ///
 /// ```rust
-/// use iced_aksel::{plot::{Plot, PlotData}, PlotPoint, shape::Circle, Measure};
+/// use iced_aksel::{plot::{Plot, PlotData}, PlotPoint, shape::Ellipse, Measure};
 /// use iced::{Color, Theme};
 ///
 /// struct DataPoints {
@@ -67,7 +67,7 @@ impl<T> Renderer for T where
 ///     fn draw(&self, plot: &mut Plot<f64>, theme: &Theme) {
 ///         for point in &self.points {
 ///             plot.add_shape(
-///                 Circle::new(*point, Measure::Screen(3.0))
+///                 Ellipse::new(*point, Measure::Screen(20.0), Measure::Screen(10.0))
 ///                     .fill(theme.palette().primary)
 ///             );
 ///         }
@@ -157,7 +157,7 @@ where
     ///
     /// # Example
     ///
-    /// ```rust,no_run
+    /// ```rust
     /// # use iced_aksel::plot::{Plot, PlotData};
     /// # struct MyData;
     /// # impl PlotData<f64> for MyData {
@@ -176,14 +176,14 @@ where
     ///
     /// # Example
     ///
-    /// ```rust,no_run
-    /// # use iced_aksel::{plot::{Plot, PlotData}, PlotPoint, shape::Circle, Measure};
+    /// ```rust
+    /// # use iced_aksel::{plot::{Plot, PlotData}, PlotPoint, shape::Ellipse, Measure};
     /// # use iced::Color;
     /// # struct MyData;
     /// # impl PlotData<f64> for MyData {
     /// #     fn draw(&self, plot: &mut Plot<f64>, theme: &iced::Theme) {
     /// plot.add_shape(
-    ///     Circle::new(PlotPoint::new(5.0, 10.0), Measure::Screen(5.0))
+    ///     Ellipse::new(PlotPoint::new(5.0, 10.0), Measure::Screen(20.0), Measure::Screen(10.0))
     ///         .fill(Color::from_rgb(1.0, 0.0, 0.0))
     /// );
     /// #     }

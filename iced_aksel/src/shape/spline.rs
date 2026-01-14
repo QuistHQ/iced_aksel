@@ -14,7 +14,8 @@ use iced_core::Point;
 /// # Usage
 /// ```rust
 /// use iced_aksel::shape::Spline;
-/// use iced_aksel::Stroke;
+/// use iced_aksel::{Measure, Stroke};
+/// use iced::Color;
 /// use aksel::PlotPoint;
 ///
 /// let data = vec![
@@ -25,7 +26,7 @@ use iced_core::Point;
 ///
 /// // Standard smooth curve
 /// let curve = Spline::new(data)
-///     .stroke(Stroke::default());
+/// .stroke(Stroke::new(Color::BLACK, Measure::Screen(2.0)));
 /// ```
 #[derive(Debug, Clone)]
 pub struct Spline<D> {

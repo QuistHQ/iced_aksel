@@ -14,7 +14,7 @@
 //! ```rust,no_run
 //! use iced_aksel::{
 //!     Chart, State, Axis, Plot, PlotPoint, axis, scale::Linear,
-//!     plot::PlotData, shape::Circle, Measure
+//!     plot::PlotData, shape::Ellipse, Measure
 //! };
 //! use iced::{Element, Theme};
 //!
@@ -62,7 +62,7 @@
 //!     fn draw(&self, plot: &mut Plot<f64>, theme: &Theme) {
 //!         for point in &self.points {
 //!             plot.add_shape(
-//!                 Circle::new(*point, Measure::Screen(5.0))
+//!                 Ellipse::new(*point, Measure::Screen(5.0), Measure::Screen(5.0))
 //!                     .fill(theme.palette().primary)
 //!             );
 //!         }
@@ -198,6 +198,7 @@ type AxisScrollHandler<AxisId, Message> = Box<dyn Fn(AxisId, f32, ScrollDelta) -
 /// let mut state: State<&str, f64> = State::new();
 /// state.set_axis("x_axis", Axis::new(Linear::new(0.0, 100.0), axis::Position::Bottom));
 /// state.set_axis("y_axis", Axis::new(Linear::new(0.0, 100.0), axis::Position::Left));
+///
 /// let data = MyData;
 ///
 /// let chart = Chart::new(&state)

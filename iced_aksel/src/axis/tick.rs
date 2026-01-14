@@ -15,15 +15,7 @@ use iced_core::{
 /// It effectively decouples the tick logic from the rendering logic, allowing
 /// for highly customizable axes.
 ///
-/// # Example
-///
-/// ```rust
-/// use iced_aksel::axis::{TickResult, TickLine};
-///
-/// // Create a tick that has a label and a short line
-/// let result = TickResult::with_label("100")
-///     .tick_line(TickLine::default());
-/// ```
+/// See [`crate::Axis`] for more info
 #[derive(Default)]
 pub struct TickResult {
     /// Optional tick line mark on the axis.

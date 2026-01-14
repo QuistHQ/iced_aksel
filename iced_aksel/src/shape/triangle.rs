@@ -23,7 +23,7 @@ use iced_core::{Color, Point};
 ///     Measure::Screen(20.0), // Width
 ///     Measure::Screen(10.0)  // Height
 /// )
-/// .fill(Color::RED);
+/// .fill(Color::WHITE);
 /// ```
 #[derive(Debug, Clone)]
 enum Geometry<D> {

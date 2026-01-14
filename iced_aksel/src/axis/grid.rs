@@ -11,15 +11,14 @@ use crate::style::{DashStyle, GridLineStyle};
 ///
 /// ```rust
 /// use iced_aksel::axis::GridLine;
-/// use iced::Pixels;
+/// use iced::{Color, Pixels};
 ///
 /// // Create a grid line with 2-pixel thickness
 /// let grid_line = GridLine {
-///     thickness: Pixels(2.0),
+///     width: Pixels(2.0),
+///     color: Color::BLACK,
+///     dashed: None,
 /// };
-///
-/// // Or use the default (1-pixel thickness)
-/// let default_grid = GridLine::default();
 /// ```
 #[derive(Debug, Clone, Copy)]
 pub struct GridLine {

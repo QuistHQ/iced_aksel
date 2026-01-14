@@ -10,17 +10,17 @@ use crate::style::LabelStyle;
 ///
 /// ```rust
 /// use iced_aksel::axis::Label;
-/// use iced::{Pixels, Padding};
+/// use iced::{Pixels, Padding, Color, widget::text::LineHeight};
 ///
 /// // Create a custom label
 /// let label = Label {
 ///     size: Pixels(14.0),
+///     color: Color::BLACK,
 ///     content: "100.0".to_string(),
 ///     padding: Padding::new(6.0),
+///     font: None, // Don't override default font
+///     line_height: LineHeight::Relative(1.2),
 /// };
-///
-/// // Or use the default (12px, empty content, 4px padding)
-/// let default_label = Label::default();
 /// ```
 #[derive(Debug, Clone)]
 pub struct Label {

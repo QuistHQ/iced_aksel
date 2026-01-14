@@ -15,10 +15,10 @@ pub enum Orientation {
 /// use iced_aksel::{Axis, axis::Position, scale::Linear};
 ///
 /// // Create an axis at the bottom of the chart
-/// let x_axis = Axis::new(Linear::new(0.0, 100.0), Position::Bottom);
+/// let x_axis: Axis<f64>  = Axis::new(Linear::new(0.0, 100.0), Position::Bottom);
 ///
 /// // Create an axis at the left side of the chart
-/// let y_axis = Axis::new(Linear::new(0.0, 50.0), Position::Left);
+/// let y_axis: Axis<f64> = Axis::new(Linear::new(0.0, 50.0), Position::Left);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Position {

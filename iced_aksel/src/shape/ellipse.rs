@@ -16,21 +16,22 @@ use iced_core::Color;
 /// ## 1. Perfect Circle
 /// ```rust
 /// use iced_aksel::shape::Ellipse;
-/// use iced_aksel::Measure;
-/// use aksel::PlotPoint;
+/// use iced_aksel::{Stroke, Measure};
 /// use iced_core::Color;
+/// use aksel::PlotPoint;
 ///
 /// let circle = Ellipse::circle(
 ///     PlotPoint::new(0.0, 0.0),
 ///     Measure::Screen(10.0)
 /// )
-/// .fill(Color::RED);
+/// .fill(Color::WHITE);
 /// ```
 ///
 /// ## 2. Stretched Ellipse
 /// ```rust
 /// use iced_aksel::shape::Ellipse;
-/// use iced_aksel::Measure;
+/// use iced_aksel::{Stroke, Measure};
+/// use iced::Color;
 /// use aksel::PlotPoint;
 ///
 /// let oval = Ellipse::new(
@@ -38,7 +39,7 @@ use iced_core::Color;
 ///     Measure::Screen(20.0), // Radius X
 ///     Measure::Screen(10.0)  // Radius Y
 /// )
-/// .stroke(iced_aksel::Stroke::default());
+/// .stroke(Stroke::new(Color::BLACK, Measure::Screen(2.0)));
 /// ```
 #[derive(Debug, Clone)]
 pub struct Ellipse<D> {

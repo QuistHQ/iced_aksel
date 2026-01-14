@@ -13,14 +13,15 @@ use iced_core::Point;
 /// # Usage
 /// ```rust
 /// use iced_aksel::shape::Line;
-/// use iced_aksel::Stroke;
+/// use iced_aksel::{Measure, Stroke};
+/// use iced::Color;
 /// use aksel::PlotPoint;
 ///
 /// let trend = Line::new(
 ///     PlotPoint::new(0.0, 0.0),
 ///     PlotPoint::new(100.0, 100.0)
 /// )
-/// .stroke(Stroke::default()) // Essential!
+/// .stroke(Stroke::new(Color::BLACK, Measure::Screen(2.0)))
 /// .infinite();
 /// ```
 #[derive(Debug, Clone)]

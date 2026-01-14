@@ -120,11 +120,10 @@ where
     ///
     /// ```rust
     /// # use iced_aksel::{State, Axis, axis, scale::Linear};
-    /// # let mut state = State::new();
+    /// # let mut state: State<&'static str, f64> = State::new();
     /// # state.set_axis("x", Axis::new(Linear::new(0.0, 100.0), axis::Position::Bottom));
-    /// if let Some(x_axis) = state.axis(&"x") {
-    ///     let (min, max) = x_axis.domain();
-    /// }
+    /// let x_axis =  state.axis(&"x");
+    /// let (min, max) = x_axis.domain();
     /// ```
     pub fn axis_opt(&self, id: &AxisId) -> Option<&Axis<D, Theme>> {
         self.axes.get(id)
@@ -143,11 +142,9 @@ where
     ///
     /// ```rust
     /// # use iced_aksel::{State, Axis, axis, scale::Linear};
-    /// # let mut state = State::new();
+    /// # let mut state: State<&'static str, f64> = State::new();
     /// # state.set_axis("x", Axis::new(Linear::new(0.0, 100.0), axis::Position::Bottom));
-    /// if let Some(x_axis) = state.axis_mut(&"x") {
-    ///     x_axis.pan(0.1);
-    /// }
+    /// state.axis_mut(&"x").pan(0.1);
     /// ```
     pub fn axis_mut_opt(&mut self, id: &AxisId) -> Option<&mut Axis<D, Theme>> {
         self.axes.get_mut(id)
@@ -199,7 +196,7 @@ where
     ///
     /// ```rust
     /// # use iced_aksel::{State, Axis, axis, scale::Linear};
-    /// # let mut state = State::new();
+    /// # let mut state: State<&'static str, f64> = State::new();
     /// # state.set_axis("x", Axis::new(Linear::new(0.0, 100.0), axis::Position::Bottom));
     /// # state.set_axis("y", Axis::new(Linear::new(0.0, 100.0), axis::Position::Left));
     /// // Pan 10% right and 5% up
@@ -228,7 +225,7 @@ where
     ///
     /// ```rust
     /// # use iced_aksel::{State, Axis, axis, scale::Linear};
-    /// # let mut state = State::new();
+    /// # let mut state: State<&'static str, f64> = State::new();
     /// # state.set_axis("x", Axis::new(Linear::new(0.0, 100.0), axis::Position::Bottom));
     /// # state.set_axis("y", Axis::new(Linear::new(0.0, 100.0), axis::Position::Left));
     /// // Zoom in 2x around the center
@@ -256,7 +253,7 @@ where
     ///
     /// ```rust
     /// # use iced_aksel::{State, Axis, axis, scale::Linear};
-    /// # let mut state = State::new();
+    /// # let mut state: State<&'static str, f64> = State::new();
     /// # state.set_axis("x", Axis::new(Linear::new(0.0, 100.0), axis::Position::Bottom));
     /// state.set_domain(&"x", 0.0, 200.0);
     /// ```
