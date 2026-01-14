@@ -89,7 +89,7 @@ pub struct AxisStyle {
     pub label: LabelStyle,
     /// Style of the ticks (lines).
     pub tick: TickLineStyle,
-    /// Style of tick badge
+    /// Style of the badge behind axis labels
     pub label_badge: LabelBadge,
     /// Style of the marker badge and line on the axis.
     pub marker: MarkerStyle,
