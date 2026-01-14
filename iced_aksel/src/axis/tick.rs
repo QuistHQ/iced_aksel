@@ -161,7 +161,7 @@ impl<D: Float, Theme> TickContext<'_, D, Theme> {
     }
 }
 
-/// Visual properties for the badge background behind the tick label.
+/// Visual properties for the badge background behind a tick label.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LabelBadge {
     /// The background color of the badge.
