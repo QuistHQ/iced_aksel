@@ -6,7 +6,21 @@ use crate::{
     style::{AxisStyle, BadgeStyle, MarkerLineStyle, MarkerStyle},
 };
 
-/// A position of a marker
+/// The position of a marker
+///
+/// Used when setting markers for an axis on a chart via. [`crate::Chart::marker`] or
+/// [`crate::Chart::marker_maybe`]
+///
+/// ```rust,no_run
+/// # use iced_aksel::{Chart, MarkerPosition};
+/// Chart::new(&self.state)
+///     // Set marker to follow cursor
+///     .marker("axis_id", MarkerPosition::Cursor, |ctx| { Some(ctx.marker()) })
+///     // Set marker at domain value 100.0
+///     .marker("axis_id", MarkerPosition::Value(100.0), |ctx| { Some(ctx.marker()) })
+///     // Set marker in the middle of the axis
+///     .marker("axis_id", MarkerPosition::Normalized(0.5), |ctx| { Some(ctx.marker()) })
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub enum MarkerPosition<D> {
     /// A specific value of the domain. The marker will not render if the value is outside of the
@@ -23,7 +37,7 @@ pub type MarkerRendererFn<D, Theme> = Box<dyn Fn(MarkerContext<D, Theme>) -> Opt
 
 /// A request to render a marker on a specific axis at a given position.
 ///
-/// Created via [`Chart::marker`] or [`Chart::marker_maybe`] and processed during rendering.
+/// Created via [`crate::Chart::marker`] or [`crate::Chart::marker_maybe`] and processed during rendering.
 pub struct MarkerRequest<'a, AxisId, D, Theme = iced_core::Theme> {
     pub(crate) position: MarkerPosition<D>,
     pub(crate) axis_id: &'a AxisId,
