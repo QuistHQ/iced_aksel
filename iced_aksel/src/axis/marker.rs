@@ -18,8 +18,12 @@ pub enum MarkerPosition<D> {
     Cursor,
 }
 
+/// A boxed function that renders a marker given context, returning `Some(Marker)` if rendering should occur.
 pub type MarkerRendererFn<D, Theme> = Box<dyn Fn(MarkerContext<D, Theme>) -> Option<Marker>>;
 
+/// A request to render a marker on a specific axis at a given position.
+///
+/// Created via [`Chart::marker`] or [`Chart::marker_maybe`] and processed during rendering.
 pub struct MarkerRequest<'a, AxisId, D, Theme = iced_core::Theme> {
     pub(crate) position: MarkerPosition<D>,
     pub(crate) axis_id: &'a AxisId,
