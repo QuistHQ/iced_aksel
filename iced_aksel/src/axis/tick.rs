@@ -153,11 +153,10 @@ impl<D: Float, Theme> TickContext<'_, D, Theme> {
     pub fn label_empty(&self) -> super::Label {
         super::Label::from_style("".to_string(), self.style.label)
     }
-
     /// Creates a new [`LabelBadge`] with applied styling. Only one [`LabelBadge`] can be returned in the
     /// [`TickResult`]
     pub fn label_badge(&self) -> super::LabelBadge {
-        super::LabelBadge::from(self.style.label_badge)
+        self.style.label_badge
     }
 }
 
