@@ -9,7 +9,7 @@
 </div>
 
 
-`iced_aksel` is an experimental, "batteries not included", charting crate for
+`iced_aksel` is a WIP, "batteries not included", charting crate for
 the [Iced] GUI toolkit, wrapping the [Aksel] plotting core in an ergonomic
 widget. It focuses on rendering large, interactive datasets with customizable
 axes, grids, styles, and event handlers that plug directly into your Iced
@@ -28,10 +28,10 @@ application logic.
   feels native to Iced apps.
 
 - 🪓 **Powerful axes** – Configure positions, scales, tick/label policies,
-  cursor labels, visibility, and grid renderers per axis.
+  cursor labels, visibility, and grid renderers per axis. You can even have multiple axes on the same side.
 
 - 🖌️**Canvas-like API** – Implement `PlotData` to add any shape primitive
-  (`shape::Line`, `shape::Circle`, `shape::Rectangle`, etc.) to the plot - Or
+  (`shape::Line`, `shape::Ellipse`, `shape::Rectangle`, etc.) to the plot - Or
   create your own shape primitives with the `Shape` trait!
 
 - 📏 **Internal Transformation** - Handles all the math headaches associated
@@ -63,11 +63,12 @@ use iced::{Element, Theme};
 use iced_aksel::shape::Ellipse;
 use iced_aksel::{Axis, Chart, Measure, Plot, PlotData, PlotPoint, State, axis, scale::Linear};
 
+// Initialize IDs for ***individual*** axes
 const X_ID: &'static str = "x_id";
 const Y_ID: &'static str = "y_id";
 
 struct App {
-    chart: State<&'static str, f64>,
+    state: State<&'static str, f64>,
     scatter: Scatter,
 }
 
@@ -76,29 +77,30 @@ enum Message {}
 
 impl App {
     fn new() -> Self {
-        let mut chart = State::new();
-        chart.set_axis(
+        let mut state = State::new();
+        state.set_axis(
             X_ID,
             Axis::new(Linear::new(0.0, 100.0), axis::Position::Bottom),
         );
-        chart.set_axis(
+        state.set_axis(
             Y_ID,
             Axis::new(Linear::new(0.0, 100.0), axis::Position::Left),
         );
 
         Self {
-            chart,
+            state,
             scatter: Scatter::demo(),
         }
     }
 
     fn view(&self) -> Element<Message> {
-        Chart::new(&self.chart)
+        Chart::new(&self.state)
             .plot_data(&self.scatter, X_ID, Y_ID)
             .into()
     }
 }
 
+// Your own custom plot that implements `PlotData`
 struct Scatter {
     points: Vec<PlotPoint<f64>>,
 }
@@ -130,10 +132,10 @@ impl PlotData<f64> for Scatter {
 
 ### Core Concepts
 
-- `Chart` is the widget that lays out axes and plots, and routes user events.
+- `Chart` is the widget. It is the primary driver that renders the axes and plots and routes user events.
 - `State` holds every axis definition and is shared between updates and
   rendering.
-- `Axis` controls domain, scale, position, grid lines, cursor labels, and more.
+- `Axis` controls domain, scale, position, grid lines, marker, tick labels and more.
 - `PlotData` is implemented by your data structures; it receives a `Plot`
   builder to push shapes into.
 - `Shape`, `Stroke`, and `Measure` describe how primitives are drawn.
