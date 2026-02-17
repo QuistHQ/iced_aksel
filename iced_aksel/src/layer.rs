@@ -34,7 +34,7 @@ impl<'a, AxisId: Hash + Eq, D: Float, R: crate::Renderer, Theme> Layer<'a, AxisI
     }
 }
 
-pub static NEXT_LAYER_ID: AtomicU64 = AtomicU64::new(1);
+pub(crate) static NEXT_LAYER_ID: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug)]
 pub struct Cached<T> {
