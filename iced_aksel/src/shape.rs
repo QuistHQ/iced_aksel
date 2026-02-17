@@ -27,7 +27,6 @@
 //! let line = Line::new(
 //!     PlotPoint::new(0.0, 0.0),
 //!     PlotPoint::new(10.0, 10.0),
-//! ).stroke(
 //!     Stroke::new(Color::from_rgb(0.0, 0.0, 1.0), Measure::Screen(2.0))
 //! );
 //!

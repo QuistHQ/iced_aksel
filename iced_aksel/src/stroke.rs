@@ -27,7 +27,10 @@ pub enum StrokeStyle {
     ///
     /// ```rust
     /// use iced_aksel::stroke::StrokeStyle;
-    /// let style = StrokeStyle::Dashed;
+    /// let style = StrokeStyle::Dashed {
+    ///     dash: 5.0,
+    ///     gap: 5.0,
+    /// };
     /// ```
     Dashed {
         /// Length of the dashes
@@ -42,7 +45,9 @@ pub enum StrokeStyle {
     ///
     /// ```rust
     /// use iced_aksel::stroke::StrokeStyle;
-    /// let style = StrokeStyle::Dotted;
+    /// let style = StrokeStyle::Dotted {
+    ///    gap: 5.0,
+    /// };
     /// ```
     Dotted {
         /// Length of the gap between dots
@@ -67,7 +72,10 @@ pub enum StrokeStyle {
 /// let dashed: Stroke<f64> = Stroke::with_style(
 ///     Color::from_rgb(0.0, 0.0, 1.0),
 ///     Measure::Screen(3.0),
-///     StrokeStyle::Dashed
+///     StrokeStyle::Dashed {
+///         dash: 5.0,
+///         gap: 5.0,
+///     }
 /// );
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -114,7 +122,10 @@ impl<D: Float> Stroke<D> {
     /// let stroke: Stroke<f64> = Stroke::with_style(
     ///     Color::from_rgb(0.0, 1.0, 0.0),
     ///     Measure::Plot(1.0),
-    ///     StrokeStyle::Dashed
+    ///     StrokeStyle::Dashed {
+    ///         dash: 5.0,
+    ///         gap: 5.0,
+    ///     }
     /// );
     /// ```
     pub const fn with_style(fill: Color, thickness: Measure<D>, style: StrokeStyle) -> Self {

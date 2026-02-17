@@ -17,8 +17,7 @@ use iced_core::Point;
 /// use aksel::PlotPoint;
 ///
 /// let data = vec![PlotPoint::new(0.0, 0.0), PlotPoint::new(1.0, 5.0)];
-/// let series = Polyline::new(data)
-///     .stroke(Stroke::new(Color::BLACK, Measure::Screen(2.0)));
+/// let series = Polyline::new(data, Stroke::new(Color::BLACK, Measure::Screen(2.0)));
 /// ```
 #[derive(Debug, Clone)]
 pub struct Polyline<D> {

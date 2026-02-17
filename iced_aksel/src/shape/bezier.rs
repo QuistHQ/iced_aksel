@@ -11,28 +11,29 @@ use iced_core::Point;
 /// ## 1. Quadratic Curve (Simple Arch)
 /// ```rust
 /// use iced_aksel::shape::Bezier;
-/// use iced_aksel::{Measure, Stroke, };
+/// use iced_aksel::{Measure, Stroke, PlotPoint};
 /// use iced::Color;
-/// use aksel::PlotPoint;
 ///
 /// let curve = Bezier::quadratic(
 ///     PlotPoint::new(0.0, 0.0),  // Start
 ///     PlotPoint::new(5.0, 10.0), // Control Point
-///     PlotPoint::new(10.0, 0.0)  // End
-/// )
-/// .stroke(Stroke::new(Color::BLACK, Measure::Screen(2.0)));
+///     PlotPoint::new(10.0, 0.0),  // End
+///     Stroke::new(Color::BLACK, Measure::Screen(2.0))
+/// );
 /// ```
 ///
 /// ## 2. Cubic Curve (S-Shape)
 /// ```rust
 /// use iced_aksel::shape::Bezier;
-/// use aksel::PlotPoint;
+/// use iced_aksel::{Measure, Stroke, PlotPoint};
+/// use iced::Color;
 ///
 /// let curve = Bezier::cubic(
 ///     PlotPoint::new(0.0, 0.0),  // Start
 ///     PlotPoint::new(5.0, 10.0), // Control 1
 ///     PlotPoint::new(5.0, -10.0),// Control 2
-///     PlotPoint::new(10.0, 0.0)  // End
+///     PlotPoint::new(10.0, 0.0),  // End
+///     Stroke::new(Color::BLACK, Measure::Screen(2.0))
 /// );
 /// ```
 #[derive(Debug, Clone)]

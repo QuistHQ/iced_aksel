@@ -19,9 +19,9 @@ use iced_core::Point;
 ///
 /// let trend = Line::new(
 ///     PlotPoint::new(0.0, 0.0),
-///     PlotPoint::new(100.0, 100.0)
+///     PlotPoint::new(100.0, 100.0),
+///     Stroke::new(Color::BLACK, Measure::Screen(2.0))
 /// )
-/// .stroke(Stroke::new(Color::BLACK, Measure::Screen(2.0)))
 /// .infinite();
 /// ```
 #[derive(Debug, Clone)]
@@ -72,8 +72,6 @@ impl<D: Float, R: crate::Renderer> Shape<D, R> for Line<D> {
 
 impl<D: Float> Line<D> {
     /// Creates a new `Line` segment between two points.
-    ///
-    /// Note: The shape is invisible by default. You **must** call `.stroke()` to render it.
     pub const fn new(p1: PlotPoint<D>, p2: PlotPoint<D>, stroke: Stroke<D>) -> Self {
         Self {
             p1,

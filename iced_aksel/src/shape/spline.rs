@@ -21,8 +21,7 @@ use iced_core::Point;
 /// ];
 ///
 /// // Standard smooth curve
-/// let curve = Spline::new(data)
-/// .stroke(Stroke::new(Color::BLACK, Measure::Screen(2.0)));
+/// let curve = Spline::new(data, Stroke::new(Color::BLACK, Measure::Screen(2.0)));
 /// ```
 #[derive(Debug, Clone)]
 pub struct Spline<D> {
