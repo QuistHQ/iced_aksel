@@ -906,12 +906,13 @@ impl<D: Float, Theme> Axis<D, Theme> {
         Renderer: crate::Renderer,
     {
         let thickness = line.width.0;
+        let half_thickness = thickness / 2.0;
         let length = line.length.0;
         let fill = line.color;
 
         match self.position {
             Position::Bottom => {
-                let x = bounds.width.mul_add(pos_norm, bounds.x);
+                let x = bounds.width.mul_add(pos_norm, bounds.x) - half_thickness;
                 renderer.fill_quad(
                     Quad {
                         bounds: Rectangle::new(
@@ -928,7 +929,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
                 );
             }
             Position::Top => {
-                let x = bounds.width.mul_add(pos_norm, bounds.x);
+                let x = bounds.width.mul_add(pos_norm, bounds.x) - half_thickness;
                 renderer.fill_quad(
                     Quad {
                         bounds: Rectangle::new(
@@ -945,7 +946,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
                 );
             }
             Position::Right => {
-                let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y);
+                let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y) - half_thickness;
                 renderer.fill_quad(
                     Quad {
                         bounds: Rectangle::new(
@@ -962,11 +963,14 @@ impl<D: Float, Theme> Axis<D, Theme> {
                 );
             }
             Position::Left => {
-                let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y);
+                let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y) - half_thickness;
                 renderer.fill_quad(
                     Quad {
                         bounds: Rectangle::new(
-                            Point { x: bounds.x, y },
+                            Point {
+                                x: bounds.x + bounds.width - length,
+                                y,
+                            },
                             Size {
                                 width: length,
                                 height: thickness,

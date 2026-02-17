@@ -116,6 +116,7 @@ impl AnalyzerApp {
 
                 self.last_frame_time = Some(now);
                 self.rebuild_curve();
+                self.state.request_redraw();
             }
             Message::DeviceSelected(device_name) => {
                 println!("Switching to device: {}", device_name);

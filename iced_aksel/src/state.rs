@@ -56,6 +56,11 @@ where
         self.version
     }
 
+    /// Invalidates any cache during rendering, triggering a redraw of the chart layers
+    pub const fn request_redraw(&mut self) {
+        self.increment_version();
+    }
+
     /// Increments the version of the State
     const fn increment_version(&mut self) {
         self.version = self.version.wrapping_add(1);
