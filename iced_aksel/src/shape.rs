@@ -95,6 +95,6 @@ where
     D: Float,
     Renderer: crate::Renderer,
 {
-    /// Renders this shape into the plot context as a mesh
+    /// Renders this shape into the plot context as a primitive.
     fn render(self, ctx: &mut plot::Context<'_, D, Renderer>);
 }
