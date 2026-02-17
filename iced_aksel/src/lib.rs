@@ -85,7 +85,7 @@ use iced_core::{
     Widget,
     layout::{self, Limits, Node},
     mouse::{self, ScrollDelta},
-    renderer::Style,
+    renderer::{Quad, Style},
     touch,
     widget::{Tree, tree},
 };
@@ -124,7 +124,6 @@ use axis::{MarkerContext, MarkerPosition, MarkerRequest, Orientation, Position};
 use layer::Layer;
 use memory::Memory;
 use plot::DragDelta;
-use render::RenderBuffer;
 
 use crate::render::Primitive;
 
@@ -803,7 +802,7 @@ where
         layout: Layout<'_>,
         style: &style::Style,
         plot: Rectangle,
-        buffer: &mut RenderBuffer<Renderer>,
+        renderer: &mut Renderer,
     ) {
         // Track the "inner-most" spine properties for each side
         let mut left: Option<(f32, Color)> = None;
@@ -869,42 +868,58 @@ where
 
         // Bottom-Left
         if let (Some((lw, lc)), Some((bw, _))) = (left, bottom) {
-            buffer.add_primitive(Primitive::Rectangle {
-                xy1: Point::new(plot.x - lw, plot.y + plot.height),
-                xy2: Point::new(plot.x, plot.y + plot.height + bw),
-                fill: Some(lc),
-                stroke: None,
-            });
+            let top_left = Point::new(plot.x - lw, plot.y + plot.height);
+            let size = Size::new(lw, bw);
+            renderer.fill_quad(
+                Quad {
+                    bounds: Rectangle::new(top_left, size),
+                    snap: true,
+                    ..Default::default()
+                },
+                lc,
+            );
         }
 
         // Top-Left
         if let (Some((lw, lc)), Some((tw, _))) = (left, top) {
-            buffer.add_primitive(Primitive::Rectangle {
-                xy1: Point::new(plot.x - lw, plot.y - tw),
-                xy2: Point::new(plot.x, plot.y),
-                fill: Some(lc),
-                stroke: None,
-            });
+            let top_left = Point::new(plot.x - lw, plot.y - tw);
+            let size = Size::new(lw, tw);
+            renderer.fill_quad(
+                Quad {
+                    bounds: Rectangle::new(top_left, size),
+                    snap: true,
+                    ..Default::default()
+                },
+                lc,
+            );
         }
 
         // Bottom-Right
         if let (Some((rw, rc)), Some((bw, _))) = (right, bottom) {
-            buffer.add_primitive(Primitive::Rectangle {
-                xy1: Point::new(plot.x + plot.width, plot.y + plot.height),
-                xy2: Point::new(plot.x + plot.width + rw, plot.y + plot.height + bw),
-                fill: Some(rc),
-                stroke: None,
-            });
+            let top_left = Point::new(plot.x + plot.width, plot.y + plot.height);
+            let size = Size::new(rw, bw);
+            renderer.fill_quad(
+                Quad {
+                    bounds: Rectangle::new(top_left, size),
+                    snap: true,
+                    ..Default::default()
+                },
+                rc,
+            );
         }
 
         // Top-Right
         if let (Some((rw, rc)), Some((tw, _))) = (right, top) {
-            buffer.add_primitive(Primitive::Rectangle {
-                xy1: Point::new(plot.x + plot.width, plot.y - tw),
-                xy2: Point::new(plot.x + plot.width + rw, plot.y),
-                fill: Some(rc),
-                stroke: None,
-            });
+            let top_left = Point::new(plot.x + plot.width, plot.y - tw);
+            let size = Size::new(rw, tw);
+            renderer.fill_quad(
+                Quad {
+                    bounds: Rectangle::new(top_left, size),
+                    snap: true,
+                    ..Default::default()
+                },
+                rc,
+            );
         }
     }
 }
@@ -1164,7 +1179,7 @@ where
         }
 
         // 2. Draw Spine Corners (Self-contained logic)
-        self.draw_spine_corners(layout, &style, plot_bounds, &mut buffer);
+        self.draw_spine_corners(layout, &style, plot_bounds, renderer);
 
         if buffer.needs_redraw() {
             // 3. Render data layers if nothing in the buffer/cache
