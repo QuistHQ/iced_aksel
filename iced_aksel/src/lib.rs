@@ -864,8 +864,6 @@ where
 
         // 2. Render the corners
 
-        // TODO: Switch to rendering Quads
-
         // Bottom-Left
         if let (Some((lw, lc)), Some((bw, _))) = (left, bottom) {
             let top_left = Point::new(plot.x - lw, plot.y + plot.height);
@@ -1178,7 +1176,6 @@ where
             );
         }
 
-        // 2. Draw Spine Corners (Self-contained logic)
         self.draw_spine_corners(layout, &style, plot_bounds, renderer);
 
         if buffer.needs_redraw() {
