@@ -3,7 +3,7 @@ pub mod linear;
 pub mod polygon;
 pub mod radial;
 
-use crate::render::buffer::MeshData;
+use crate::render::cache::MeshData;
 use iced_core::{Color, Point, Vector};
 
 /// The "Fast Path" rendering engine.

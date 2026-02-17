@@ -25,9 +25,9 @@ pub struct Polyline<D> {
     pub points: Vec<PlotPoint<D>>,
     /// The stroke style (color, thickness, pattern)
     pub stroke: Stroke<D>,
-    /// Wether to extend the line infinitely
+    /// Whether to extend the line infinitely
     pub extensions: LineExtensions,
-    /// Wether to draw arrowheads on the line
+    /// Whether to draw arrowheads on the line
     pub arrows: LineArrows,
 }
 

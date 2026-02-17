@@ -6,7 +6,7 @@
 use std::ops::Deref;
 
 use crate::{
-    render::{Primitive, RenderBuffer},
+    render::{Primitive, RenderCache},
     shape::Shape,
 };
 
@@ -69,11 +69,11 @@ where
     /// Use `plot.add_shape()` to add visual elements to the chart.
     fn draw(&self, plot: &mut Plot<D, R>, theme: &Theme);
 
-    /// 0 = Always dirty (Default).
-    /// >0 = Cached.
+    /// The version of the layer, used for caching.
     ///
-    fn version(&self) -> u64 {
-        0
+    /// If version returns None (default), then the layer will always redraw.
+    fn version(&self) -> Option<u64> {
+        None
     }
 
     /// The id of the layer. Primarily used by the [`Cached`](crate::Cached) struct
@@ -87,11 +87,11 @@ where
 
 /// Internal rendering context for shapes.
 ///
-/// Manages layer ordering and buffering for efficient rendering.
+/// Manages layer ordering and cacheing for efficient rendering.
 pub struct Context<'a, D: Float, Renderer: crate::Renderer = iced_renderer::Renderer> {
     transform: &'a Transform<'a, D, f32, f32>,
     renderer: &'a mut Renderer,
-    buffer: &'a mut RenderBuffer<Renderer>,
+    cache: &'a mut RenderCache<Renderer>,
 }
 
 impl<'a, D: Float, Renderer: crate::Renderer> Deref for Context<'a, D, Renderer> {
@@ -109,14 +109,14 @@ impl<'a, D: Float, Renderer: crate::Renderer> Context<'a, D, Renderer> {
         self.renderer.default_font()
     }
 
-    /// Returns a mutable reference to the underlying [`RenderBuffer`].
-    pub const fn buffer(&mut self) -> &mut RenderBuffer<Renderer> {
-        self.buffer
+    /// Returns a mutable reference to the underlying [`RenderCache`].
+    pub const fn cache(&mut self) -> &mut RenderCache<Renderer> {
+        self.cache
     }
 
-    /// Adds a low-level [`Primitive`] directly to the render buffer.
+    /// Adds a low-level [`Primitive`] directly to the render cache.
     pub fn add_primitive(&mut self, primitive: Primitive) {
-        self.buffer.add_primitive(primitive);
+        self.cache.add_primitive(primitive);
     }
 }
 
@@ -138,13 +138,13 @@ where
     /// This is typically called internally by the Chart widget.
     pub const fn new(
         renderer: &'a mut R,
-        buffer: &'a mut RenderBuffer<R>,
+        cache: &'a mut RenderCache<R>,
         transform: &'a Transform<'a, D, f32, f32>,
     ) -> Self {
         let context = Context {
             transform,
             renderer,
-            buffer,
+            cache,
         };
         Self { context }
     }

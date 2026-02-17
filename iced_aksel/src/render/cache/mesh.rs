@@ -62,7 +62,7 @@ impl MeshData {
 ///
 /// It manages the lifecycle of `iced_graphics::mesh::Indexed`, automatically
 /// flushing it to the renderer when it exceeds its capacity or when the frame ends.
-pub struct MeshBatcher {
+pub struct MeshCache {
     /// The raw mesh data storage.
     buffer: Vec<Primitive>,
     cached: Cache,
@@ -72,7 +72,7 @@ pub struct MeshBatcher {
     pub(crate) tessellator: Tessellator,
 }
 
-impl MeshBatcher {
+impl MeshCache {
     /// Creates a new buffer with a specific soft limit.
     pub fn new() -> Self {
         Self {

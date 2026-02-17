@@ -126,7 +126,7 @@ impl Tessellator {
     #[allow(clippy::too_many_arguments)]
     pub fn draw_rectangle(
         &mut self,
-        buffer: &mut crate::render::buffer::MeshData,
+        buffer: &mut crate::render::cache::MeshData,
         x_min: f32,
         y_min: f32,
         x_max: f32,
@@ -208,7 +208,7 @@ impl Tessellator {
     /// based on the radius and the current [`quality`](Self::quality) setting.
     pub fn draw_ellipse(
         &mut self,
-        buffer: &mut crate::render::buffer::MeshData,
+        buffer: &mut crate::render::cache::MeshData,
         center: Point,
         radius: Point,
         fill: Option<Color>,
@@ -290,7 +290,7 @@ impl Tessellator {
     /// math consistency. You do not need to provide points in clockwise/counter-clockwise order.
     pub fn draw_triangle(
         &mut self,
-        buffer: &mut crate::render::buffer::MeshData,
+        buffer: &mut crate::render::cache::MeshData,
         p1: Point,
         p2: Point,
         p3: Point,
@@ -391,7 +391,7 @@ impl Tessellator {
     #[allow(clippy::too_many_arguments)]
     pub fn draw_polygon(
         &mut self,
-        buffer: &mut crate::render::buffer::MeshData,
+        buffer: &mut crate::render::cache::MeshData,
         center: Point,
         radius: f32,
         vertices: u16,
@@ -445,7 +445,7 @@ impl Tessellator {
     #[allow(clippy::too_many_arguments)]
     pub fn draw_line(
         &mut self,
-        buffer: &mut crate::render::buffer::MeshData,
+        buffer: &mut crate::render::cache::MeshData,
         raw_start: Point,
         raw_end: Point,
         stroke: ResolvedStroke,
@@ -563,7 +563,7 @@ impl Tessellator {
     #[allow(clippy::too_many_arguments)]
     pub fn draw_polyline(
         &mut self,
-        buffer: &mut crate::render::buffer::MeshData,
+        buffer: &mut crate::render::cache::MeshData,
         mut points: Vec<Point>,
         stroke: ResolvedStroke,
         clip_bounds: Rectangle,
@@ -660,7 +660,7 @@ impl Tessellator {
     /// * `control_2`: If `None`, draws a Quadratic curve. If `Some`, draws a Cubic curve.
     pub fn draw_bezier(
         &mut self,
-        buffer: &mut crate::render::buffer::MeshData,
+        buffer: &mut crate::render::cache::MeshData,
         start: Point,
         control_1: Point,
         control_2: Option<Point>,
@@ -706,7 +706,7 @@ impl Tessellator {
     #[allow(clippy::too_many_arguments)]
     pub fn draw_spline(
         &mut self,
-        buffer: &mut crate::render::buffer::MeshData,
+        buffer: &mut crate::render::cache::MeshData,
         points: &[Point],
         stroke: ResolvedStroke,
         tension: f32,
@@ -775,7 +775,7 @@ impl Tessellator {
     #[allow(clippy::too_many_arguments)]
     pub fn draw_arc(
         &mut self,
-        buffer: &mut crate::render::buffer::MeshData,
+        buffer: &mut crate::render::cache::MeshData,
         center_x: f32,
         center_y: f32,
         radius_inner: f32,
@@ -971,7 +971,7 @@ impl Tessellator {
     /// * **Concave Polygons:** Automatically detected and triangulated using Earcut.
     pub fn draw_area(
         &mut self,
-        buffer: &mut crate::render::buffer::MeshData,
+        buffer: &mut crate::render::cache::MeshData,
         points: &[Point],
         fill: Option<Color>,
         stroke: Option<ResolvedStroke>,
@@ -1043,7 +1043,7 @@ impl Tessellator {
     /// advanced path stroking engine.
     fn stroke_polyline<I>(
         &mut self,
-        buffer: &mut crate::render::buffer::MeshData,
+        buffer: &mut crate::render::cache::MeshData,
         points: I,
         stroke: ResolvedStroke,
         close_path: bool,
@@ -1086,7 +1086,7 @@ impl Tessellator {
 
     fn stroke_path<Iter>(
         &mut self,
-        buffer: &mut crate::render::buffer::MeshData,
+        buffer: &mut crate::render::cache::MeshData,
         path: Iter,
         stroke: ResolvedStroke,
         tolerance: f32,
@@ -1112,7 +1112,7 @@ impl Tessellator {
     ///
     /// Unlike standard text, this method generates raw geometry (triangles) which can be
     /// freely rotated and scaled without losing quality.
-    pub fn draw_text(&mut self, mesh_buffer: &mut crate::render::buffer::MeshData, text: Text) {
+    pub fn draw_text(&mut self, mesh_buffer: &mut crate::render::cache::MeshData, text: Text) {
         // Construct the context to hold heavy resources (caches, buffers)
         let ctx = &mut TextRenderContext {
             mesh_buffer,

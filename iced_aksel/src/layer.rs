@@ -99,8 +99,8 @@ impl<D: Float, Renderer: crate::Renderer, T: PlotData<D, Renderer>> PlotData<D, 
         self.data.draw(plot, theme);
     }
 
-    fn version(&self) -> u64 {
-        self.version
+    fn version(&self) -> Option<u64> {
+        Some(self.version)
     }
 
     fn id(&self) -> Option<u64> {

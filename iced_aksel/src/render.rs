@@ -1,8 +1,8 @@
-mod buffer;
+mod cache;
 mod primitive;
 mod text;
 
-pub use buffer::RenderBuffer;
+pub use cache::RenderCache;
 pub use primitive::{LineArrows, LineExtensions, Primitive};
 pub use text::Text;
 
@@ -71,7 +71,7 @@ pub trait Renderer<Font = iced_core::Font>:
     + iced_graphics::mesh::Renderer
 {
     /// Returns the preferred rendering backend for this renderer.
-    fn preffered_backend(&self) -> Backend;
+    fn preferred_backend(&self) -> Backend;
 }
 
 impl<A, B> Renderer<A::Font> for iced_renderer::fallback::Renderer<A, B>
@@ -79,22 +79,22 @@ where
     A: Renderer,
     B: Renderer<A::Font, Paragraph = A::Paragraph, Editor = A::Editor>,
 {
-    fn preffered_backend(&self) -> Backend {
+    fn preferred_backend(&self) -> Backend {
         match self {
-            Self::Primary(primary) => primary.preffered_backend(),
-            Self::Secondary(secondary) => secondary.preffered_backend(),
+            Self::Primary(primary) => primary.preferred_backend(),
+            Self::Secondary(secondary) => secondary.preferred_backend(),
         }
     }
 }
 
 impl Renderer for iced_wgpu::Renderer {
-    fn preffered_backend(&self) -> Backend {
+    fn preferred_backend(&self) -> Backend {
         Backend::Mesh
     }
 }
 
 impl Renderer for iced_tiny_skia::Renderer {
-    fn preffered_backend(&self) -> Backend {
+    fn preferred_backend(&self) -> Backend {
         Backend::Path
     }
 }

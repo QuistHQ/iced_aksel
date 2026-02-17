@@ -58,7 +58,7 @@ const CACHE_CAPACITY: usize = 2000;
 /// A single tessellated character cached for reuse.
 ///
 /// Storing the `VertexBuffers` directly allows us to "stamp" this geometry
-/// into the main mesh buffer multiple times without re-running the expensive
+/// into the main mesh cache multiple times without re-running the expensive
 /// tessellation math.
 #[derive(Clone, Debug)]
 struct CachedGlyph {
@@ -139,7 +139,7 @@ impl Default for TextTessellationCache {
 /// to rendering functions.
 pub struct TextRenderContext<'a> {
     /// The final destination for the mesh data.
-    pub mesh_buffer: &'a mut crate::render::buffer::MeshData,
+    pub mesh_buffer: &'a mut crate::render::cache::MeshData,
     /// The Lyon tessellator instance (reused to avoid allocation).
     pub tessellator: &'a mut FillTessellator,
     /// The LRU cache for glyph geometry.
@@ -411,7 +411,7 @@ pub fn draw_geometric_text(ctx: &mut TextRenderContext, req: Text) {
 
 /// Transforms local glyph geometry to world/screen space and pushes it to the mesh buffer.
 fn flush_character_to_mesh(
-    target_buffer: &mut crate::render::buffer::MeshData,
+    target_buffer: &mut crate::render::cache::MeshData,
     source_geometry: &VertexBuffers<Point, u16>,
     screen_origin: Point,
     rotation_radians: f32,

@@ -114,11 +114,7 @@ impl PlotData<f64> for SmaItems {
         if !self.points.is_empty() {
             let sma_line = shape::Polyline::new(
                 self.points.clone(),
-                Stroke {
-                    fill: palette.warning,
-                    thickness: Measure::Screen(1.5),
-                    style: StrokeStyle::Solid,
-                },
+                Stroke::with_style(palette.warning, Measure::Screen(1.5), StrokeStyle::Solid),
             );
             plot.add_shape(sma_line);
         }

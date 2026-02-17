@@ -32,7 +32,7 @@ pub struct Line<D> {
     pub p2: PlotPoint<D>,
     /// The stroke style (color, thickness, pattern)
     pub stroke: Stroke<D>,
-    /// Wether to extend the line infinitely
+    /// Whether to extend the line infinitely
     pub extensions: LineExtensions,
     /// Whether to draw arrowheads on the line
     pub arrows: LineArrows,

@@ -175,10 +175,16 @@ type AxisHoverHandler<AxisId, Message> = Box<dyn Fn(AxisId, f32) -> Message>;
 type AxisScrollHandler<AxisId, Message> = Box<dyn Fn(AxisId, f32, ScrollDelta) -> Message>;
 
 #[derive(Debug, PartialEq)]
+struct LayerIdentifier {
+    id: Option<u64>,
+    version: Option<u64>,
+}
+
+#[derive(Debug, PartialEq)]
 struct CacheSignature {
     state_version: u64,
     layout_bounds: Rectangle,
-    layers: Vec<(Option<u64>, u64)>,
+    layers: Vec<LayerIdentifier>,
 }
 
 /// The main charting widget that renders axes and plot data.
@@ -1044,18 +1050,29 @@ where
         }
 
         // Construct current cache signature
+        let mut force_redraw = false;
         let current_signature = CacheSignature {
             state_version: self.state.version(),
             layout_bounds: layout.bounds(),
             layers: self
                 .layers
                 .iter()
-                .map(|l| (l.items.id(), l.items.version()))
+                .map(|l| {
+                    // Make sure we force a redraw if no version is provided for any layer
+                    if !force_redraw {
+                        force_redraw = l.items.version().is_none();
+                    }
+
+                    LayerIdentifier {
+                        id: l.items.id(),
+                        version: l.items.version(),
+                    }
+                })
                 .collect(),
         };
 
         // Check if we need to redraw
-        if memory.last_signature.as_ref() != Some(&current_signature) {
+        if force_redraw || memory.last_signature.as_ref() != Some(&current_signature) {
             memory.get_buffer_mut().clear();
             // Update signature
             memory.last_signature = Some(current_signature);

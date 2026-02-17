@@ -10,29 +10,23 @@ use iced_graphics::geometry::{
 
 const PRE_ALLOC_PATHS: usize = 5000;
 
-pub struct PathBatcher<Renderer: crate::Renderer> {
+pub struct PathCache<Renderer: crate::Renderer> {
     buffer: Vec<Primitive>,
     cache: Cache<Renderer>,
-    paths_limit: usize,
     needs_redraw: bool,
 }
 
-impl<Renderer: crate::render::Renderer> PathBatcher<Renderer> {
-    pub fn new(paths_limit: usize) -> Self {
+impl<Renderer: crate::render::Renderer> PathCache<Renderer> {
+    pub fn new() -> Self {
         Self {
             buffer: Vec::with_capacity(PRE_ALLOC_PATHS),
             cache: Cache::new(),
-            paths_limit,
             needs_redraw: true,
         }
     }
 
     pub const fn paths_count(&self) -> usize {
         self.buffer.len()
-    }
-
-    pub const fn limit(&self) -> usize {
-        self.paths_limit
     }
 
     /// Renders a primitive into this path buffer.

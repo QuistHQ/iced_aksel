@@ -2,7 +2,7 @@
 //!
 //! Handles expanding thin mathematical lines into thick, renderable triangles.
 
-use crate::render::buffer::MeshData;
+use crate::render::cache::MeshData;
 use iced_core::{Color, Point, Vector};
 use iced_graphics::{color::pack, mesh::SolidVertex2D};
 

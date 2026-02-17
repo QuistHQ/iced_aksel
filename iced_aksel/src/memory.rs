@@ -3,7 +3,7 @@ use std::cell::{RefCell, RefMut};
 use super::Action;
 use crate::{
     CacheSignature, Quality,
-    render::{Backend, RenderBuffer},
+    render::{Backend, RenderCache},
 };
 
 use iced_core::mouse;
@@ -12,7 +12,7 @@ use iced_core::mouse;
 pub struct Memory<AxisId, Renderer: crate::Renderer> {
     pub action: Action<AxisId>,
     pub previous_click: Option<mouse::Click>,
-    pub buffer: Option<RefCell<RenderBuffer<Renderer>>>,
+    pub buffer: Option<RefCell<RenderCache<Renderer>>>,
     pub last_signature: Option<CacheSignature>,
 }
 
@@ -30,9 +30,9 @@ impl<AxisId, Renderer: crate::Renderer> Memory<AxisId, Renderer> {
         if let Some(buffer) = &self.buffer {
             buffer.borrow_mut().set_quality(quality);
         } else {
-            let mut buffer = match renderer.preffered_backend() {
-                Backend::Mesh => RenderBuffer::new_mesh(),
-                Backend::Path => RenderBuffer::new_path(5000),
+            let mut buffer = match renderer.preferred_backend() {
+                Backend::Mesh => RenderCache::new_mesh(),
+                Backend::Path => RenderCache::new_path(),
             };
             buffer.set_quality(quality);
             self.buffer = Some(RefCell::new(buffer));
@@ -42,7 +42,7 @@ impl<AxisId, Renderer: crate::Renderer> Memory<AxisId, Renderer> {
     /// Gets a mutable reference to the internal buffer
     ///
     /// Panics if the buffer isn't initialized
-    pub fn get_buffer_mut(&self) -> RefMut<'_, RenderBuffer<Renderer>> {
+    pub fn get_buffer_mut(&self) -> RefMut<'_, RenderCache<Renderer>> {
         self.buffer
             .as_ref()
             .expect("Buffer isn't initialized")

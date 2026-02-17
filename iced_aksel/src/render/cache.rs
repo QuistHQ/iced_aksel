@@ -16,69 +16,69 @@ use iced_core::Rectangle;
 mod mesh;
 mod path;
 
-pub use mesh::{MeshBatcher, MeshData};
-pub use path::PathBatcher;
+pub use mesh::{MeshCache, MeshData};
+pub use path::PathCache;
 
-pub enum RenderBuffer<Renderer: crate::Renderer> {
-    Mesh(Box<MeshBatcher>),
-    Path(Box<PathBatcher<Renderer>>),
+pub enum RenderCache<Renderer: crate::Renderer> {
+    Mesh(Box<MeshCache>),
+    Path(Box<PathCache<Renderer>>),
 }
 
-impl<Renderer: crate::Renderer> RenderBuffer<Renderer> {
+impl<Renderer: crate::Renderer> RenderCache<Renderer> {
     pub fn new_mesh() -> Self {
-        Self::Mesh(Box::new(MeshBatcher::new()))
+        Self::Mesh(Box::new(MeshCache::new()))
     }
 
-    pub fn new_path(limit: usize) -> Self {
-        Self::Path(Box::new(PathBatcher::new(limit)))
+    pub fn new_path() -> Self {
+        Self::Path(Box::new(PathCache::new()))
     }
 
     pub fn clear(&mut self) {
         match self {
-            Self::Path(buf) => {
-                buf.clear();
+            Self::Path(cache) => {
+                cache.clear();
             }
-            Self::Mesh(buf) => {
-                buf.clear();
+            Self::Mesh(cache) => {
+                cache.clear();
             }
         }
     }
 
     pub fn needs_redraw(&self) -> bool {
         match self {
-            Self::Mesh(buf) => buf.needs_redraw(),
-            Self::Path(buf) => buf.needs_redraw(),
+            Self::Mesh(cache) => cache.needs_redraw(),
+            Self::Path(cache) => cache.needs_redraw(),
         }
     }
 
     pub fn draw(&mut self, renderer: &mut Renderer, clip_bounds: &Rectangle) {
         match self {
-            Self::Path(buf) => {
-                buf.draw(renderer, clip_bounds);
+            Self::Path(cache) => {
+                cache.draw(renderer, clip_bounds);
             }
-            Self::Mesh(buf) => {
-                buf.draw(renderer, clip_bounds);
+            Self::Mesh(cache) => {
+                cache.draw(renderer, clip_bounds);
             }
         }
     }
 
     pub fn add_primitive(&mut self, primitive: Primitive) {
         match self {
-            Self::Mesh(buf) => {
-                buf.add_primitive(primitive);
+            Self::Mesh(cache) => {
+                cache.add_primitive(primitive);
             }
-            Self::Path(buf) => {
-                buf.add_primitive(primitive);
+            Self::Path(cache) => {
+                cache.add_primitive(primitive);
             }
         }
     }
 
     pub fn set_quality(&mut self, quality: Quality) {
         match self {
-            Self::Mesh(buf) => {
-                buf.tessellator.set_quality(quality);
+            Self::Mesh(cache) => {
+                cache.tessellator.set_quality(quality);
             }
-            Self::Path(_buf) => {
+            Self::Path(_cache) => {
                 // todo!("Set quality on path-buffer")
             }
         }

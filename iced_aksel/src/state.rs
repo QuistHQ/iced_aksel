@@ -167,7 +167,9 @@ where
     /// state.axis_mut(&"x").pan(0.1);
     /// ```
     pub fn axis_mut_opt(&mut self, id: &AxisId) -> Option<&mut Axis<D, Theme>> {
-        self.increment_version();
+        if self.axes.contains_key(id) {
+            self.increment_version();
+        }
         self.axes.get_mut(id)
     }
 

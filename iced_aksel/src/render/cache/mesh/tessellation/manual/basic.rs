@@ -2,7 +2,7 @@
 //!
 //! This module handles shapes that can be trivially defined by a bounding box or center/radius.
 
-use crate::render::buffer::MeshData;
+use crate::render::cache::MeshData;
 use iced_core::{Color, Point};
 use iced_graphics::{color::pack, mesh::SolidVertex2D};
 

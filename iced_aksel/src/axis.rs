@@ -21,7 +21,7 @@ use iced_core::{
 };
 
 use crate::{
-    render::{Primitive, RenderBuffer},
+    render::{Primitive, RenderCache},
     stroke::{ResolvedStroke, StrokeStyle},
     style::{AxisStyle, DashStyle, Style},
 };
@@ -318,7 +318,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
         style: &Style,
         layout: Layout<'_>,
         plot_bounds: &Rectangle,
-        buffer: &mut RenderBuffer<Renderer>,
+        buffer: &mut RenderCache<Renderer>,
         viewport: &Rectangle,
     ) where
         Renderer: crate::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
@@ -991,7 +991,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
         line: GridLine,
         axis_bounds: &Rectangle,
         plot_bounds: &Rectangle,
-        buffer: &mut RenderBuffer<Renderer>,
+        buffer: &mut RenderCache<Renderer>,
         pos_norm: f32,
     ) where
         Renderer: crate::Renderer,
