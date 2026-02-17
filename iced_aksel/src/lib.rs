@@ -865,7 +865,7 @@ where
 
         // 2. Render the corners
 
-        // TODO: Switch to rendering primitives
+        // TODO: Switch to rendering Quads
 
         // Bottom-Left
         if let (Some((lw, lc)), Some((bw, _))) = (left, bottom) {
@@ -1146,26 +1146,27 @@ where
             height: plot_bounds.height,
         };
 
-        // for (i, (_, axis)) in self.state.axes().iter().enumerate() {
-        //     // We only care about layout bounds here to determine position
-        //     let axis_layout = layout.children().nth(i).unwrap();
-        //
-        //     // Draw the axis itself (Standard draw call)
-        //     axis.draw::<Renderer>(
-        //         renderer,
-        //         theme,
-        //         &style,
-        //         axis_layout,
-        //         &plot_bounds,
-        //         &mut buffer,
-        //         &bounds,
-        //     );
-        // }
-        //
-        // // 2. Draw Spine Corners (Self-contained logic)
-        // self.draw_spine_corners(layout, &style, plot_bounds, &mut buffer);
+        // Draw axis
+        for (i, (_, axis)) in self.state.axes().iter().enumerate() {
+            // We only care about layout bounds here to determine position
+            let axis_layout = layout.children().nth(i).unwrap();
 
-        if buffer.is_empty() {
+            // Draw the axis itself (Standard draw call)
+            axis.draw::<Renderer>(
+                renderer,
+                theme,
+                &style,
+                axis_layout,
+                &plot_bounds,
+                &mut buffer,
+                &bounds,
+            );
+        }
+
+        // 2. Draw Spine Corners (Self-contained logic)
+        self.draw_spine_corners(layout, &style, plot_bounds, &mut buffer);
+
+        if buffer.needs_redraw() {
             // 3. Render data layers if nothing in the buffer/cache
             for layer in &self.layers {
                 // These axes are guaranteed to exist because of `verify_layer` check
@@ -1210,7 +1211,7 @@ where
             );
         }
 
-        buffer.draw(renderer, &bounds);
+        buffer.draw(renderer, &plot_bounds);
     }
 }
 

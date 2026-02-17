@@ -14,7 +14,7 @@ pub struct PathBatcher<Renderer: crate::Renderer> {
     buffer: Vec<Primitive>,
     cache: Cache<Renderer>,
     paths_limit: usize,
-    should_redraw: bool,
+    needs_redraw: bool,
 }
 
 impl<Renderer: crate::render::Renderer> PathBatcher<Renderer> {
@@ -23,7 +23,7 @@ impl<Renderer: crate::render::Renderer> PathBatcher<Renderer> {
             buffer: Vec::with_capacity(PRE_ALLOC_PATHS),
             cache: Cache::new(),
             paths_limit,
-            should_redraw: true,
+            needs_redraw: true,
         }
     }
 
@@ -46,21 +46,23 @@ impl<Renderer: crate::render::Renderer> PathBatcher<Renderer> {
     pub fn clear(&mut self) {
         self.buffer.clear();
         self.cache.clear();
-        self.should_redraw = true;
+        self.needs_redraw = true;
     }
 
-    /// Check if the buffer is empty (should redraw)
-    pub const fn is_empty(&self) -> bool {
-        self.should_redraw
+    pub const fn needs_redraw(&self) -> bool {
+        self.needs_redraw
     }
 
-    pub(crate) fn draw(&self, renderer: &mut Renderer, clip_bounds: &Rectangle) {
+    pub(crate) fn draw(&mut self, renderer: &mut Renderer, clip_bounds: &Rectangle) {
         let geometry = self
             .cache
             .draw_with_bounds(renderer, *clip_bounds, |frame| {
-                self.buffer
-                    .iter()
-                    .for_each(|primitive| Self::draw_primitive(primitive, frame))
+                if self.needs_redraw {
+                    self.needs_redraw = false;
+                    self.buffer
+                        .iter()
+                        .for_each(|primitive| Self::draw_primitive(primitive, frame))
+                }
             });
 
         renderer.draw_geometry(geometry);

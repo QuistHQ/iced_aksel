@@ -44,10 +44,10 @@ impl<Renderer: crate::Renderer> RenderBuffer<Renderer> {
         }
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub fn needs_redraw(&self) -> bool {
         match self {
-            Self::Mesh(buf) => buf.is_empty(),
-            Self::Path(buf) => buf.is_empty(),
+            Self::Mesh(buf) => buf.needs_redraw(),
+            Self::Path(buf) => buf.needs_redraw(),
         }
     }
 

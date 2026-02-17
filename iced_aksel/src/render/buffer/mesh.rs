@@ -66,6 +66,7 @@ pub struct MeshBatcher {
     /// The raw mesh data storage.
     buffer: Vec<Primitive>,
     cached: Cache,
+    needs_redraw: bool,
 
     /// The mesh-tessellation cache/builder.
     pub(crate) tessellator: Tessellator,
@@ -77,6 +78,7 @@ impl MeshBatcher {
         Self {
             buffer: Vec::new(),
             cached: Cache::new(Arc::new([])),
+            needs_redraw: true,
             tessellator: Tessellator::new(),
         }
     }
@@ -86,14 +88,15 @@ impl MeshBatcher {
         self.tessellator.set_quality(quality);
     }
 
-    // Clear the buffer and cache
+    /// Clears the buffer
     pub fn clear(&mut self) {
         self.buffer.clear();
+        self.needs_redraw = true;
     }
 
-    // Check if the buffer is empty (Should redraw)
-    pub const fn is_empty(&self) -> bool {
-        self.buffer.is_empty()
+    /// Returns true if the buffer wants a redraw this frame
+    pub const fn needs_redraw(&self) -> bool {
+        self.needs_redraw
     }
 
     /// Flushes the pending geometry to the `iced` renderer.
@@ -104,7 +107,7 @@ impl MeshBatcher {
         R: Renderer,
     {
         // If the buffer is filled with primitives - Rerender the cache.
-        if !self.is_empty() {
+        if self.needs_redraw {
             let mut mesh_buffer = MeshData::default();
 
             self.buffer.iter().for_each(|primitive| {
@@ -114,6 +117,8 @@ impl MeshBatcher {
             if let Some(mesh) = mesh_buffer.into_mesh(*clip_bounds) {
                 self.cached.update([mesh].into());
             }
+
+            self.needs_redraw = false;
         }
 
         // Cache is cheap to clone thanks to Arc - This is intended

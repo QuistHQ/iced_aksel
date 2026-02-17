@@ -333,7 +333,6 @@ impl<D: Float, Theme> Axis<D, Theme> {
         let (&d_min, &d_max) = self.scale.domain();
 
         // --- Prioritize Ticks (Center-Out) ---
-
         let prioritized_ticks = self.collect_prioritized_ticks();
 
         let mut label_candidates = Vec::new();
@@ -368,7 +367,8 @@ impl<D: Float, Theme> Axis<D, Theme> {
             };
 
             // Draw Grid Lines (Global style + local config)
-            if self.render_grid
+            if buffer.needs_redraw()
+                && self.render_grid
                 && let Some(line) = grid_line
             {
                 self.draw_grid_line(line, &bounds, plot_bounds, buffer, pos_norm);
@@ -416,7 +416,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
 
             // Draw Tick Marks (Axis style + local config)
             if let Some(line) = tick_line {
-                self.draw_tick_line(line, &bounds, buffer, pos_norm);
+                self.draw_tick_line(line, &bounds, renderer, pos_norm);
             }
         }
 
@@ -895,12 +895,12 @@ impl<D: Float, Theme> Axis<D, Theme> {
         })
     }
 
-    /// Renders a single tick mark into the mesh buffer using linear tessellators.
+    /// Renders a single tick mark
     fn draw_tick_line<Renderer>(
         &self,
         line: TickLine,
         bounds: &Rectangle,
-        buffer: &mut RenderBuffer<Renderer>,
+        renderer: &mut Renderer,
         pos_norm: f32,
     ) where
         Renderer: crate::Renderer,
@@ -912,64 +912,76 @@ impl<D: Float, Theme> Axis<D, Theme> {
         match self.position {
             Position::Bottom => {
                 let x = bounds.width.mul_add(pos_norm, bounds.x);
-                buffer.add_primitive(Primitive::VerticalLine {
-                    x,
-                    y_start: bounds.y,
-                    y_end: bounds.y + length,
-                    stroke: ResolvedStroke {
-                        fill,
-                        thickness,
-                        style: StrokeStyle::Solid,
+                renderer.fill_quad(
+                    Quad {
+                        bounds: Rectangle::new(
+                            Point { x, y: bounds.y },
+                            Size {
+                                width: thickness,
+                                height: length,
+                            },
+                        ),
+                        snap: true,
+                        ..Default::default()
                     },
-                    snap: true,
-                });
+                    fill,
+                );
             }
             Position::Top => {
                 let x = bounds.width.mul_add(pos_norm, bounds.x);
-                buffer.add_primitive(Primitive::VerticalLine {
-                    x,
-                    y_start: bounds.y,
-                    y_end: bounds.y + length,
-                    stroke: ResolvedStroke {
-                        fill,
-                        thickness,
-                        style: StrokeStyle::Solid,
+                renderer.fill_quad(
+                    Quad {
+                        bounds: Rectangle::new(
+                            Point { x, y: bounds.y },
+                            Size {
+                                width: thickness,
+                                height: length,
+                            },
+                        ),
+                        snap: true,
+                        ..Default::default()
                     },
-                    snap: true,
-                });
+                    fill,
+                );
             }
             Position::Right => {
                 let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y);
-                buffer.add_primitive(Primitive::HorizontalLine {
-                    y,
-                    x_start: bounds.x,
-                    x_end: bounds.x + length,
-                    stroke: ResolvedStroke {
-                        fill,
-                        thickness,
-                        style: StrokeStyle::Solid,
+                renderer.fill_quad(
+                    Quad {
+                        bounds: Rectangle::new(
+                            Point { x: bounds.x, y },
+                            Size {
+                                width: length,
+                                height: thickness,
+                            },
+                        ),
+                        snap: true,
+                        ..Default::default()
                     },
-                    snap: true,
-                });
+                    fill,
+                );
             }
             Position::Left => {
                 let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y);
-                buffer.add_primitive(Primitive::HorizontalLine {
-                    y,
-                    x_start: bounds.x,
-                    x_end: bounds.x + length,
-                    stroke: ResolvedStroke {
-                        fill,
-                        thickness,
-                        style: StrokeStyle::Solid,
+                renderer.fill_quad(
+                    Quad {
+                        bounds: Rectangle::new(
+                            Point { x: bounds.x, y },
+                            Size {
+                                width: length,
+                                height: thickness,
+                            },
+                        ),
+                        snap: true,
+                        ..Default::default()
                     },
-                    snap: true,
-                });
+                    fill,
+                );
             }
         }
     }
 
-    /// Renders a single grid line into the mesh buffer.
+    /// Renders a single grid line into the buffer.
     fn draw_grid_line<Renderer>(
         &self,
         line: GridLine,
