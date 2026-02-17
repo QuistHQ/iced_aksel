@@ -160,7 +160,7 @@ impl<Renderer: crate::render::Renderer> PathCache<Renderer> {
             Primitive::Area { fill, stroke, .. } => (*fill, stroke.as_ref()),
             Primitive::Arc { fill, stroke, .. } => (*fill, stroke.as_ref()),
             Primitive::Spline { stroke, .. } => (None, Some(stroke)),
-            Primitive::Text { .. } => (None, None),
+            Primitive::Text { .. } => unreachable!("We already rendered text"),
         };
 
         // B. Build Geometry (Using the method on Primitive we added)

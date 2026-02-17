@@ -76,7 +76,7 @@ impl<Renderer: crate::Renderer> RenderCache<Renderer> {
     pub fn set_quality(&mut self, quality: Quality) {
         match self {
             Self::Mesh(cache) => {
-                cache.tessellator.set_quality(quality);
+                cache.set_quality(quality);
             }
             Self::Path(_cache) => {
                 // todo!("Set quality on path-buffer")
