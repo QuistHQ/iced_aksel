@@ -223,11 +223,7 @@ impl Tessellator {
 
         let segments = self.resolve_lod(max_radius);
 
-        let is_consumed = if let Some(stroke) = stroke {
-            stroke.thickness >= max_radius
-        } else {
-            false
-        };
+        let is_consumed = stroke.is_some_and(|stroke| stroke.thickness >= max_radius);
 
         if is_consumed {
             if let Some(stroke) = stroke {
@@ -311,33 +307,32 @@ impl Tessellator {
             (p1, p2, p3, cross_product)
         };
 
-        let (inner_p1, inner_p2, inner_p3, is_consumed) = if let Some(stroke) = stroke {
-            let dist_1 = p1.distance(p2);
-            let dist_2 = p2.distance(p3);
-            let dist_3 = p3.distance(p1);
-            let perimeter = dist_1 + dist_2 + dist_3;
+        let (inner_p1, inner_p2, inner_p3, is_consumed) =
+            stroke.map_or((p1, p2, p3, false), |stroke| {
+                let dist_1 = p1.distance(p2);
+                let dist_2 = p2.distance(p3);
+                let dist_3 = p3.distance(p1);
+                let perimeter = dist_1 + dist_2 + dist_3;
 
-            if perimeter < 1e-4 {
-                (Point::ORIGIN, Point::ORIGIN, Point::ORIGIN, true)
-            } else {
-                let inradius = double_area / perimeter;
-
-                // If stroke is thicker than the inradius, the triangle is fully filled by the stroke
-                if stroke.thickness >= inradius {
+                if perimeter < 1e-4 {
                     (Point::ORIGIN, Point::ORIGIN, Point::ORIGIN, true)
                 } else {
-                    // Compute the inner triangle for the "hole"
-                    (
-                        compute_inset_vertex(p3, p1, p2, stroke.thickness),
-                        compute_inset_vertex(p1, p2, p3, stroke.thickness),
-                        compute_inset_vertex(p2, p3, p1, stroke.thickness),
-                        false,
-                    )
+                    let inradius = double_area / perimeter;
+
+                    // If stroke is thicker than the inradius, the triangle is fully filled by the stroke
+                    if stroke.thickness >= inradius {
+                        (Point::ORIGIN, Point::ORIGIN, Point::ORIGIN, true)
+                    } else {
+                        // Compute the inner triangle for the "hole"
+                        (
+                            compute_inset_vertex(p3, p1, p2, stroke.thickness),
+                            compute_inset_vertex(p1, p2, p3, stroke.thickness),
+                            compute_inset_vertex(p2, p3, p1, stroke.thickness),
+                            false,
+                        )
+                    }
                 }
-            }
-        } else {
-            (p1, p2, p3, false)
-        };
+            });
 
         if is_consumed {
             if let Some(stroke) = stroke {
@@ -393,6 +388,7 @@ impl Tessellator {
     ///
     /// * `vertices`: The number of sides (must be >= 3).
     /// * `rotation`: Rotation in degrees. 0.0 aligns the first vertex to the North.
+    #[allow(clippy::too_many_arguments)]
     pub fn draw_polygon(
         &mut self,
         buffer: &mut crate::render::buffer::MeshData,
@@ -565,7 +561,7 @@ impl Tessellator {
     /// Supports dashed lines (via `StrokeStyle`), infinite extensions on the first/last segments,
     /// and arrowheads at the ends.
     #[allow(clippy::too_many_arguments)]
-    pub fn draw_polyline<'a>(
+    pub fn draw_polyline(
         &mut self,
         buffer: &mut crate::render::buffer::MeshData,
         mut points: Vec<Point>,
@@ -711,7 +707,7 @@ impl Tessellator {
     pub fn draw_spline(
         &mut self,
         buffer: &mut crate::render::buffer::MeshData,
-        points: &Vec<Point>,
+        points: &[Point],
         stroke: ResolvedStroke,
         tension: f32,
     ) {
@@ -799,11 +795,7 @@ impl Tessellator {
         let thickness = radius_outer - radius_inner;
 
         // If stroke is thicker than the arc itself, just fill the whole arc
-        let is_consumed = if let Some(stroke) = stroke {
-            stroke.thickness >= thickness
-        } else {
-            false
-        };
+        let is_consumed = stroke.is_some_and(|stroke| stroke.thickness >= thickness);
 
         if is_consumed {
             if let Some(stroke) = stroke {

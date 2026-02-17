@@ -20,13 +20,13 @@ pub enum Quality {
     Low,
     /// Custom value.
     Custom {
-        // Higher is better (High = 2.0)
-        //
-        // Must be between 0.1..5.0
+        /// Tessellation quality multiplier. Higher is better (`High` = 2.0).
+        ///
+        /// Clamped to the range `0.1..=5.0`.
         tessellation: f32,
-        // Lower is better (High = 0.2)
-        //
-        // If value < 0.001, it will default to 0.001
+        /// Text rendering tolerance. Lower is better (`High` = 0.2).
+        ///
+        /// Values below `0.001` are treated as `0.001`.
         text: f32,
     },
 }
@@ -53,8 +53,11 @@ impl Quality {
     }
 }
 
+/// The preferred rendering backend for a renderer.
 pub enum Backend {
+    /// GPU-accelerated mesh-based rendering (e.g. wgpu).
     Mesh,
+    /// Software path-based rendering (e.g. tiny-skia).
     Path,
 }
 
@@ -67,6 +70,7 @@ pub trait Renderer<Font = iced_core::Font>:
     + iced_graphics::geometry::Renderer
     + iced_graphics::mesh::Renderer
 {
+    /// Returns the preferred rendering backend for this renderer.
     fn preffered_backend(&self) -> Backend;
 }
 

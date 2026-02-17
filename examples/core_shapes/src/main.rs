@@ -1,3 +1,4 @@
+//! Showcase of the core shapes available in iced_aksel.
 use iced::alignment::{Horizontal, Vertical};
 use iced::widget::text::Wrapping;
 use iced::{
@@ -86,7 +87,10 @@ impl GridData {
     // Helper to get center of a grid cell
     // Rows: 0 (Bottom) to 3 (Top). Cols: 0 (Left) to 3 (Right)
     fn cell(&self, row: usize, col: usize) -> PlotPoint {
-        PlotPoint::new(col as f64 * 100.0 + 50.0, row as f64 * 100.0 + 50.0)
+        PlotPoint::new(
+            (col as f64).mul_add(100.0, 50.0),
+            (row as f64).mul_add(100.0, 50.0),
+        )
     }
 }
 

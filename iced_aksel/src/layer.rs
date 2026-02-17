@@ -34,8 +34,32 @@ impl<'a, AxisId: Hash + Eq, D: Float, R: crate::Renderer, Theme> Layer<'a, AxisI
     }
 }
 
-pub(crate) static NEXT_LAYER_ID: AtomicU64 = AtomicU64::new(1);
+pub static NEXT_LAYER_ID: AtomicU64 = AtomicU64::new(1);
 
+/// A versioned wrapper that caches [`PlotData`](crate::PlotData) across frames.
+///
+/// Wrapping your data in `Cached` allows the renderer to skip re-drawing when
+/// the data has not changed since the last frame. The cache is invalidated only
+/// when you call [`edit`](Self::edit), which bumps an internal version counter.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use iced_aksel::Cached;
+///
+/// let mut data = Cached::new(vec![1.0_f64, 2.0, 3.0]);
+///
+/// // Reading does not invalidate the cache — version stays the same.
+/// let _ = data.get();
+///
+/// // Editing returns a mutable reference and bumps the internal version,
+/// // signalling to the renderer that this layer must be redrawn.
+/// data.edit().push(4.0);
+/// assert_eq!(data.get().len(), 4);
+/// ```
+///
+/// See [`PlotData`](crate::PlotData) for details on how versioning integrates
+/// with the rendering pipeline.
 #[derive(Debug)]
 pub struct Cached<T> {
     data: T,
@@ -44,6 +68,7 @@ pub struct Cached<T> {
 }
 
 impl<T> Cached<T> {
+    /// Creates a new `Cached` wrapper around the given data.
     pub fn new(data: T) -> Self {
         Self {
             data,
@@ -52,11 +77,16 @@ impl<T> Cached<T> {
         }
     }
 
+    /// Returns a mutable reference to the inner data and increments the version.
+    ///
+    /// The bumped version signals to the renderer that the layer must be redrawn
+    /// on the next frame.
     pub const fn edit(&mut self) -> &mut T {
         self.version = self.version.wrapping_add(1);
         &mut self.data
     }
 
+    /// Returns a shared reference to the inner data without incrementing the version.
     pub const fn get(&self) -> &T {
         &self.data
     }

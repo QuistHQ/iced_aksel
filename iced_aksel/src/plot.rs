@@ -90,7 +90,6 @@ where
 /// Manages layer ordering and buffering for efficient rendering.
 pub struct Context<'a, D: Float, Renderer: crate::Renderer = iced_renderer::Renderer> {
     transform: &'a Transform<'a, D, f32, f32>,
-    clip_bounds: &'a iced_core::Rectangle,
     renderer: &'a mut Renderer,
     buffer: &'a mut RenderBuffer<Renderer>,
 }
@@ -110,10 +109,12 @@ impl<'a, D: Float, Renderer: crate::Renderer> Context<'a, D, Renderer> {
         self.renderer.default_font()
     }
 
+    /// Returns a mutable reference to the underlying [`RenderBuffer`].
     pub const fn buffer(&mut self) -> &mut RenderBuffer<Renderer> {
         self.buffer
     }
 
+    /// Adds a low-level [`Primitive`] directly to the render buffer.
     pub fn add_primitive(&mut self, primitive: Primitive) {
         self.buffer.add_primitive(primitive);
     }
@@ -137,13 +138,11 @@ where
     /// This is typically called internally by the Chart widget.
     pub const fn new(
         renderer: &'a mut R,
-        clip_bounds: &'a iced_core::Rectangle,
         buffer: &'a mut RenderBuffer<R>,
         transform: &'a Transform<'a, D, f32, f32>,
     ) -> Self {
         let context = Context {
             transform,
-            clip_bounds,
             renderer,
             buffer,
         };

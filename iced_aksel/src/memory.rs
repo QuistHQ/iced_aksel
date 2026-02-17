@@ -1,4 +1,4 @@
-use std::cell::{Ref, RefCell, RefMut};
+use std::cell::{RefCell, RefMut};
 
 use super::Action;
 use crate::{
@@ -47,15 +47,5 @@ impl<AxisId, Renderer: crate::Renderer> Memory<AxisId, Renderer> {
             .as_ref()
             .expect("Buffer isn't initialized")
             .borrow_mut()
-    }
-
-    /// Gets an immutable reference to the internal buffer
-    ///
-    /// Panics if the buffer isn't initialized
-    pub fn get_buffer(&self) -> Ref<'_, RenderBuffer<Renderer>> {
-        self.buffer
-            .as_ref()
-            .expect("Buffer isn't initialized")
-            .borrow()
     }
 }

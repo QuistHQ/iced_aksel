@@ -110,7 +110,7 @@ pub mod stroke;
 pub mod style;
 
 pub use axis::Axis;
-pub use layer::{Cached, NEXT_LAYER_ID};
+pub use layer::Cached;
 pub use measure::Measure;
 pub use plot::{Plot, PlotData};
 pub use render::{Quality, Renderer};
@@ -124,8 +124,6 @@ use axis::{MarkerContext, MarkerPosition, MarkerRequest, Orientation, Position};
 use layer::Layer;
 use memory::Memory;
 use plot::DragDelta;
-
-use crate::render::Primitive;
 
 /// Default movement threshold (in pixels) to distinguish a click from a drag operation.
 const DEFAULT_DRAG_DEADBAND: f32 = 10.0;
@@ -1145,13 +1143,6 @@ where
         let style = theme.style(&self.class);
         let bounds = layout.bounds();
         let plot_bounds = self.get_plot_layout(layout).bounds();
-
-        // 1. Retrieve the Memory from the Tree directly
-        let memory = tree.state.downcast_ref::<Memory<AxisId, Renderer>>();
-
-        // Get buffer from memory
-        let mut buffer = memory.get_buffer_mut();
-
         let screen_rect = ScreenRect {
             x: plot_bounds.x,
             y: plot_bounds.y,
@@ -1159,12 +1150,18 @@ where
             height: plot_bounds.height,
         };
 
-        // Draw axis
+        // Retrieve the Memory from the Tree directly
+        let memory = tree.state.downcast_ref::<Memory<AxisId, Renderer>>();
+
+        // Get buffer from memory
+        let mut buffer = memory.get_buffer_mut();
+
+        // Draw axes
         for (i, (_, axis)) in self.state.axes().iter().enumerate() {
             // We only care about layout bounds here to determine position
             let axis_layout = layout.children().nth(i).unwrap();
 
-            // Draw the axis itself (Standard draw call)
+            // Draw the axis itself (Ticks, labels, spine and gridlines)
             axis.draw::<Renderer>(
                 renderer,
                 theme,
@@ -1176,25 +1173,25 @@ where
             );
         }
 
+        // Connect axis spines
         self.draw_spine_corners(layout, &style, plot_bounds, renderer);
 
+        // Draw data layers if the buffer needs redraw
         if buffer.needs_redraw() {
-            // 3. Render data layers if nothing in the buffer/cache
             for layer in &self.layers {
                 // These axes are guaranteed to exist because of `verify_layer` check
                 let x_axis = self.state.axis(&layer.horizontal_axis_id);
                 let y_axis = self.state.axis(&layer.vertical_axis_id);
                 let transform = Transform::new(&screen_rect, x_axis.deref(), y_axis.deref());
 
-                let mut plot: Plot<Domain, Renderer> =
-                    Plot::new(renderer, &plot_bounds, &mut buffer, &transform);
+                let mut plot: Plot<Domain, Renderer> = Plot::new(renderer, &mut buffer, &transform);
 
                 // User code draws shapes into the plot here
                 layer.items.draw(&mut plot, theme);
             }
         }
 
-        // 4. Render markers
+        // Draw markers
         for marker_request in &self.markers {
             let Some((idx, _id, axis)) = self.state.axes().get_full(marker_request.axis_id) else {
                 continue;
@@ -1223,6 +1220,7 @@ where
             );
         }
 
+        // Draw the currently cached primitives
         buffer.draw(renderer, &plot_bounds);
     }
 }

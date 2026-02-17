@@ -1,3 +1,4 @@
+//! Minimal iced_aksel plot example.
 use iced::{
     Element, Length, Theme,
     widget::{column, container},

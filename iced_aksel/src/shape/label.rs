@@ -1,13 +1,13 @@
 use crate::render::Primitive;
 use crate::{Measure, Shape, plot};
 use aksel::{Float, PlotPoint};
+use iced_core::text::LineHeight;
 use iced_core::{
     Color, Font, Point, Size,
     alignment::{Horizontal, Vertical},
     text::Wrapping,
 };
 use std::fmt::Debug;
-use iced_core::text::LineHeight;
 
 /// Defines how text bounds should be interpreted.
 ///
@@ -121,9 +121,9 @@ impl<D: Float + Debug, R: crate::Renderer> Shape<D, R> for Label<D> {
             vertical_alignment,
             fill,
             quality,
-            letter_spacing,
+            letter_spacing, // TODO: Use this!
             font,
-            line_height,
+            line_height, // TODO: Use this!
             bounds,
             wrapping,
         } = self;

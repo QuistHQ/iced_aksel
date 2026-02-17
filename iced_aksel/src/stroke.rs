@@ -162,9 +162,15 @@ impl<D: Float> Stroke<D> {
     }
 }
 
+/// A stroke with all measurements resolved to screen-space pixels.
+///
+/// Produced by converting a [`Stroke`] through the current plot transform.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ResolvedStroke {
+    /// The stroke color.
     pub fill: Color,
+    /// Stroke width in screen-space pixels.
     pub thickness: f32,
+    /// The dash/dot pattern style of the stroke.
     pub style: StrokeStyle,
 }

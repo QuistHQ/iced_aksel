@@ -4,20 +4,27 @@ use iced_core::{
     alignment::{Horizontal, Vertical},
     text::{LineHeight, Wrapping},
 };
+use iced_graphics::geometry::path::Builder;
 use iced_graphics::geometry::path::arc::Elliptical;
-use iced_graphics::geometry::path::{Arc, Builder};
 use std::f32::consts::PI;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// Controls whether a line is extended to the edges of the plot bounds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LineExtensions {
+    /// Extend the line infinitely beyond its start point.
     pub start: bool,
+    /// Extend the line infinitely beyond its end point.
     pub end: bool,
 }
 
+/// Controls arrowhead rendering at the ends of a line.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LineArrows {
+    /// Draw an arrowhead at the start of the line.
     pub start: bool,
+    /// Draw an arrowhead at the end of the line.
     pub end: bool,
+    /// Arrowhead size.
     pub size: f32,
 }
 
@@ -124,7 +131,7 @@ impl Primitive {
     /// Draws the geometry of this primitive into the provided Iced Path Builder.
     pub fn draw_geometry(&self, builder: &mut iced_graphics::geometry::path::Builder) {
         match self {
-            Primitive::Rectangle { xy1, xy2, .. } => {
+            Self::Rectangle { xy1, xy2, .. } => {
                 let x = xy1.x.min(xy2.x);
                 let y = xy1.y.min(xy2.y);
                 let w = (xy1.x - xy2.x).abs();
@@ -133,14 +140,14 @@ impl Primitive {
                 builder.rectangle(Point::new(x, y), Size::new(w, h));
             }
 
-            Primitive::Triangle { points, .. } => {
+            Self::Triangle { points, .. } => {
                 builder.move_to(points[0]);
                 builder.line_to(points[1]);
                 builder.line_to(points[2]);
                 builder.close();
             }
 
-            Primitive::Ellipse { center, radius, .. } => {
+            Self::Ellipse { center, radius, .. } => {
                 // Optimization: Use native circle if radii match (within epsilon)
                 if (radius.x - radius.y).abs() < 0.001 {
                     builder.circle(*center, radius.x);
@@ -156,7 +163,7 @@ impl Primitive {
                 }
             }
 
-            Primitive::Polygon {
+            Self::Polygon {
                 center,
                 radius,
                 vertices,
@@ -187,7 +194,7 @@ impl Primitive {
                 }
                 builder.close();
             }
-            Primitive::Line {
+            Self::Line {
                 start,
                 end,
                 stroke,
@@ -204,7 +211,7 @@ impl Primitive {
                         // Dot product manually: (dx * dx) + (dy * dy)
                         let d_orig = p2 - p1;
                         let d_clip = c2 - c1;
-                        let dot = (d_orig.x * d_clip.x) + (d_orig.y * d_clip.y);
+                        let dot = d_orig.x.mul_add(d_clip.x, d_orig.y * d_clip.y);
 
                         // Align the clip points with the line direction
                         if dot < 0.0 {
@@ -234,7 +241,7 @@ impl Primitive {
                 // 3. Draw Arrows
                 // Calculate length squared manually
                 let d = p2 - p1;
-                let len_sq = (d.x * d.x) + (d.y * d.y);
+                let len_sq = d.x.mul_add(d.x, d.y * d.y);
 
                 if len_sq > 0.000001 {
                     let len = len_sq.sqrt();
@@ -266,7 +273,7 @@ impl Primitive {
             // -----------------------------------------------------------------
             // PolyLine (Connected Segments)
             // -----------------------------------------------------------------
-            Primitive::PolyLine {
+            Self::PolyLine {
                 points,
                 stroke,
                 clip_bounds,
@@ -288,19 +295,17 @@ impl Primitive {
                         p_first = edge;
                     }
                 }
-                if extensions.end {
-                    let p_prev = points[last_idx - 1];
-                    if let Some((_, edge)) =
+                if extensions.end
+                    && let Some((_, edge)) =
                         clip_infinite_line(points[last_idx - 1], p_last, *clip_bounds)
-                    {
-                        p_last = edge;
-                    }
+                {
+                    p_last = edge;
                 }
 
                 // 2. Draw Chain
                 builder.move_to(p_first);
-                for i in 1..last_idx {
-                    builder.line_to(points[i]);
+                for point in points.iter().take(last_idx).skip(1) {
+                    builder.line_to(*point);
                 }
                 builder.line_to(p_last);
 
@@ -309,7 +314,7 @@ impl Primitive {
 
                 if arrows.start && !extensions.start {
                     let d = points[1] - p_first;
-                    let len = (d.x * d.x + d.y * d.y).sqrt();
+                    let len = d.x.hypot(d.y);
 
                     if len > 0.001 {
                         let dir = Vector::new(d.x / len, d.y / len);
@@ -325,7 +330,7 @@ impl Primitive {
 
                 if arrows.end && !extensions.end {
                     let d = p_last - points[last_idx - 1];
-                    let len = (d.x * d.x + d.y * d.y).sqrt();
+                    let len = d.x.hypot(d.y);
 
                     if len > 0.001 {
                         let dir = Vector::new(d.x / len, d.y / len);
@@ -338,7 +343,7 @@ impl Primitive {
                 }
             }
 
-            Primitive::BezierCurve {
+            Self::BezierCurve {
                 start,
                 end,
                 control_1,
@@ -360,7 +365,7 @@ impl Primitive {
             // -----------------------------------------------------------------
             // Area (Arbitrary Polygon)
             // -----------------------------------------------------------------
-            Primitive::Area { points, .. } => {
+            Self::Area { points, .. } => {
                 if points.len() < 3 {
                     return;
                 }
@@ -374,7 +379,7 @@ impl Primitive {
             // -----------------------------------------------------------------
             // Spline (Smooth Curve)
             // -----------------------------------------------------------------
-            Primitive::Spline {
+            Self::Spline {
                 points, tension, ..
             } => {
                 if points.len() < 2 {
@@ -406,7 +411,7 @@ impl Primitive {
             // -----------------------------------------------------------------
             // Arc (Pie Slice or Donut)
             // -----------------------------------------------------------------
-            Primitive::Arc {
+            Self::Arc {
                 center,
                 radius_inner,
                 radius_outer,
@@ -476,12 +481,15 @@ fn calculate_arrowhead(tip: Point, direction: Vector, size: f32) -> (Point, Poin
     let ry = -direction.y * size;
 
     // Rotate +angle
-    let p1 = Point::new(tip.x + (rx * cos - ry * sin), tip.y + (rx * sin + ry * cos));
+    let p1 = Point::new(
+        tip.x + rx.mul_add(cos, -(ry * sin)),
+        tip.y + rx.mul_add(sin, ry * cos),
+    );
 
     // Rotate -angle
     let p2 = Point::new(
-        tip.x + (rx * cos + ry * sin),  // sin(-a) = -sin(a)
-        tip.y + (rx * -sin + ry * cos), // cos(-a) = cos(a)
+        tip.x + rx.mul_add(cos, ry * sin),  // sin(-a) = -sin(a)
+        tip.y + rx.mul_add(-sin, ry * cos), // cos(-a) = cos(a)
     );
 
     (p1, p2)
@@ -514,10 +522,8 @@ fn clip_infinite_line(p1: Point, p2: Point, bounds: Rectangle) -> Option<(Point,
             if t > t_min {
                 t_min = t;
             }
-        } else {
-            if t < t_max {
-                t_max = t;
-            }
+        } else if t < t_max {
+            t_max = t;
         }
         t_min <= t_max
     };
@@ -544,8 +550,8 @@ fn clip_infinite_line(p1: Point, p2: Point, bounds: Rectangle) -> Option<(Point,
 
     // Infinite lines extend effectively from -inf to +inf,
     // so we clamp to the box range we found.
-    let start = Point::new(p1.x + t_min * d.x, p1.y + t_min * d.y);
-    let end = Point::new(p1.x + t_max * d.x, p1.y + t_max * d.y);
+    let start = Point::new(t_min.mul_add(d.x, p1.x), t_min.mul_add(d.y, p1.y));
+    let end = Point::new(t_max.mul_add(d.x, p1.x), t_max.mul_add(d.y, p1.y));
 
     Some((start, end))
 }
@@ -588,10 +594,8 @@ fn add_arc_using_beziers(
         if total_sweep < 0.0 {
             total_sweep += 2.0 * std::f32::consts::PI;
         }
-    } else {
-        if total_sweep > 0.0 {
-            total_sweep -= 2.0 * std::f32::consts::PI;
-        }
+    } else if total_sweep > 0.0 {
+        total_sweep -= 2.0 * std::f32::consts::PI;
     }
 
     let num_segments = (total_sweep.abs() / (std::f32::consts::PI / 2.0)).ceil() as usize;
@@ -608,12 +612,12 @@ fn add_arc_using_beziers(
 
         // Start/End points of this segment
         let p0 = Point::new(
-            center.x + radius * current_start.cos(),
-            center.y + radius * current_start.sin(),
+            radius.mul_add(current_start.cos(), center.x),
+            radius.mul_add(current_start.sin(), center.y),
         );
         let p3 = Point::new(
-            center.x + radius * current_end.cos(),
-            center.y + radius * current_end.sin(),
+            radius.mul_add(current_end.cos(), center.x),
+            radius.mul_add(current_end.sin(), center.y),
         );
 
         // Control Points (Tangent to the circle)
