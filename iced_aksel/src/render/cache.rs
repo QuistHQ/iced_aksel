@@ -13,6 +13,7 @@
 use super::{Primitive, Quality};
 use iced_core::Rectangle;
 
+mod math;
 mod mesh;
 mod path;
 
