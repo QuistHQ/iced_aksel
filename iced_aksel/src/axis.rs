@@ -1000,7 +1000,6 @@ impl<D: Float, Theme> Axis<D, Theme> {
         let thickness = line.width.0;
         let fill = line.color;
 
-        // TODO: Switch to using primitives!
 
         match orientation {
             Orientation::Horizontal => {
