@@ -1089,7 +1089,7 @@ impl Tessellator {
                 _ => None,
             })
             .collect();
-        self.stroke_polyline(buffer, points, stroke, true);
+        self.stroke_polyline(buffer, points, stroke, false);
     }
 
     // =========================================================================
