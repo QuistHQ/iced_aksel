@@ -237,22 +237,5 @@ pub fn draw_stroke_circle(
     }
 
     // Connect the strip
-    for i in 0..segments {
-        let i = i as u32;
-        let next_i = (i + 1) % segments as u32;
-
-        let inner_current = start_index + i * 2;
-        let outer_current = start_index + i * 2 + 1;
-        let inner_next = start_index + next_i * 2;
-        let outer_next = start_index + next_i * 2 + 1;
-
-        mesh.indices.extend_from_slice(&[
-            inner_current,
-            outer_current,
-            outer_next, // Triangle 1
-            inner_current,
-            outer_next,
-            inner_next, // Triangle 2
-        ]);
-    }
+    super::push_ring_strip_indices(mesh, start_index, segments, true);
 }

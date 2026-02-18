@@ -5,6 +5,34 @@ pub mod radial;
 
 use crate::{radii::ResolvedRadii, render::cache::MeshData};
 use iced_core::{Color, Point, Vector};
+use iced_graphics::mesh::{Indexed, SolidVertex2D};
+
+/// Connects interleaved inner/outer vertex pairs into a quad strip.
+///
+/// Vertices must be laid out as `[inner_0, outer_0, inner_1, outer_1, ...]`
+/// starting at `start_index` in the mesh vertex buffer.
+///
+/// - `wrap`: `true` connects the last pair back to the first (closed ring,
+///   e.g. a circle stroke). `false` stops at the last pair (open arc).
+pub(super) fn push_ring_strip_indices(
+    mesh: &mut Indexed<SolidVertex2D>,
+    start_index: u32,
+    count: usize,
+    wrap: bool,
+) {
+    for i in 0..count {
+        let curr = i as u32;
+        let next = if wrap { ((i + 1) % count) as u32 } else { curr + 1 };
+        let inner_curr = start_index + curr * 2;
+        let outer_curr = start_index + curr * 2 + 1;
+        let inner_next = start_index + next * 2;
+        let outer_next = start_index + next * 2 + 1;
+        mesh.indices.extend_from_slice(&[
+            inner_curr, outer_curr, outer_next,
+            inner_curr, outer_next, inner_next,
+        ]);
+    }
+}
 
 /// The "Fast Path" rendering engine.
 ///
