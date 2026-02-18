@@ -105,6 +105,7 @@ mod state;
 
 pub mod axis;
 pub mod plot;
+pub mod radii;
 pub mod shape;
 pub mod stroke;
 pub mod style;
@@ -113,6 +114,7 @@ pub use axis::Axis;
 pub use layer::Cached;
 pub use measure::Measure;
 pub use plot::{Plot, PlotData};
+pub use radii::Radii;
 pub use render::{Quality, Renderer};
 pub use shape::Shape;
 pub use state::State;

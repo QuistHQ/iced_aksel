@@ -34,9 +34,9 @@ pub enum StrokeStyle {
     /// ```
     Dashed {
         /// Length of the dashes
-        dash: f32,
+        dash: f32, // TODO: Convert to Measure!
         /// Length of the gaps in-between
-        gap: f32,
+        gap: f32, // TODO: Convert to Measure!
     },
 
     /// Dotted line with small circular dots.
@@ -51,7 +51,7 @@ pub enum StrokeStyle {
     /// ```
     Dotted {
         /// Length of the gap between dots
-        gap: f32,
+        gap: f32, // TODO: Convert to Measure!
     },
 }
 

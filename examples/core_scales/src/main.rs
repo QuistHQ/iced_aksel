@@ -177,9 +177,7 @@ impl PlotData<f64> for StyleableData {
 
         // Draw markers
         for point in &self.markers {
-            plot.add_shape(
-                Ellipse::new(*point, Measure::Screen(4.0), Measure::Screen(4.0)).fill(color),
-            );
+            plot.add_shape(Ellipse::circle(*point, Measure::Screen(4.0)).fill(color));
         }
     }
 }

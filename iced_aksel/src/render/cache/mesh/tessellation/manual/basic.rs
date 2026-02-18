@@ -2,7 +2,7 @@
 //!
 //! This module handles shapes that can be trivially defined by a bounding box or center/radius.
 
-use crate::render::cache::MeshData;
+use crate::{radii::ResolvedRadii, render::cache::MeshData};
 use iced_core::{Color, Point};
 use iced_graphics::{color::pack, mesh::SolidVertex2D};
 
@@ -159,7 +159,7 @@ pub fn draw_stroke_rect(
 pub fn draw_fill_circle(
     buffer: &mut MeshData,
     center: Point,
-    radius: Point,
+    radii: ResolvedRadii,
     color: Color,
     segments: usize,
 ) {
@@ -180,8 +180,8 @@ pub fn draw_fill_circle(
         let (sin, cos) = theta.sin_cos();
         mesh.vertices.push(SolidVertex2D {
             position: [
-                cos.mul_add(radius.x, center.x),
-                sin.mul_add(radius.y, center.y),
+                cos.mul_add(radii.x, center.x),
+                sin.mul_add(radii.y, center.y),
             ],
             color: packed_color,
         });
@@ -203,8 +203,8 @@ pub fn draw_fill_circle(
 pub fn draw_stroke_circle(
     buffer: &mut MeshData,
     center: Point,
-    inner_radius: Point,
-    outer_radius: Point,
+    inner_radius: ResolvedRadii,
+    outer_radius: ResolvedRadii,
     color: Color,
     segments: usize,
 ) {

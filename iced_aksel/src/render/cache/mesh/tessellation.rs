@@ -22,6 +22,7 @@ pub mod text;
 
 use crate::{
     Quality,
+    radii::ResolvedRadii,
     render::{
         primitive::{LineArrows, LineExtensions},
         text::Text,
@@ -210,11 +211,11 @@ impl Tessellator {
         &mut self,
         buffer: &mut crate::render::cache::MeshData,
         center: Point,
-        radius: Point,
+        radii: ResolvedRadii,
         fill: Option<Color>,
         stroke: Option<ResolvedStroke>,
     ) {
-        let max_radius = radius.x.max(radius.y);
+        let max_radius = radii.x.max(radii.y);
 
         // Culling: Too small to be seen
         if max_radius < 0.5 {
@@ -222,22 +223,19 @@ impl Tessellator {
         }
 
         let segments = self.resolve_lod(max_radius);
-
         let is_consumed = stroke.is_some_and(|stroke| stroke.thickness >= max_radius);
 
         if is_consumed {
             if let Some(stroke) = stroke {
                 self.manual
-                    .draw_fill_circle(buffer, center, radius, stroke.fill, segments);
+                    .draw_fill_circle(buffer, center, radii, stroke.fill, segments);
             }
             return;
         }
 
         if let Some(color) = fill {
             let overlap = if stroke.is_some() { 0.5 } else { 0.0 };
-            let fill_radius =
-                Point::new((radius.x - overlap).max(0.0), (radius.y - overlap).max(0.0));
-
+            let fill_radius = (radii - overlap).max(0.0);
             if fill_radius.x > 0.1 && fill_radius.y > 0.1 {
                 self.manual
                     .draw_fill_circle(buffer, center, fill_radius, color, segments);
@@ -247,29 +245,27 @@ impl Tessellator {
         if let Some(stroke) = stroke {
             match stroke.style {
                 StrokeStyle::Solid => {
-                    let inner_radius =
-                        Point::new(radius.x - stroke.thickness, radius.y - stroke.thickness);
+                    let inner_radius = radii - stroke.thickness;
                     self.manual.draw_stroke_circle(
                         buffer,
                         center,
                         inner_radius,
-                        radius,
+                        radii,
                         stroke.fill,
                         segments,
                     );
                 }
                 _ => {
                     // Elliptical stroking with Lyon for dashed lines
-                    let stroke_radius_x = radius.x - (stroke.thickness / 2.0);
-                    let stroke_radius_y = radius.y - (stroke.thickness / 2.0);
+                    let stroke_radius = radii - (stroke.thickness / 2.0);
 
-                    if stroke_radius_x > 0.1 && stroke_radius_y > 0.1 {
+                    if stroke_radius.x > 0.1 && stroke_radius.y > 0.1 {
                         use lyon_tessellation::geom::Arc;
                         use lyon_tessellation::math::{Angle, Point, Vector};
 
                         let arc = Arc {
                             center: Point::new(center.x, center.y),
-                            radii: Vector::new(stroke_radius_x, stroke_radius_y),
+                            radii: Vector::new(stroke_radius.x, stroke_radius.y),
                             start_angle: Angle::radians(0.0),
                             sweep_angle: Angle::radians(std::f32::consts::TAU),
                             x_rotation: Angle::radians(0.0),

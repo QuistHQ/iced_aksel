@@ -1,4 +1,4 @@
-use crate::stroke::ResolvedStroke;
+use crate::{radii::ResolvedRadii, stroke::ResolvedStroke};
 use iced_core::{
     Color, Font, Pixels, Point, Radians, Rectangle, Size, Vector,
     alignment::{Horizontal, Vertical},
@@ -38,7 +38,7 @@ pub enum Primitive {
     },
     Ellipse {
         center: Point,
-        radius: Point,
+        radii: ResolvedRadii,
         fill: Option<Color>,
         stroke: Option<ResolvedStroke>,
     },
@@ -147,15 +147,15 @@ impl Primitive {
                 builder.close();
             }
 
-            Self::Ellipse { center, radius, .. } => {
-                // Optimization: Use native circle if radii match (within epsilon)
-                if (radius.x - radius.y).abs() < 0.001 {
-                    builder.circle(*center, radius.x);
+            Self::Ellipse { center, radii, .. } => {
+                // Optimization: Use native circle if radii is_uniform
+                if radii.is_uniform() {
+                    builder.circle(*center, radii.x);
                 } else {
                     // Stretched Ellipse
                     builder.ellipse(Elliptical {
                         center: *center,
-                        radii: Vector::new(radius.x, radius.y),
+                        radii: Vector::new(radii.x, radii.y),
                         rotation: Radians(0.0),
                         start_angle: Radians(0.0),
                         end_angle: Radians(2.0 * PI),

@@ -142,11 +142,11 @@ impl MeshCache {
             }
             Primitive::Ellipse {
                 center,
-                radius,
+                radii,
                 fill,
                 stroke,
             } => {
-                tessellator.draw_ellipse(buffer, *center, *radius, *fill, *stroke);
+                tessellator.draw_ellipse(buffer, *center, *radii, *fill, *stroke);
             }
             Primitive::Triangle {
                 points,

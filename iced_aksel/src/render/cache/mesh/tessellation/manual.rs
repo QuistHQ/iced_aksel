@@ -3,7 +3,7 @@ pub mod linear;
 pub mod polygon;
 pub mod radial;
 
-use crate::render::cache::MeshData;
+use crate::{radii::ResolvedRadii, render::cache::MeshData};
 use iced_core::{Color, Point, Vector};
 
 /// The "Fast Path" rendering engine.
@@ -60,7 +60,7 @@ impl ManualTessellator {
         &self,
         buffer: &mut MeshData,
         center: Point,
-        radius: Point,
+        radius: ResolvedRadii,
         color: Color,
         segments: usize,
     ) {
@@ -73,8 +73,8 @@ impl ManualTessellator {
         &self,
         buffer: &mut MeshData,
         center: Point,
-        inner_radius: Point,
-        outer_radius: Point,
+        inner_radius: ResolvedRadii,
+        outer_radius: ResolvedRadii,
         color: Color,
         segments: usize,
     ) {
