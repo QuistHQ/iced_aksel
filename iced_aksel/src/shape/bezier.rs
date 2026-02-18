@@ -73,8 +73,6 @@ impl<D: Float, R: crate::Renderer> Shape<D, R> for Bezier<D> {
 
 impl<D: Float> Bezier<D> {
     /// Creates a **Quadratic** Bézier curve (Start -> Control -> End).
-    ///
-    /// Note: The shape is invisible by default. You **must** call `.stroke()` to render it.
     pub const fn quadratic(
         start: PlotPoint<D>,
         control: PlotPoint<D>,
@@ -91,8 +89,6 @@ impl<D: Float> Bezier<D> {
     }
 
     /// Creates a **Cubic** Bézier curve (Start -> Control 1 -> Control 2 -> End).
-    ///
-    /// Note: The shape is invisible by default. You **must** call `.stroke()` to render it.
     pub const fn cubic(
         start: PlotPoint<D>,
         control_1: PlotPoint<D>,
