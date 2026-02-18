@@ -1,4 +1,5 @@
 //! Showcase of the core shapes available in iced_aksel.
+use iced::Degrees;
 use iced::alignment::{Horizontal, Vertical};
 use iced::widget::text::Wrapping;
 use iced::{
@@ -134,7 +135,7 @@ impl PlotData<f64> for GridData {
         let c = self.cell(0, 3);
         plot.add_shape(
             Polygon::new(c, Measure::Screen(30.0), 6)
-                .rotation(30.0) // Flat top
+                .rotation(Degrees(30.0)) // Flat top
                 .fill(Color::from_rgb(0.8, 0.8, 0.2))
                 .stroke(Stroke::new(Color::BLACK, Measure::Screen(2.0))),
         );
@@ -191,7 +192,6 @@ impl PlotData<f64> for GridData {
                 // Fixed: Moved stroke inside new()
                 Stroke::new(Color::from_rgb(1.0, 0.5, 0.8), Measure::Screen(2.0)),
             )
-            // Fixed: Replaced .arrows(true) with explicit start/end
             .arrow_start(true)
             .arrow_end(true),
         );

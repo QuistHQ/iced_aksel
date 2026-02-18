@@ -1,7 +1,7 @@
-use crate::{Measure, Shape, Stroke, plot, render::Primitive};
+use crate::{Measure, Shape, Stroke, plot, radii::Radius, render::Primitive};
 
 use aksel::{Float, PlotPoint};
-use iced_core::{Color, Point};
+use iced_core::{Color, Point, Radians};
 
 /// A primitive representing a sector of a circle or a ring.
 ///
@@ -25,13 +25,13 @@ pub struct Arc<D> {
     /// The center point of the arc
     pub center: PlotPoint<D>,
     /// The outer radius of the arc
-    pub radius: Measure<D>,
+    pub radius: Radius<Measure<D>>,
     /// The inner radius of the arc (0 for a pie slice)
-    pub inner_radius: Measure<D>,
+    pub inner_radius: Radius<Measure<D>>,
     /// The starting angle in radians
-    pub start_angle: f32,
+    pub start_angle: Radians,
     /// The ending angle in radians
-    pub end_angle: f32,
+    pub end_angle: Radians,
     /// The fill color for the arc interior
     pub fill: Option<Color>,
     /// The stroke style for the arc border
@@ -50,21 +50,13 @@ impl<D: Float, R: crate::Renderer> Shape<D, R> for Arc<D> {
             stroke,
         } = self;
 
+        // If the outer radius doesn't resolve, we don't render anything
+        let Some(radius_outer) = radius.resolve_isotropic(ctx) else {
+            return;
+        };
+
+        let radius_inner = inner_radius.resolve_isotropic(ctx);
         let center = Point::new(ctx.x_to_screen(&center.x), ctx.y_to_screen(&center.y));
-
-        // Calculate isotropic radii by taking the minimum scale of X and Y dimensions
-        let radius_outer = {
-            let x = radius.resolve_x(ctx);
-            let y = radius.resolve_y(ctx);
-            x.min(y)
-        };
-
-        let radius_inner = {
-            let x = inner_radius.resolve_x(ctx);
-            let y = inner_radius.resolve_y(ctx);
-            x.min(y)
-        };
-
         let stroke = stroke.map(|s| s.resolve(ctx));
 
         ctx.add_primitive(Primitive::Arc {
@@ -87,26 +79,26 @@ impl<D: Float> Arc<D> {
     /// * `end_angle`: Ending angle in **Radians**.
     ///
     /// Note: The shape is invisible by default. You must call `.fill()` or `.stroke()` to render it.
-    pub const fn new(
+    pub fn new(
         center: PlotPoint<D>,
-        radius: Measure<D>,
-        start_angle: f32,
-        end_angle: f32,
+        radius: impl Into<Radius<Measure<D>>>,
+        start_angle: impl Into<Radians>,
+        end_angle: impl Into<Radians>,
     ) -> Self {
         Self {
             center,
-            radius,
-            inner_radius: Measure::Screen(0.0),
-            start_angle,
-            end_angle,
+            radius: radius.into(),
+            inner_radius: Radius(Measure::Screen(0.0)),
+            start_angle: start_angle.into(),
+            end_angle: end_angle.into(),
             fill: None,
             stroke: None,
         }
     }
 
     /// Sets the inner radius of the arc, creating a donut sector.
-    pub const fn inner_radius(mut self, radius: Measure<D>) -> Self {
-        self.inner_radius = radius;
+    pub fn inner_radius(mut self, radius: impl Into<Radius<Measure<D>>>) -> Self {
+        self.inner_radius = radius.into();
         self
     }
 

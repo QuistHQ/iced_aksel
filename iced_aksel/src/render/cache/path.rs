@@ -137,13 +137,13 @@ impl<Renderer: crate::render::Renderer> PathCache<Renderer> {
                 let path = Path::new(|builder| {
                     // Convert degrees to radians and adjust so 0 deg = North (Up)
                     // Standard trig 0 is East (Right). North is -90 deg (-PI/2).
-                    let start_angle = (rotation - 90.0).to_radians();
+                    let start_angle = rotation.0;
                     let step = (std::f32::consts::PI * 2.0) / (*vertices as f32);
 
                     for i in 0..count {
                         let angle = start_angle + (step * i as f32);
-                        let px = center.x + radius * angle.cos();
-                        let py = center.y + radius * angle.sin();
+                        let px = center.x + radius.0 * angle.cos();
+                        let py = center.y + radius.0 * angle.sin();
                         let point = Point::new(px, py);
 
                         if i == 0 {
@@ -433,29 +433,31 @@ impl<Renderer: crate::render::Renderer> PathCache<Renderer> {
                 let path = Path::new(|builder| {
                     // A. Draw Outer Arc (Clockwise)
                     let start_outer = Point::new(
-                        center.x + radius_outer * start_angle.cos(),
-                        center.y + radius_outer * start_angle.sin(),
+                        center.x + radius_outer.0 * start_angle.0.cos(),
+                        center.y + radius_outer.0 * start_angle.0.sin(),
                     );
                     builder.move_to(start_outer);
 
                     add_arc_using_beziers(
                         builder,
                         *center,
-                        *radius_outer,
-                        *start_angle,
-                        *end_angle,
+                        radius_outer.0,
+                        start_angle.0,
+                        end_angle.0,
                         true, // Clockwise
                     );
 
+                    let radius_inner = radius_inner.map(|r| r.0).unwrap_or(0.0);
+
                     // B. Draw Inner Arc (Hole vs Pie)
-                    if *radius_inner < 0.5 {
+                    if radius_inner < 0.5 {
                         // Pie Slice: Just go to center
                         builder.line_to(*center);
                     } else {
                         // Donut: Line to inner end
                         let end_inner = Point::new(
-                            center.x + radius_inner * end_angle.cos(),
-                            center.y + radius_inner * end_angle.sin(),
+                            center.x + radius_inner * end_angle.0.cos(),
+                            center.y + radius_inner * end_angle.0.sin(),
                         );
                         builder.line_to(end_inner);
 
@@ -464,9 +466,9 @@ impl<Renderer: crate::render::Renderer> PathCache<Renderer> {
                         add_arc_using_beziers(
                             builder,
                             *center,
-                            *radius_inner,
-                            *end_angle,
-                            *start_angle,
+                            radius_inner,
+                            end_angle.0,
+                            start_angle.0,
                             false,
                         );
                     }
@@ -695,6 +697,12 @@ fn add_arc_using_beziers(
     }
 
     let num_segments = (total_sweep.abs() / (std::f32::consts::PI / 2.0)).ceil() as usize;
+
+    // No segments, so we don't draw
+    if num_segments == 0 {
+        return;
+    }
+
     let step = total_sweep / num_segments as f32;
 
     for i in 0..num_segments {

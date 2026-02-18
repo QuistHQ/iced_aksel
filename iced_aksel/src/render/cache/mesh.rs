@@ -164,7 +164,7 @@ impl MeshCache {
                 stroke,
             } => {
                 tessellator.draw_polygon(
-                    buffer, *center, *radius, *vertices, *rotation, *fill, *stroke,
+                    buffer, *center, radius.0, *vertices, rotation.0, *fill, *stroke,
                 );
             }
             Primitive::Line {
@@ -292,10 +292,10 @@ impl MeshCache {
                     buffer,
                     center.x,
                     center.y,
-                    *radius_inner,
-                    *radius_outer,
-                    *start_angle,
-                    *end_angle,
+                    radius_inner.map(|r| r.0).unwrap_or(0.0),
+                    radius_outer.0,
+                    start_angle.0,
+                    end_angle.0,
                     *fill,
                     *stroke,
                 );
@@ -332,7 +332,7 @@ impl MeshCache {
                         content: content.clone(),
                         position: *position,
                         size: *size,
-                        rotation: *rotation,
+                        rotation: rotation.0,
                         horizontal_alignment: *horizontal_alignment,
                         vertical_alignment: *vertical_alignment,
                         fill: *fill,

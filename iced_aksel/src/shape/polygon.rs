@@ -1,6 +1,6 @@
-use crate::{Measure, Shape, Stroke, plot, render::Primitive};
+use crate::{Measure, Shape, Stroke, plot, radii::Radius, render::Primitive};
 use aksel::{Float, PlotPoint};
-use iced_core::{Color, Point};
+use iced_core::{Color, Point, Radians};
 
 /// A primitive representing a regular N-sided shape (Hexagon, Octagon, etc.).
 ///
@@ -21,9 +21,9 @@ use iced_core::{Color, Point};
 #[derive(Debug, Clone)]
 pub struct Polygon<D> {
     center: PlotPoint<D>,
-    radius: Measure<D>,
+    radius: Radius<Measure<D>>,
     vertices: u16,
-    rotation: f32,
+    rotation: Radians,
     fill: Option<Color>,
     stroke: Option<Stroke<D>>,
 }
@@ -47,14 +47,9 @@ impl<D: Float, R: crate::Renderer> Shape<D, R> for Polygon<D> {
 
         // For Polygons, we treat radius isotropically. We take the minimum scale
         // to ensure the polygon is not distorted if axes have different scales.
-        let radius_x = radius.resolve_x(ctx);
-        let radius_y = radius.resolve_y(ctx);
-        let radius = radius_x.min(radius_y);
-
-        if radius < 0.5 {
-            return;
-        }
-
+        let Some(radius) = radius.resolve_isotropic(ctx) else {
+            return; // No radius, no rendering!
+        };
         let stroke = stroke.map(|s| s.resolve(ctx));
 
         ctx.add_primitive(Primitive::Polygon {
@@ -72,21 +67,21 @@ impl<D: Float> Polygon<D> {
     /// Creates a new regular `Polygon` with a center, radius, and number of vertices.
     ///
     /// Note: The shape is invisible by default. You must call `.fill()` or `.stroke()` to render it.
-    pub const fn new(center: PlotPoint<D>, radius: Measure<D>, vertices: u16) -> Self {
+    pub fn new(center: PlotPoint<D>, radius: impl Into<Radius<Measure<D>>>, vertices: u16) -> Self {
         Self {
             center,
-            radius,
+            radius: radius.into(),
             vertices,
-            rotation: 0.0,
+            rotation: Radians(0.0),
             fill: None,
             stroke: None,
         }
     }
 
-    /// Sets the rotation of the polygon in **degrees**.
+    /// Sets the rotation of the polygon in **radians**.
     /// `0.0` means the first vertex is at the top (North/-90 degrees).
-    pub const fn rotation(mut self, degrees: f32) -> Self {
-        self.rotation = degrees;
+    pub fn rotation(mut self, radians: impl Into<Radians>) -> Self {
+        self.rotation = radians.into();
         self
     }
 

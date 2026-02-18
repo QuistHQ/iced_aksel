@@ -1,15 +1,12 @@
-use crate::{radii::ResolvedRadii, stroke::ResolvedStroke};
+use crate::{
+    radii::{ResolvedRadii, ResolvedRadius},
+    stroke::ResolvedStroke,
+};
 use iced_core::{
-    Color, Font, Pixels, Point, Radians, Rectangle, Size, Vector,
+    Color, Font, Pixels, Point, Radians, Rectangle, Size,
     alignment::{Horizontal, Vertical},
     text::{LineHeight, Wrapping},
 };
-use iced_graphics::geometry::{self, path::arc::Elliptical};
-use iced_graphics::geometry::{
-    Path,
-    path::{self, Builder},
-};
-use std::f32::consts::PI;
 
 /// Controls whether a line is extended to the edges of the plot bounds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,9 +49,9 @@ pub enum Primitive {
     },
     Polygon {
         center: Point,
-        radius: f32,
+        radius: ResolvedRadius,
         vertices: u16,
-        rotation: f32,
+        rotation: Radians,
         fill: Option<Color>,
         stroke: Option<ResolvedStroke>,
     },
@@ -101,10 +98,10 @@ pub enum Primitive {
     },
     Arc {
         center: Point,
-        radius_inner: f32,
-        radius_outer: f32,
-        start_angle: f32,
-        end_angle: f32,
+        radius_inner: Option<ResolvedRadius>,
+        radius_outer: ResolvedRadius,
+        start_angle: Radians,
+        end_angle: Radians,
         fill: Option<Color>,
         stroke: Option<ResolvedStroke>,
     },
@@ -118,7 +115,7 @@ pub enum Primitive {
         content: String,
         position: Point,
         size: Pixels,
-        rotation: f32,
+        rotation: Radians,
         horizontal_alignment: Horizontal,
         vertical_alignment: Vertical,
         fill: Color,

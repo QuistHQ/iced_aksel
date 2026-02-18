@@ -216,14 +216,9 @@ impl Tessellator {
         stroke: Option<ResolvedStroke>,
     ) {
         let max_radius = radii.x.max(radii.y);
-
-        // Culling: Too small to be seen
-        if max_radius < 0.5 {
-            return;
-        }
+        let is_consumed = stroke.is_some_and(|stroke| stroke.thickness >= max_radius);
 
         let segments = self.resolve_lod(max_radius);
-        let is_consumed = stroke.is_some_and(|stroke| stroke.thickness >= max_radius);
 
         if is_consumed {
             if let Some(stroke) = stroke {
@@ -395,9 +390,10 @@ impl Tessellator {
         fill: Option<Color>,
         stroke: Option<ResolvedStroke>,
     ) {
-        if vertices < 3 || radius < 0.5 {
+        if vertices < 3 {
             return;
         }
+
         let outer_points = generate_ring(center, radius, vertices, rotation);
 
         if let Some(color) = fill {
@@ -781,10 +777,6 @@ impl Tessellator {
         fill: Option<Color>,
         stroke: Option<ResolvedStroke>,
     ) {
-        if radius_outer < 0.5 {
-            return;
-        }
-
         let arc_length = (end_angle - start_angle).abs() * radius_outer;
         let segments = self.resolve_lod_custom(arc_length);
 

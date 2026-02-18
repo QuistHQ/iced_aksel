@@ -3,7 +3,7 @@ use crate::{Measure, Shape, plot};
 use aksel::{Float, PlotPoint};
 use iced_core::text::LineHeight;
 use iced_core::{
-    Color, Font, Point, Size,
+    Color, Font, Point, Radians, Size,
     alignment::{Horizontal, Vertical},
     text::Wrapping,
 };
@@ -87,7 +87,7 @@ pub struct Label<D> {
     /// Font-size of the label
     pub size: Measure<D>,
     /// Text rotation in radians
-    pub rotation: f32, // Radians
+    pub rotation: Radians,
     /// Horizontal alignment
     pub horizontal_alignment: Horizontal,
     /// Vertical alignment
@@ -165,7 +165,7 @@ impl<D: Float> Label<D> {
             content: content.to_string(),
             position,
             size: Measure::Screen(12.0),
-            rotation: 0.0,
+            rotation: Radians(0.0),
             horizontal_alignment: Horizontal::Left,
             vertical_alignment: Vertical::Center,
             fill: Color::BLACK,
@@ -220,8 +220,8 @@ impl<D: Float> Label<D> {
     }
 
     /// Sets the rotation of the text in radians.
-    pub const fn rotation(mut self, radians: f32) -> Self {
-        self.rotation = radians;
+    pub fn rotation(mut self, radians: impl Into<Radians>) -> Self {
+        self.rotation = radians.into();
         self
     }
 

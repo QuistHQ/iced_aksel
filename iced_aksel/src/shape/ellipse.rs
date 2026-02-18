@@ -59,9 +59,12 @@ impl<D: Float, R: crate::Renderer> Shape<D, R> for Ellipse<D> {
         } = self;
 
         let center = Point::new(ctx.x_to_screen(&center.x), ctx.y_to_screen(&center.y));
-        let radii = radii.resolve(ctx);
-
         let stroke = stroke.map(|s| s.resolve(ctx));
+
+        // If the radii can't be resolved, we don't render anything
+        let Some(radii) = radii.resolve(ctx) else {
+            return;
+        };
 
         ctx.add_primitive(Primitive::Ellipse {
             center,
