@@ -1064,14 +1064,14 @@ impl Tessellator {
                 &mut writer,
             ),
             StrokeStyle::Dashed { dash, gap } => {
-                let dashes = [stroke.thickness * dash, stroke.thickness * gap];
+                let dashes = [*dash, *gap];
                 let dashed = DashedPolyline::new(points.into_iter(), &dashes);
                 self.complex
                     .stroke
                     .tessellate(dashed, &options, &mut writer)
             }
             StrokeStyle::Dotted { gap } => {
-                let dots = [stroke.thickness, stroke.thickness * gap];
+                let dots = [stroke.thickness, *gap];
                 let dashed = DashedPolyline::new(points.into_iter(), &dots);
                 self.complex
                     .stroke
