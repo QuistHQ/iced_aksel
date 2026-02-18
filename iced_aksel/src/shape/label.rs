@@ -123,7 +123,7 @@ impl<D: Float + Debug, R: crate::Renderer> Shape<D, R> for Label<D> {
             quality,
             letter_spacing, // TODO: Use this!
             font,
-            line_height, // TODO: Use this!
+            line_height,
             bounds,
             wrapping,
         } = self;
@@ -149,7 +149,7 @@ impl<D: Float + Debug, R: crate::Renderer> Shape<D, R> for Label<D> {
             fill,
             quality,
             font,
-            line_height: LineHeight::Relative(self.line_height),
+            line_height: LineHeight::Relative(line_height),
             bounds,
             wrapping,
         });
