@@ -1,3 +1,5 @@
+//! Radii type implementation
+
 use std::ops::{Add, Div, Mul, Sub};
 
 use crate::Measure;
@@ -6,7 +8,9 @@ use aksel::{Float, Transform};
 /// A radius that covers both the x and y axes
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Radii<T = f32> {
+    /// The radius on the x-axis
     pub x: T,
+    /// The radius on the y-axis
     pub y: T,
 }
 
@@ -37,6 +41,7 @@ impl<T> Radii<T> {
 }
 
 impl<D: Float> Radii<Measure<D>> {
+    /// Resolves the [`Radii`] using the current plot [`Transform`]
     pub fn resolve(&self, transform: &Transform<D, f32, f32>) -> ResolvedRadii {
         ResolvedRadii {
             x: self.x.resolve_x(transform),
@@ -159,21 +164,26 @@ impl<T: Sub<Output = T>> Sub<Self> for Radii<T> {
 
 /// A radii with all measurements resolved to screen-space pixels.
 ///
-/// Produced by converting a [`Radii`] through the current plot transform.
+/// Produced by converting a [`Radii<Measure<T>>`](Radii) through a plot transform, or constructed
+/// manually from pixel-values.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct ResolvedRadii {
+    /// Resolved value of the radius on the x-axis in pixels
     pub x: f32,
+    /// Resolved value of the radius on the y-axis in pixels
     pub y: f32,
 }
 
 impl ResolvedRadii {
-    pub fn is_uniform(&self) -> bool {
+    /// Checks wether or not the Radii values are close to equal (Accounting for sub-pixel
+    /// tolerance)
+    pub const fn is_uniform(&self) -> bool {
         (self.x - self.y).abs() < 0.001
     }
 
     /// Returns a new Radii, calling the [`f32::max`] method on the x and y values with the `other`
     /// parameter
-    pub fn max(self, other: f32) -> Self {
+    pub const fn max(self, other: f32) -> Self {
         Self {
             x: self.x.max(other),
             y: self.y.max(other),

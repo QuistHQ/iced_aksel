@@ -28,14 +28,14 @@ pub enum StrokeStyle {
     /// ```rust
     /// use iced_aksel::stroke::StrokeStyle;
     /// let style = StrokeStyle::Dashed {
-    ///     dash: 5.0,
-    ///     gap: 5.0,
+    ///     dash: 5.0, // 5px dashes
+    ///     gap: 5.0, // 5px gaps
     /// };
     /// ```
     Dashed {
-        /// Length of the dashes
+        /// Length of the dashes **in screen space-pixels**
         dash: f32, // TODO: Convert to Measure!
-        /// Length of the gaps in-between
+        /// Length of the gaps in-between **in screen-space pixels**
         gap: f32, // TODO: Convert to Measure!
     },
 
@@ -46,11 +46,11 @@ pub enum StrokeStyle {
     /// ```rust
     /// use iced_aksel::stroke::StrokeStyle;
     /// let style = StrokeStyle::Dotted {
-    ///    gap: 5.0,
+    ///    gap: 5.0, // 5px gaps
     /// };
     /// ```
     Dotted {
-        /// Length of the gap between dots
+        /// Length of the gap between dots **in screen-space pixels**
         gap: f32, // TODO: Convert to Measure!
     },
 }
