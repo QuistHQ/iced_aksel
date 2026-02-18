@@ -99,7 +99,7 @@ pub struct Label<D> {
     /// Letter spacing for the text
     ///
     /// TODO: Unused - Add this to rendering implementation!
-    pub letter_spacing: f32,
+    // pub letter_spacing: f32,
     /// Font override - Defaults to the default font of the application
     pub font: Option<Font>,
     /// Line height for the text (How much space **between** lines)
@@ -121,7 +121,7 @@ impl<D: Float + Debug, R: crate::Renderer> Shape<D, R> for Label<D> {
             vertical_alignment,
             fill,
             quality,
-            letter_spacing, // TODO: Use this!
+            // letter_spacing, // TODO: Use this!
             font,
             line_height,
             bounds,
@@ -170,7 +170,7 @@ impl<D: Float> Label<D> {
             vertical_alignment: Vertical::Center,
             fill: Color::BLACK,
             quality: None,
-            letter_spacing: 1.2,
+            // letter_spacing: 1.2,
             font: None,
             line_height: 1.0,
             bounds: Bounds::INFINITE,
