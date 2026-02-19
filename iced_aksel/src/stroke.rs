@@ -160,6 +160,16 @@ impl<D: Float> Stroke<D> {
 
                 let sx = screen_bounds.width / x_span;
                 let sy = screen_bounds.height / y_span;
+
+                // Guard against infinite thickness
+                if sx.is_infinite() || sy.is_infinite() {
+                    return ResolvedStroke {
+                        fill,
+                        thickness: 0.0,
+                        style,
+                    };
+                }
+
                 let stroke_scale = (sx.abs() * sy.abs()).sqrt();
                 p.to_f32().expect("plot to pixel mapping") * stroke_scale
             }
