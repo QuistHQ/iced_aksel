@@ -1000,7 +1000,6 @@ impl<D: Float, Theme> Axis<D, Theme> {
         let thickness = line.width.0;
         let fill = line.color;
 
-
         match orientation {
             Orientation::Horizontal => {
                 let x = axis_bounds.width.mul_add(pos_norm, axis_bounds.x);

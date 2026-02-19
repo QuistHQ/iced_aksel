@@ -9,7 +9,7 @@ use iced_graphics::{color::pack, mesh::SolidVertex2D};
 /// Writes a polygon to represent a circular dot.
 ///
 /// Automatically scales the Level of Detail (LOD). For tiny dots, it uses a highly
-/// optimized 8-sided polygon. For larger dots, it dynamically calculates the 
+/// optimized 8-sided polygon. For larger dots, it dynamically calculates the
 /// required segments for a smooth circle.
 #[inline]
 pub fn draw_dot(buffer: &mut MeshData, center: Point, radius: f32, color: Color) {
@@ -23,28 +23,71 @@ pub fn draw_dot(buffer: &mut MeshData, center: Point, radius: f32, color: Color)
     if radius <= 3.0 {
         let diag = radius * std::f32::consts::FRAC_1_SQRT_2;
 
-        mesh.vertices.push(SolidVertex2D { position: [center.x, center.y], color: packed_color });
+        mesh.vertices.push(SolidVertex2D {
+            position: [center.x, center.y],
+            color: packed_color,
+        });
 
         mesh.vertices.extend_from_slice(&[
-            SolidVertex2D { position: [center.x + radius, center.y], color: packed_color },
-            SolidVertex2D { position: [center.x + diag, center.y + diag], color: packed_color },
-            SolidVertex2D { position: [center.x, center.y + radius], color: packed_color },
-            SolidVertex2D { position: [center.x - diag, center.y + diag], color: packed_color },
-            SolidVertex2D { position: [center.x - radius, center.y], color: packed_color },
-            SolidVertex2D { position: [center.x - diag, center.y - diag], color: packed_color },
-            SolidVertex2D { position: [center.x, center.y - radius], color: packed_color },
-            SolidVertex2D { position: [center.x + diag, center.y - diag], color: packed_color },
+            SolidVertex2D {
+                position: [center.x + radius, center.y],
+                color: packed_color,
+            },
+            SolidVertex2D {
+                position: [center.x + diag, center.y + diag],
+                color: packed_color,
+            },
+            SolidVertex2D {
+                position: [center.x, center.y + radius],
+                color: packed_color,
+            },
+            SolidVertex2D {
+                position: [center.x - diag, center.y + diag],
+                color: packed_color,
+            },
+            SolidVertex2D {
+                position: [center.x - radius, center.y],
+                color: packed_color,
+            },
+            SolidVertex2D {
+                position: [center.x - diag, center.y - diag],
+                color: packed_color,
+            },
+            SolidVertex2D {
+                position: [center.x, center.y - radius],
+                color: packed_color,
+            },
+            SolidVertex2D {
+                position: [center.x + diag, center.y - diag],
+                color: packed_color,
+            },
         ]);
 
         mesh.indices.extend_from_slice(&[
-            start_index, start_index + 1, start_index + 2,
-            start_index, start_index + 2, start_index + 3,
-            start_index, start_index + 3, start_index + 4,
-            start_index, start_index + 4, start_index + 5,
-            start_index, start_index + 5, start_index + 6,
-            start_index, start_index + 6, start_index + 7,
-            start_index, start_index + 7, start_index + 8,
-            start_index, start_index + 8, start_index + 1,
+            start_index,
+            start_index + 1,
+            start_index + 2,
+            start_index,
+            start_index + 2,
+            start_index + 3,
+            start_index,
+            start_index + 3,
+            start_index + 4,
+            start_index,
+            start_index + 4,
+            start_index + 5,
+            start_index,
+            start_index + 5,
+            start_index + 6,
+            start_index,
+            start_index + 6,
+            start_index + 7,
+            start_index,
+            start_index + 7,
+            start_index + 8,
+            start_index,
+            start_index + 8,
+            start_index + 1,
         ]);
         return;
     }
@@ -53,7 +96,7 @@ pub fn draw_dot(buffer: &mut MeshData, center: Point, radius: f32, color: Color)
     // DYNAMIC PATH: Large dots (> 6px diameter)
     // =========================================================================
 
-    // Calculate segments based on circumference. 
+    // Calculate segments based on circumference.
     // We clamp between 12 and 64 segments to prevent insane vertex bloat on massive dots.
     let segments = (radius * std::f32::consts::PI).clamp(12.0, 64.0) as usize;
     let step_angle = std::f32::consts::TAU / segments as f32;
@@ -69,10 +112,7 @@ pub fn draw_dot(buffer: &mut MeshData, center: Point, radius: f32, color: Color)
         let theta = i as f32 * step_angle;
         let (sin, cos) = theta.sin_cos();
         mesh.vertices.push(SolidVertex2D {
-            position: [
-                cos.mul_add(radius, center.x),
-                sin.mul_add(radius, center.y),
-            ],
+            position: [cos.mul_add(radius, center.x), sin.mul_add(radius, center.y)],
             color: packed_color,
         });
     }
@@ -81,11 +121,8 @@ pub fn draw_dot(buffer: &mut MeshData, center: Point, radius: f32, color: Color)
     for i in 0..segments {
         let current = (i + 1) as u32;
         let next = if i == segments - 1 { 1 } else { current + 1 };
-        mesh.indices.extend_from_slice(&[
-            start_index,
-            start_index + current,
-            start_index + next
-        ]);
+        mesh.indices
+            .extend_from_slice(&[start_index, start_index + current, start_index + next]);
     }
 }
 
