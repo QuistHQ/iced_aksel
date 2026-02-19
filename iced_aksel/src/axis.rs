@@ -318,7 +318,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
         style: &Style,
         layout: Layout<'_>,
         plot_bounds: &Rectangle,
-        buffer: &mut RenderCache<Renderer>,
+        cache: &mut RenderCache<Renderer>,
         viewport: &Rectangle,
     ) where
         Renderer: crate::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
@@ -367,11 +367,11 @@ impl<D: Float, Theme> Axis<D, Theme> {
             };
 
             // Draw Grid Lines (Global style + local config)
-            if buffer.needs_redraw()
+            if cache.needs_redraw()
                 && self.render_grid
                 && let Some(line) = grid_line
             {
-                self.draw_grid_line(line, &bounds, plot_bounds, buffer, pos_norm);
+                self.draw_grid_line(line, &bounds, plot_bounds, cache, pos_norm);
             }
 
             if self.invisible {
@@ -985,13 +985,13 @@ impl<D: Float, Theme> Axis<D, Theme> {
         }
     }
 
-    /// Renders a single grid line into the buffer.
+    /// Renders a single grid line into the cache.
     fn draw_grid_line<Renderer>(
         &self,
         line: GridLine,
         axis_bounds: &Rectangle,
         plot_bounds: &Rectangle,
-        buffer: &mut RenderCache<Renderer>,
+        cache: &mut RenderCache<Renderer>,
         pos_norm: f32,
     ) where
         Renderer: crate::Renderer,
@@ -1008,7 +1008,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
                     gap_length,
                 }) = line.dashed
                 {
-                    buffer.add_primitive(Primitive::VerticalLine {
+                    cache.add_primitive(Primitive::VerticalLine {
                         x,
                         y_start: plot_bounds.y,
                         y_end: plot_bounds.y + plot_bounds.height,
@@ -1023,7 +1023,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
                         snap: true,
                     });
                 } else {
-                    buffer.add_primitive(Primitive::VerticalLine {
+                    cache.add_primitive(Primitive::VerticalLine {
                         x,
                         y_start: plot_bounds.y,
                         y_end: plot_bounds.y + plot_bounds.height,
@@ -1043,7 +1043,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
                     gap_length,
                 }) = line.dashed
                 {
-                    buffer.add_primitive(Primitive::HorizontalLine {
+                    cache.add_primitive(Primitive::HorizontalLine {
                         y,
                         x_start: plot_bounds.x,
                         x_end: plot_bounds.x + plot_bounds.width,
@@ -1058,7 +1058,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
                         snap: true,
                     });
                 } else {
-                    buffer.add_primitive(Primitive::HorizontalLine {
+                    cache.add_primitive(Primitive::HorizontalLine {
                         y,
                         x_start: plot_bounds.x,
                         x_end: plot_bounds.x + plot_bounds.width,

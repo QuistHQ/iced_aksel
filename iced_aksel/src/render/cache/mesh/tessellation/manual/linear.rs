@@ -465,6 +465,11 @@ pub fn draw_horizontal_dotted_line(
     gap_length: f32,
     snap: bool,
 ) {
+    // Prevent inifnite loops
+    if gap_length < 0.0 || width <= 0.0 {
+        return;
+    }
+
     let radius = width / 2.0;
     let spacing = width + gap_length; // Space taken by the dot + the gap
 
@@ -529,7 +534,7 @@ pub fn draw_dotted_path(
     gap: f32,
     color: Color,
 ) {
-    if points.is_empty() {
+    if points.is_empty() || gap < 0.0 || width <= 0.0 {
         return;
     }
 

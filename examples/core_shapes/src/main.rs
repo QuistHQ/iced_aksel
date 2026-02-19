@@ -189,7 +189,6 @@ impl PlotData<f64> for GridData {
                     PlotPoint::new(c.x + 10.0, c.y - 20.0),
                     PlotPoint::new(c.x + 40.0, c.y + 20.0),
                 ],
-                // Fixed: Moved stroke inside new()
                 Stroke::new(Color::from_rgb(1.0, 0.5, 0.8), Measure::Screen(2.0)),
             )
             .arrow_start(true)

@@ -275,6 +275,7 @@ impl MeshCache {
             } => {
                 tessellator.draw_polyline(
                     buffer,
+                    // TODO: Could we not take in an owned value for drawing polylines?
                     points.clone(),
                     *stroke,
                     *clip_bounds,

@@ -1,14 +1,4 @@
-//! The central geometry collector for the rendering pipeline.
-//!
-//! # Role in Architecture
-//! The `MeshBuffer` acts as a "Funnel". It accepts triangles from various sources:
-//! * The Text Engine (Glyphs)
-//! * The Shape Engine (Circles, Rectangles)
-//! * The Line Engine (Polylines)
-//!
-//! It bundles all these tiny pieces of geometry into massive batches. This is critical for performance
-//! because talking to the GPU is expensive. Sending 10,000 triangles in one call is much faster
-//! than making 10,000 calls of 1 triangle each.
+//! The cache for the rendering pipeline.
 
 use super::{Primitive, Quality};
 use iced_core::Rectangle;

@@ -34,7 +34,21 @@ impl<'a, AxisId: Hash + Eq, D: Float, R: crate::Renderer, Theme> Layer<'a, AxisI
     }
 }
 
-pub static NEXT_LAYER_ID: AtomicU64 = AtomicU64::new(1);
+static NEXT_LAYER_ID: AtomicU64 = AtomicU64::new(1);
+
+/// An ID for a layer
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct LayerId(u64);
+
+impl LayerId {
+    /// Creates a new layer id.
+    ///
+    /// This ensures no collision will occur, since we increment the underlying u64 atomically each
+    /// time we create a new id.
+    pub fn new() -> LayerId {
+        Self(NEXT_LAYER_ID.fetch_add(1, Ordering::Relaxed))
+    }
+}
 
 /// A versioned wrapper that caches [`PlotData`](crate::PlotData) across frames.
 ///
@@ -64,7 +78,7 @@ pub static NEXT_LAYER_ID: AtomicU64 = AtomicU64::new(1);
 pub struct Cached<T> {
     data: T,
     version: u64,
-    uid: u64,
+    uid: LayerId,
 }
 
 impl<T> Cached<T> {
@@ -73,7 +87,7 @@ impl<T> Cached<T> {
         Self {
             data,
             version: 1,
-            uid: NEXT_LAYER_ID.fetch_add(1, Ordering::Relaxed),
+            uid: LayerId::new(),
         }
     }
 
@@ -103,7 +117,7 @@ impl<D: Float, Renderer: crate::Renderer, T: PlotData<D, Renderer>> PlotData<D, 
         Some(self.version)
     }
 
-    fn id(&self) -> Option<u64> {
+    fn id(&self) -> Option<LayerId> {
         Some(self.uid)
     }
 }

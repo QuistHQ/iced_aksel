@@ -90,7 +90,7 @@ impl<T> Radii<T> {
         }
     }
 
-    /// Crates a new *uniform* radii (X and Y values are the exact same)
+    /// Creates a new *uniform* radii (X and Y values are the exact same)
     pub const fn uniform(radius: T) -> Self
     where
         T: Copy,

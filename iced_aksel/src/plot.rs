@@ -6,6 +6,7 @@
 use std::ops::Deref;
 
 use crate::{
+    layer::LayerId,
     render::{Primitive, RenderCache},
     shape::Shape,
 };
@@ -76,18 +77,15 @@ where
         None
     }
 
-    /// The id of the layer. Primarily used by the [`Cached`](crate::Cached) struct
-    ///
-    /// To avoid conflicts, if you implement this yourself, use the
-    /// [`NEXT_LAYER_ID`](crate::NEXT_LAYER_ID) to generate the
-    fn id(&self) -> Option<u64> {
+    /// The id of the layer. Primarily used by the [`Cached`](crate::Cached) struct.
+    fn id(&self) -> Option<LayerId> {
         None
     }
 }
 
 /// Internal rendering context for shapes.
 ///
-/// Manages layer ordering and cacheing for efficient rendering.
+/// Manages layer ordering and caching for efficient rendering.
 pub struct Context<'a, D: Float, Renderer: crate::Renderer = iced_renderer::Renderer> {
     transform: &'a Transform<'a, D, f32, f32>,
     renderer: &'a mut Renderer,

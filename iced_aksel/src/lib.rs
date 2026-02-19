@@ -111,7 +111,7 @@ pub mod stroke;
 pub mod style;
 
 pub use axis::Axis;
-pub use layer::Cached;
+pub use layer::{Cached, LayerId};
 pub use measure::Measure;
 pub use plot::{Plot, PlotData};
 pub use radii::Radii;
@@ -179,7 +179,7 @@ type AxisScrollHandler<AxisId, Message> = Box<dyn Fn(AxisId, f32, ScrollDelta) -
 #[derive(Debug, PartialEq)]
 struct LayerIdentifier {
     id: Option<u64>,
-    version: Option<u64>,
+    version: Option<LayerId>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -958,7 +958,10 @@ where
         Size::new(self.width, self.height)
     }
 
-    fn layout(&mut self, _tree: &mut Tree, _renderer: &Renderer, limits: &Limits) -> Node {
+    fn layout(&mut self, tree: &mut Tree, renderer: &Renderer, limits: &Limits) -> Node {
+        let memory: &mut Memory<AxisId, Renderer> = tree.state.downcast_mut();
+        memory.make_sure_cache_is_initialized(renderer, self.quality);
+
         let bounds = limits.resolve(self.width, self.height, Size::ZERO);
 
         let axis_count = self.state.axes().len();
@@ -1034,14 +1037,11 @@ where
         event: &Event,
         layout: layout::Layout<'_>,
         cursor: mouse::Cursor,
-        renderer: &Renderer,
+        _renderer: &Renderer,
         _clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
     ) {
-        let memory: &mut Memory<AxisId, Renderer> = tree.state.downcast_mut();
-        memory.make_sure_buffer_is_initialized(renderer, self.quality);
-
         if !self.errors.is_empty()
             && let Some(handler) = &self.on_error
         {
@@ -1073,11 +1073,18 @@ where
                 .collect(),
         };
 
+        let memory: &mut Memory<AxisId, Renderer> = tree.state.downcast_mut();
+
         // Check if we need to redraw
         if force_redraw || memory.last_signature.as_ref() != Some(&current_signature) {
-            memory.get_buffer_mut().clear();
             // Update signature
             memory.last_signature = Some(current_signature);
+
+            // Get and clear the cache
+            let Some(mut cache) = memory.get_cache_mut() else {
+                return;
+            };
+            cache.clear();
         }
 
         // Only handle events if the cursor is near the chart
@@ -1172,8 +1179,10 @@ where
         // Retrieve the Memory from the Tree directly
         let memory = tree.state.downcast_ref::<Memory<AxisId, Renderer>>();
 
-        // Get buffer from memory
-        let mut buffer = memory.get_buffer_mut();
+        // Get cache from memory
+        let Some(mut cache) = memory.get_cache_mut() else {
+            return;
+        };
 
         // Draw axes
         for (i, (_, axis)) in self.state.axes().iter().enumerate() {
@@ -1187,7 +1196,7 @@ where
                 &style,
                 axis_layout,
                 &plot_bounds,
-                &mut buffer,
+                &mut cache,
                 &bounds,
             );
         }
@@ -1195,15 +1204,15 @@ where
         // Connect axis spines
         self.draw_spine_corners(layout, &style, plot_bounds, renderer);
 
-        // Draw data layers if the buffer needs redraw
-        if buffer.needs_redraw() {
+        // Draw data layers if the cache needs redraw
+        if cache.needs_redraw() {
             for layer in &self.layers {
                 // These axes are guaranteed to exist because of `verify_layer` check
                 let x_axis = self.state.axis(&layer.horizontal_axis_id);
                 let y_axis = self.state.axis(&layer.vertical_axis_id);
                 let transform = Transform::new(&screen_rect, x_axis.deref(), y_axis.deref());
 
-                let mut plot: Plot<Domain, Renderer> = Plot::new(renderer, &mut buffer, &transform);
+                let mut plot: Plot<Domain, Renderer> = Plot::new(renderer, &mut cache, &transform);
 
                 // User code draws shapes into the plot here
                 layer.items.draw(&mut plot, theme);
@@ -1240,7 +1249,7 @@ where
         }
 
         // Draw the currently cached primitives
-        buffer.draw(renderer, &plot_bounds);
+        cache.draw(renderer, &plot_bounds);
     }
 }
 

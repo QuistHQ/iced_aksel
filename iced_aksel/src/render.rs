@@ -32,8 +32,8 @@ pub enum Quality {
 }
 
 impl Quality {
-    /// Converts the quality setting into a tessellation tolerance value.
-    /// Lower values mean higher precision (more triangles).
+    /// Converts the quality setting into a text tolerance value.
+    /// Lower values mean higher precision (smoother text outlines).
     pub(crate) const fn to_text_tolerance(self) -> f32 {
         match self {
             Self::High => 0.2,
@@ -43,6 +43,8 @@ impl Quality {
         }
     }
 
+    /// Converts the quality setting into a tessellation tolerance value.
+    /// Higher values mean higher precision (more triangles)
     pub(crate) const fn to_tessellation_quality(self) -> f32 {
         match self {
             Self::High => 2.0,
@@ -62,8 +64,6 @@ pub enum Backend {
 }
 
 /// Renderer requirements for plotting.
-///
-/// This trait is automatically implemented for any renderer that satisfies the requirements.
 pub trait Renderer<Font = iced_core::Font>:
     iced_core::Renderer
     + iced_core::text::Renderer<Font = Font>

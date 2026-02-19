@@ -216,7 +216,9 @@ impl Tessellator {
         stroke: Option<ResolvedStroke>,
     ) {
         let max_radius = radii.x.max(radii.y);
-        let is_consumed = stroke.is_some_and(|stroke| stroke.thickness >= max_radius);
+        let is_consumed = stroke
+            .as_ref()
+            .is_some_and(|stroke| stroke.thickness >= max_radius);
 
         let segments = self.resolve_lod(max_radius);
 
@@ -299,7 +301,7 @@ impl Tessellator {
         };
 
         let (inner_p1, inner_p2, inner_p3, is_consumed) =
-            stroke.map_or((p1, p2, p3, false), |stroke| {
+            stroke.as_ref().map_or((p1, p2, p3, false), |stroke| {
                 let dist_1 = p1.distance(p2);
                 let dist_2 = p2.distance(p3);
                 let dist_3 = p3.distance(p1);
@@ -798,7 +800,9 @@ impl Tessellator {
         let thickness = radius_outer - radius_inner;
 
         // If stroke is thicker than the arc itself, just fill the whole arc
-        let is_consumed = stroke.is_some_and(|stroke| stroke.thickness >= thickness);
+        let is_consumed = stroke
+            .as_ref()
+            .is_some_and(|stroke| stroke.thickness >= thickness);
 
         if is_consumed {
             if let Some(stroke) = stroke {
