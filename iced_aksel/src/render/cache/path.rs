@@ -637,12 +637,6 @@ fn add_arc_using_beziers(
         );
         let c2 = Point::new(p3.x + k * current_end.sin(), p3.y - k * current_end.cos());
 
-        // Draw
-        if i == 0 {
-            // Only move to start if we aren't already there (optional, but safer to be explicit for arcs)
-            // For the donut logic below, we handle move_to explicitly before calling this.
-            // builder.move_to(p0);
-        }
         builder.bezier_curve_to(c1, c2, p3);
     }
 }
