@@ -203,6 +203,7 @@ impl MeshCache {
                         *snap,
                     );
                 }
+
                 StrokeStyle::Dashed { dash, gap } => linear::draw_horizontal_dashed_line(
                     buffer,
                     *x_start,
@@ -214,7 +215,16 @@ impl MeshCache {
                     gap,
                     *snap,
                 ),
-                StrokeStyle::Dotted { gap: _ } => todo!("Draw dotted line"),
+                StrokeStyle::Dotted { gap } => linear::draw_horizontal_dotted_line(
+                    buffer,
+                    *x_start,
+                    *x_end,
+                    *y,
+                    stroke.thickness,
+                    stroke.fill,
+                    gap,
+                    *snap,
+                ),
             },
             Primitive::VerticalLine {
                 x,
@@ -245,7 +255,16 @@ impl MeshCache {
                     gap,
                     *snap,
                 ),
-                StrokeStyle::Dotted { gap: _ } => todo!("Draw dotted line"),
+                StrokeStyle::Dotted { gap } => linear::draw_vertical_dotted_line(
+                    buffer,
+                    *x,
+                    *y_start,
+                    *y_end,
+                    stroke.thickness,
+                    stroke.fill,
+                    gap, // dash length = line width (creates square dots)
+                    *snap,
+                ),
             },
             Primitive::PolyLine {
                 points,

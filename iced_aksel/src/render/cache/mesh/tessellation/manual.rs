@@ -22,14 +22,17 @@ pub(super) fn push_ring_strip_indices(
 ) {
     for i in 0..count {
         let curr = i as u32;
-        let next = if wrap { ((i + 1) % count) as u32 } else { curr + 1 };
+        let next = if wrap {
+            ((i + 1) % count) as u32
+        } else {
+            curr + 1
+        };
         let inner_curr = start_index + curr * 2;
         let outer_curr = start_index + curr * 2 + 1;
         let inner_next = start_index + next * 2;
         let outer_next = start_index + next * 2 + 1;
         mesh.indices.extend_from_slice(&[
-            inner_curr, outer_curr, outer_next,
-            inner_curr, outer_next, inner_next,
+            inner_curr, outer_curr, outer_next, inner_curr, outer_next, inner_next,
         ]);
     }
 }
@@ -186,6 +189,18 @@ impl ManualTessellator {
         color: Color,
     ) {
         polygon::draw_ring(buffer, outer_points, inner_points, color);
+    }
+
+    #[inline]
+    pub fn draw_dotted_path(
+        &self,
+        buffer: &mut MeshData,
+        points: &[Point],
+        width: f32,
+        gap: f32,
+        color: Color,
+    ) {
+        linear::draw_dotted_path(buffer, points, width, gap, color);
     }
 
     // =========================================================================

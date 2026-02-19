@@ -515,8 +515,18 @@ impl Tessellator {
                     stroke.fill,
                 );
             }
-            _ => {
-                // Fallback: Use Lyon for complex dashes/dots
+            StrokeStyle::Dotted { gap } => {
+                // True circular dots!
+                self.manual.draw_dotted_path(
+                    buffer,
+                    &[draw_start, draw_end],
+                    stroke.thickness,
+                    *gap,
+                    stroke.fill,
+                );
+            }
+            StrokeStyle::Dashed { .. } => {
+                // Fallback: Use Lyon for complex dashes
                 let points = vec![
                     lyon_tessellation::math::Point::new(draw_start.x, draw_start.y),
                     lyon_tessellation::math::Point::new(draw_end.x, draw_end.y),
@@ -609,10 +619,15 @@ impl Tessellator {
         // Polyline stroking involves complex joints (miters) between segments.
         // We ALWAYS use Lyon here because doing miter joints manually is extremely complex
         // and error-prone (as seen with the triangle artifacts).
-        let lyon_points = points
-            .iter()
-            .map(|p| lyon_tessellation::math::Point::new(p.x, p.y));
-        self.stroke_polyline(buffer, lyon_points, stroke, false);
+        if let StrokeStyle::Dotted { gap } = stroke.style {
+            self.manual
+                .draw_dotted_path(buffer, &points, stroke.thickness, gap, stroke.fill);
+        } else {
+            let lyon_points = points
+                .iter()
+                .map(|p| lyon_tessellation::math::Point::new(p.x, p.y));
+            self.stroke_polyline(buffer, lyon_points, stroke, false);
+        }
 
         // 4. Draw Arrowheads
         if arrows.start && !extensions.start {
