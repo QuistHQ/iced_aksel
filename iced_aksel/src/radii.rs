@@ -9,12 +9,13 @@ fn safeguard_radius(radius: f32) -> Option<ResolvedRadius> {
     (radius > 0.5).then_some(ResolvedRadius(radius))
 }
 
+/// A singular Radius
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Radius<T = f32>(pub T);
 
 impl<T> Radius<T> {
     /// Creates a new [`Radius`]
-    pub fn new(radius: T) -> Self {
+    pub const fn new(radius: T) -> Self {
         Self(radius)
     }
 }
@@ -124,6 +125,7 @@ impl<D: Float> Radii<Measure<D>> {
     }
 }
 
+/// A radius in screen-space pixels
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct ResolvedRadius(pub(crate) f32);
 
