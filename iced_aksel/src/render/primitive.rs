@@ -28,7 +28,7 @@ pub struct LineArrows {
     pub size: f32,
 }
 
-// Describes a **shared** primitive interface between the Mesh and Path backends.
+/// Describes a **shared** primitive interface between the Mesh and Path backends.
 pub enum Primitive {
     Rectangle {
         xy1: Point,

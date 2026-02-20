@@ -85,8 +85,7 @@ pub use crate::render::{LineArrows, LineExtensions};
 ///
 /// impl Shape<f64> for MyCustomShape {
 ///     fn render(self, ctx: &mut plot::Context<'_, f64>) {
-///         // Use ctx.render_mesh() for geometric shapes
-///         // or ctx.render_text() for text rendering
+///         // Use ctx.add_primitve() to render primitives
 ///     }
 /// }
 /// ```

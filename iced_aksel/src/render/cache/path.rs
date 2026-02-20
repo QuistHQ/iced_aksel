@@ -56,14 +56,12 @@ impl<Renderer: crate::render::Renderer> PathCache<Renderer> {
         let geometry = self
             .cache
             .draw_with_bounds(renderer, *clip_bounds, |frame| {
-                if self.needs_redraw {
-                    self.needs_redraw = false;
-                    self.buffer
-                        .iter()
-                        .for_each(|primitive| Self::draw_primitive(primitive, frame))
-                }
+                self.buffer
+                    .iter()
+                    .for_each(|primitive| Self::draw_primitive(primitive, frame))
             });
 
+        self.needs_redraw = false;
         renderer.draw_geometry(geometry);
     }
 
@@ -288,8 +286,11 @@ impl<Renderer: crate::render::Renderer> PathCache<Renderer> {
                     }
 
                     // 2. Draw Chain
+                    //
+                    // We draw p_first and p_last seperately from the other points, as the first
+                    // and last might have been changed due to infinite line extensions.
                     builder.move_to(p_first);
-                    points.iter().skip(1).take(last_idx).for_each(|point| builder.line_to(*point));
+                    points.iter().skip(1).take(last_idx - 1).for_each(|point| builder.line_to(*point));
                     builder.line_to(p_last);
 
                     // 3. Draw Arrows
@@ -534,7 +535,7 @@ impl<Renderer: crate::render::Renderer> PathCache<Renderer> {
                         draw_text(frame);
                     }
                 });
-                // NOTE: Early return if text
+                // NOTE: Text returns early, as no stroke/fill shall be rendered on Text.
                 return;
             }
         };

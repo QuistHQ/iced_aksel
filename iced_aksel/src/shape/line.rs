@@ -51,13 +51,7 @@ impl<D: Float, R: crate::Renderer> Shape<D, R> for Line<D> {
         let stroke = stroke.resolve(ctx);
         let start = Point::new(ctx.x_to_screen(&p1.x), ctx.y_to_screen(&p1.y));
         let end = Point::new(ctx.x_to_screen(&p2.x), ctx.y_to_screen(&p2.y));
-        let screen_bounds = ctx.screen_bounds();
-        let clip_bounds = iced_core::Rectangle {
-            x: screen_bounds.x,
-            y: screen_bounds.y,
-            width: screen_bounds.width,
-            height: screen_bounds.height,
-        };
+        let clip_bounds = ctx.clip_bounds();
 
         ctx.add_primitive(Primitive::Line {
             start,

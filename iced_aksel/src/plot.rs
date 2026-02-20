@@ -12,7 +12,7 @@ use crate::{
 };
 
 use aksel::{Float, PlotRect, Transform};
-use iced_core::Font;
+use iced_core::{Font, Rectangle};
 
 /// Normalized drag delta for panning operations.
 ///
@@ -116,6 +116,16 @@ impl<'a, D: Float, Renderer: crate::Renderer> Context<'a, D, Renderer> {
     pub fn add_primitive(&mut self, primitive: Primitive) {
         self.cache.add_primitive(primitive);
     }
+
+    pub fn clip_bounds(&self) -> Rectangle {
+        let bounds = self.transform.screen_bounds();
+        Rectangle {
+            x: bounds.x,
+            y: bounds.y,
+            width: bounds.width,
+            height: bounds.height,
+        }
+    }
 }
 
 /// The plot rendering context for drawing shapes.
@@ -162,7 +172,7 @@ where
     /// #     }
     /// # }
     /// ```
-    pub fn bounds(&self) -> PlotRect<D> {
+    pub fn plot_bounds(&self) -> PlotRect<D> {
         self.context.transform.plot_bounds()
     }
 

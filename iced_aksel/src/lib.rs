@@ -178,8 +178,8 @@ type AxisScrollHandler<AxisId, Message> = Box<dyn Fn(AxisId, f32, ScrollDelta) -
 
 #[derive(Debug, PartialEq)]
 struct LayerIdentifier {
-    id: Option<u64>,
-    version: Option<LayerId>,
+    id: Option<LayerId>,
+    version: Option<u64>,
 }
 
 #[derive(Debug, PartialEq)]

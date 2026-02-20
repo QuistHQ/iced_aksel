@@ -111,8 +111,9 @@ where
     ///
     /// Returns the removed axis if it existed.
     pub fn remove_axis(&mut self, id: &AxisId) -> Option<Axis<D, Theme>> {
+        let removed = self.axes.swap_remove(id)?;
         self.increment_version();
-        self.axes.swap_remove(id)
+        Some(removed)
     }
 
     /// Checks if an axis with the given ID exists.
@@ -167,6 +168,7 @@ where
     /// state.axis_mut(&"x").pan(0.1);
     /// ```
     pub fn axis_mut_opt(&mut self, id: &AxisId) -> Option<&mut Axis<D, Theme>> {
+        // TODO: Unsure if we could avoid double lookups here.
         if self.axes.contains_key(id) {
             self.increment_version();
         }
