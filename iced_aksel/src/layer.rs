@@ -40,13 +40,19 @@ static NEXT_LAYER_ID: AtomicU64 = AtomicU64::new(1);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LayerId(u64);
 
+impl Default for LayerId {
+    fn default() -> Self {
+        Self(NEXT_LAYER_ID.fetch_add(1, Ordering::Relaxed))
+    }
+}
+
 impl LayerId {
     /// Creates a new layer id.
     ///
     /// This ensures no collision will occur, since we increment the underlying u64 atomically each
     /// time we create a new id.
-    pub fn new() -> LayerId {
-        Self(NEXT_LAYER_ID.fetch_add(1, Ordering::Relaxed))
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 

@@ -567,7 +567,10 @@ pub fn draw_dotted_path(
 
         #[allow(clippy::while_float)]
         while advance <= len {
-            let dot_center = Point::new(p_start.x + dir_x * advance, p_start.y + dir_y * advance);
+            let dot_center = Point::new(
+                dir_x.mul_add(advance, p_start.x),
+                dir_y.mul_add(advance, p_start.y),
+            );
             draw_dot(buffer, dot_center, radius, color);
             advance += spacing;
         }

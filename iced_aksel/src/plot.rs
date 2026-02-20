@@ -117,7 +117,8 @@ impl<'a, D: Float, Renderer: crate::Renderer> Context<'a, D, Renderer> {
         self.cache.add_primitive(primitive);
     }
 
-    pub fn clip_bounds(&self) -> Rectangle {
+    /// Returns the screen bounds bounds of the plot
+    pub const fn clip_bounds(&self) -> Rectangle {
         let bounds = self.transform.screen_bounds();
         Rectangle {
             x: bounds.x,
