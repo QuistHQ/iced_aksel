@@ -193,3 +193,58 @@ pub fn rect_intersects_polyline(rect: &Rectangle, polyline: &[Point]) -> bool {
     }
     false
 }
+
+// --- ARC / SECTOR MATH ---
+pub fn point_in_arc(
+    pt: Point,
+    center: Point,
+    inner_r: f32,
+    outer_r: f32,
+    start_angle: f32,
+    end_angle: f32,
+) -> bool {
+    let dx = pt.x - center.x;
+    let dy = pt.y - center.y;
+    let dist_sq = dx * dx + dy * dy;
+
+    // 1. Check distance (Is it within the donut/circle?)
+    if dist_sq < (inner_r * inner_r) || dist_sq > (outer_r * outer_r) {
+        return false;
+    }
+
+    // 2. Check angle (Is it within the pie slice?)
+    let mut angle = dy.atan2(dx);
+    if angle < 0.0 {
+        angle += std::f32::consts::TAU;
+    }
+
+    let mut start = start_angle % std::f32::consts::TAU;
+    if start < 0.0 {
+        start += std::f32::consts::TAU;
+    }
+
+    let mut end = end_angle % std::f32::consts::TAU;
+    if end < 0.0 {
+        end += std::f32::consts::TAU;
+    }
+
+    if start < end {
+        angle >= start && angle <= end
+    } else {
+        // The arc crosses the 0/360 degree boundary
+        angle >= start || angle <= end
+    }
+}
+
+pub fn rect_intersects_arc(rect: &Rectangle, center: Point, outer_r: f32) -> bool {
+    // Precise rect-to-arc math is extremely heavy.
+    // For marquee selection (broad interactions), we approximate by checking
+    // if the rect intersects the arc's outer bounding circle.
+    let closest_x = center.x.clamp(rect.x, rect.x + rect.width);
+    let closest_y = center.y.clamp(rect.y, rect.y + rect.height);
+
+    let dx = closest_x - center.x;
+    let dy = closest_y - center.y;
+
+    (dx * dx + dy * dy) <= (outer_r * outer_r)
+}

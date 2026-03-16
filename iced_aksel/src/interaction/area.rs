@@ -73,6 +73,13 @@ pub enum Area<D> {
         width: Measure<D>,
         tension: f32,
     },
+    Arc {
+        center: PlotPoint<D>,
+        radius_outer: Measure<D>,
+        radius_inner: Measure<D>,
+        start_angle_rads: f32,
+        end_angle_rads: f32,
+    },
     /// The escape hatch for custom data-space interactions.
     Custom(Box<dyn ResolvableArea<D>>),
 }
@@ -309,6 +316,26 @@ impl<D: Float> Area<D> {
                     stroke_width_px,
                 }
             }
+            Self::Arc {
+                center,
+                radius_outer,
+                radius_inner,
+                start_angle_rads,
+                end_angle_rads,
+            } => {
+                let sc = transform.chart_to_screen(&center);
+                ResolvedArea::Arc {
+                    center: Point::new(sc.x, sc.y),
+                    radius_outer: radius_outer
+                        .resolve_x(transform)
+                        .min(radius_outer.resolve_y(transform)),
+                    radius_inner: radius_inner
+                        .resolve_x(transform)
+                        .min(radius_inner.resolve_y(transform)),
+                    start_angle: start_angle_rads,
+                    end_angle: end_angle_rads,
+                }
+            }
             Self::Custom(custom) => ResolvedArea::Custom(custom.resolve_area(transform)),
         }
     }
@@ -343,6 +370,13 @@ pub enum ResolvedArea {
     Polyline {
         points: Vec<Point>,
         stroke_width_px: f32,
+    },
+    Arc {
+        center: Point,
+        radius_outer: f32,
+        radius_inner: f32,
+        start_angle: f32,
+        end_angle: f32,
     },
     /// The escape hatch for custom screen-space hit testing.
     Custom(Box<dyn HitTest>),
@@ -442,6 +476,17 @@ impl ResolvedArea {
                     height: (max_y - min_y) + stroke_width_px,
                 }
             }
+            Self::Arc {
+                center,
+                radius_outer,
+                ..
+            } => Rectangle {
+                // A conservative bounding box covering the full circle
+                x: center.x - radius_outer,
+                y: center.y - radius_outer,
+                width: radius_outer * 2.0,
+                height: radius_outer * 2.0,
+            },
             Self::Custom(custom_test) => custom_test.bounding_box(),
         }
     }
@@ -564,6 +609,31 @@ impl ResolvedArea {
             (Self::Polyline { points, .. }, InteractionQuery::Bounds(bounds)) => {
                 math::rect_intersects_polyline(bounds, points)
             }
+            (
+                Self::Arc {
+                    center,
+                    radius_outer,
+                    radius_inner,
+                    start_angle,
+                    end_angle,
+                },
+                InteractionQuery::Point { position, .. },
+            ) => math::point_in_arc(
+                *position,
+                *center,
+                *radius_inner,
+                *radius_outer,
+                *start_angle,
+                *end_angle,
+            ),
+            (
+                Self::Arc {
+                    center,
+                    radius_outer,
+                    ..
+                },
+                InteractionQuery::Bounds(bounds),
+            ) => math::rect_intersects_arc(bounds, *center, *radius_outer),
             (Self::Custom(custom_test), q) => custom_test.intersects(q),
         }
     }

@@ -116,3 +116,15 @@ impl<D: Float> Arc<D> {
         self
     }
 }
+
+impl<D: Float> From<&Arc<D>> for crate::interaction::Area<D> {
+    fn from(value: &Arc<D>) -> Self {
+        crate::interaction::Area::Arc {
+            center: value.center,
+            radius_outer: value.radius.0,
+            radius_inner: value.inner_radius.0,
+            start_angle_rads: value.start_angle.0,
+            end_angle_rads: value.end_angle.0,
+        }
+    }
+}
