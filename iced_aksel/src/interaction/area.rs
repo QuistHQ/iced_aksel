@@ -1,7 +1,7 @@
+use crate::Measure;
+use crate::interaction::{InteractionQuery, math};
 use aksel::{Float, PlotPoint, Transform};
 use iced_core::{Point, Rectangle};
-
-use crate::Measure;
 
 /// The exact geometric intent for the hit-test.
 #[derive(Debug, Clone)]
@@ -57,7 +57,6 @@ impl<D: Float> Area<D> {
         }
     }
 }
-
 #[derive(Debug)]
 pub enum ResolvedArea {
     Rect(Rectangle),
@@ -69,17 +68,67 @@ pub enum ResolvedArea {
 }
 
 impl ResolvedArea {
-    pub fn contains(&self, point: Point) -> bool {
-        match self {
-            Self::Rect(rect) => rect.contains(point),
-            _ => todo!("Check if geometry contains point"),
-        }
-    }
-
     pub fn bounding_box(&self) -> Rectangle {
         match self {
             Self::Rect(rect) => *rect,
-            _ => todo!("Create bounding boxes"),
+            Self::LineSegment {
+                p1,
+                p2,
+                stroke_width_px,
+            } => {
+                let padding = *stroke_width_px / 2.0;
+                let min_x = p1.x.min(p2.x) - padding;
+                let max_x = p1.x.max(p2.x) + padding;
+                let min_y = p1.y.min(p2.y) - padding;
+                let max_y = p1.y.max(p2.y) + padding;
+
+                Rectangle {
+                    x: min_x,
+                    y: min_y,
+                    width: max_x - min_x,
+                    height: max_y - min_y,
+                }
+            }
+        }
+    }
+
+    pub fn intersects(&self, query: &InteractionQuery) -> bool {
+        match (self, query) {
+            (
+                Self::Rect(rect),
+                InteractionQuery::Point {
+                    position,
+                    tolerance_px,
+                },
+            ) => {
+                let expanded = Rectangle {
+                    x: rect.x - tolerance_px,
+                    y: rect.y - tolerance_px,
+                    width: rect.width + (tolerance_px * 2.0),
+                    height: rect.height + (tolerance_px * 2.0),
+                };
+                expanded.contains(*position)
+            }
+            (Self::Rect(rect), InteractionQuery::Bounds(bounds)) => {
+                math::rect_intersects_rect(rect, bounds)
+            }
+            (
+                Self::LineSegment {
+                    p1,
+                    p2,
+                    stroke_width_px,
+                },
+                InteractionQuery::Point {
+                    position,
+                    tolerance_px,
+                },
+            ) => {
+                let distance = math::distance_point_to_segment(*position, *p1, *p2);
+                distance <= (stroke_width_px / 2.0) + tolerance_px
+            }
+            (Self::LineSegment { p1, p2, .. }, InteractionQuery::Bounds(bounds)) => {
+                math::line_intersects_rect(*p1, *p2, bounds)
+            }
         }
     }
 }

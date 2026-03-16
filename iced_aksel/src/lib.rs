@@ -124,12 +124,12 @@ pub use state::State;
 pub use stroke::Stroke;
 pub use style::Catalog;
 
+use crate::interaction::InteractionQuery;
+use crate::memory::{CacheSignature, HoverIdentity};
 use action::Action;
 use axis::{MarkerContext, MarkerPosition, MarkerRequest, Orientation, Position};
 use layer::Layer;
 use memory::Memory;
-
-use crate::memory::{CacheSignature, HoverIdentity};
 
 /// Default movement threshold (in pixels) to distinguish a click from a drag operation.
 const DEFAULT_DRAG_DEADBAND: f32 = 10.0;
@@ -497,10 +497,15 @@ where
 
             let mut interaction_id = None;
             let interactions = memory.interaction_cache.borrow();
-            for (id, interaction) in interactions.iter().rev() {
-                if interaction.area.contains(mouse_pos)
-                    && let Some(handler) = &interaction.on_press
-                {
+
+            // Build the query with a 5px hover/click tolerance
+            let query = InteractionQuery::Point {
+                position: mouse_pos,
+                tolerance_px: 5.0,
+            };
+
+            for (id, interaction) in interactions.query(&query).into_iter().rev() {
+                if let Some(handler) = &interaction.on_press {
                     // TODO: Priority sorting - Which id should we actually save?
                     // We just save the top-most Id for now
                     if interaction_id.is_none() && interaction.on_drag.is_some() {
@@ -625,10 +630,14 @@ where
             Action::DraggingPlot { origin, .. } => {
                 let plot_bounds = self.get_plot_layout(layout).bounds();
                 let interactions = memory.interaction_cache.borrow();
-                for (id, interaction) in interactions.iter().rev() {
-                    if interaction.area.contains(*origin)
-                        && let Some(handler) = &interaction.on_release
-                    {
+
+                let query = InteractionQuery::Point {
+                    position: *origin,
+                    tolerance_px: 5.0,
+                };
+
+                for (id, interaction) in interactions.query(&query).into_iter().rev() {
+                    if let Some(handler) = &interaction.on_release {
                         let normalized = Point::new(
                             (origin.x - plot_bounds.x) / plot_bounds.width,
                             1.0 - ((origin.y - plot_bounds.y) / plot_bounds.height),
@@ -724,12 +733,13 @@ where
 
                     // Check the Interaction Registry for hovers!
                     let interactions = memory.interaction_cache.borrow();
-                    for (id, interaction) in interactions.iter().rev() {
-                        if !interaction.area.contains(mouse_pos) {
-                            continue;
-                        };
+                    let query = InteractionQuery::Point {
+                        position: mouse_pos,
+                        tolerance_px: 5.0,
+                    };
 
-                        let identity = HoverIdentity::Interaction(id.clone());
+                    for (id, _interaction) in interactions.query(&query).into_iter().rev() {
+                        let identity = HoverIdentity::Interaction((*id).clone());
                         if memory.last_hovered_identity != identity && new_identity.is_none() {
                             memory.last_hovered_identity = identity.clone();
                             new_identity = Some(identity);
