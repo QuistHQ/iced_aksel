@@ -5,7 +5,7 @@ use iced_core::{Point, Rectangle};
 use std::fmt::Debug;
 
 /// A trait for performing precise screen-space collision detection.
-pub trait HitTest: Debug + Send + Sync {
+pub trait HitTest: Debug {
     /// Returns the fast broad-phase bounding box in screen pixels.
     fn bounding_box(&self) -> Rectangle;
 
@@ -14,7 +14,7 @@ pub trait HitTest: Debug + Send + Sync {
 }
 
 /// A trait for custom geometries that can be resolved into screen-space hit areas.
-pub trait ResolvableArea<D: Float>: Debug + Send + Sync {
+pub trait ResolvableArea<D: Float>: Debug {
     /// Converts the data-space geometry into a screen-space `HitTest`.
     fn resolve_area(&self, transform: &Transform<D, f32, f32>) -> Box<dyn HitTest>;
 }
