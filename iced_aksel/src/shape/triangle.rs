@@ -136,3 +136,20 @@ impl<D: Float> Triangle<D> {
         self
     }
 }
+
+impl<D: Float> From<&Triangle<D>> for crate::interaction::Area<D> {
+    fn from(value: &Triangle<D>) -> Self {
+        match &value.geometry {
+            Geometry::Vertices(pts) => crate::interaction::Area::Triangle {
+                p1: pts[0],
+                p2: pts[1],
+                p3: pts[2],
+            },
+            Geometry::Centered { center, width, height } => crate::interaction::Area::CenteredTriangle {
+                center: *center,
+                width: *width,
+                height: *height,
+            },
+        }
+    }
+}

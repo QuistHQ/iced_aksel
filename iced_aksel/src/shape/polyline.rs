@@ -124,3 +124,12 @@ impl<D: Float> Polyline<D> {
         self
     }
 }
+
+impl<D: Float> From<&Polyline<D>> for crate::interaction::Area<D> {
+    fn from(value: &Polyline<D>) -> Self {
+        crate::interaction::Area::Polyline {
+            points: value.points.clone(),
+            width: value.stroke.thickness,
+        }
+    }
+}

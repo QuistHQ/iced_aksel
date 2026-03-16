@@ -114,3 +114,13 @@ impl<D: Float> Ellipse<D> {
         self
     }
 }
+
+impl<D: Float> From<&Ellipse<D>> for crate::interaction::Area<D> {
+    fn from(value: &Ellipse<D>) -> Self {
+        crate::interaction::Area::Ellipse {
+            center: value.center,
+            radius_x: value.radii.x.0,
+            radius_y: value.radii.y.0,
+        }
+    }
+}

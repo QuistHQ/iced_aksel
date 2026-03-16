@@ -111,3 +111,14 @@ impl<D: Float> Bezier<D> {
         self
     }
 }
+impl<D: Float> From<&Bezier<D>> for crate::interaction::Area<D> {
+    fn from(value: &Bezier<D>) -> Self {
+        crate::interaction::Area::Bezier {
+            start: value.start,
+            control_1: value.control_1,
+            control_2: value.control_2,
+            end: value.end,
+            width: value.stroke.thickness,
+        }
+    }
+}

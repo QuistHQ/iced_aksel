@@ -85,3 +85,12 @@ impl<D: Float> Spline<D> {
         self
     }
 }
+impl<D: Float> From<&Spline<D>> for crate::interaction::Area<D> {
+    fn from(value: &Spline<D>) -> Self {
+        crate::interaction::Area::Spline {
+            points: value.points.clone(),
+            width: value.stroke.thickness,
+            tension: value.tension,
+        }
+    }
+}

@@ -97,3 +97,13 @@ impl<D: Float> Polygon<D> {
         self
     }
 }
+impl<D: Float> From<&crate::shape::Polygon<D>> for crate::interaction::Area<D> {
+    fn from(value: &crate::shape::Polygon<D>) -> Self {
+        crate::interaction::Area::RegularPolygon {
+            center: value.center,
+            radius: value.radius.0,
+            vertices: value.vertices,
+            rotation_rads: value.rotation.0,
+        }
+    }
+}
