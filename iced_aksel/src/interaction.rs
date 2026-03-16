@@ -33,9 +33,10 @@ pub struct Interaction<D, Message: Clone, T: Hash + Eq + Clone = ()> {
 }
 
 impl<D: Float, Message: Clone, T: Hash + Eq + Clone> Interaction<D, Message, T> {
-    pub(crate) fn resolve(
+    pub(crate) fn resolve<R: iced_core::text::Renderer<Font = iced_core::Font>>(
         self,
         transform: &Transform<D, f32, f32>,
+        renderer: &R,
     ) -> (Id<T>, ResolvedInteraction<Message, T>) {
         let Self {
             id,
@@ -46,7 +47,7 @@ impl<D: Float, Message: Clone, T: Hash + Eq + Clone> Interaction<D, Message, T> 
             on_release,
         } = self;
 
-        let area = area.resolve(transform);
+        let area = area.resolve(transform, renderer);
         let bounding_box = area.bounding_box();
 
         (
@@ -137,7 +138,10 @@ impl<Message: Clone, T: Hash + Eq + Clone> InteractionsCache<Message, T> {
     }
 
     /// Queries the cache for all interactions that intersect the given query.
-    pub fn query(&self, query: &InteractionQuery) -> Vec<(&Id<T>, &ResolvedInteraction<Message, T>)> {
+    pub fn query(
+        &self,
+        query: &InteractionQuery,
+    ) -> Vec<(&Id<T>, &ResolvedInteraction<Message, T>)> {
         let mut hits = Vec::new();
         let query_bounds = query.bounds();
 

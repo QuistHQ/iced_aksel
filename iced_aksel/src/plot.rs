@@ -197,7 +197,7 @@ where
 
     pub fn add_interaction(&mut self, interaction: impl Into<Interaction<D, Message, Tag>>) {
         let interaction = interaction.into();
-        let (id, resolved) = interaction.resolve(&self.context.transform);
+        let (id, resolved) = interaction.resolve(&self.context.transform, self.context.renderer);
         self.interactions.insert(id, resolved);
     }
 }

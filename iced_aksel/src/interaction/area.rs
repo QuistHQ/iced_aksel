@@ -80,12 +80,28 @@ pub enum Area<D> {
         start_angle_rads: f32,
         end_angle_rads: f32,
     },
+    Label {
+        content: String,
+        position: PlotPoint<D>,
+        size: Measure<D>,
+        font: Option<iced_core::Font>,
+        horizontal_alignment: iced_core::alignment::Horizontal,
+        vertical_alignment: iced_core::alignment::Vertical,
+        rotation_rads: f32,
+        line_height: f32,
+        bounds: crate::shape::Bounds<D>,
+        wrapping: iced_core::text::Wrapping,
+    },
     /// The escape hatch for custom data-space interactions.
     Custom(Box<dyn ResolvableArea<D>>),
 }
 
 impl<D: Float> Area<D> {
-    pub(super) fn resolve(self, transform: &Transform<D, f32, f32>) -> ResolvedArea {
+    pub(crate) fn resolve<R: iced_core::text::Renderer<Font = iced_core::Font>>(
+        self,
+        transform: &Transform<D, f32, f32>,
+        renderer: &R,
+    ) -> ResolvedArea {
         match self {
             Self::Rect {
                 x,
@@ -334,6 +350,79 @@ impl<D: Float> Area<D> {
                         .min(radius_inner.resolve_y(transform)),
                     start_angle: start_angle_rads,
                     end_angle: end_angle_rads,
+                }
+            }
+            Self::Label {
+                content,
+                position,
+                size,
+                font,
+                horizontal_alignment,
+                vertical_alignment,
+                rotation_rads,
+                line_height,
+                bounds,
+                wrapping,
+            } => {
+                // Bring the 0.14 Paragraph trait into scope
+                use iced_core::text::Paragraph as _;
+
+                let sc = transform.chart_to_screen(&position);
+                let screen_pos = Point::new(sc.x as f32, sc.y as f32); // Force f32
+
+                let font_size_px = size.resolve_y(transform);
+                let bounds_size = bounds.resolve(transform, &position);
+                let font = font.unwrap_or_else(|| renderer.default_font());
+
+                // 1. Measure the text using the Iced 0.14 Paragraph API
+                let paragraph =
+                    <R as iced_core::text::Renderer>::Paragraph::with_text(iced_core::text::Text {
+                        content: content.as_str(),
+                        bounds: bounds_size,
+                        size: iced_core::Pixels(font_size_px),
+                        line_height: iced_core::text::LineHeight::Relative(line_height),
+                        font,
+                        align_x: horizontal_alignment.into(),
+                        align_y: vertical_alignment.into(),
+                        shaping: iced_core::text::Shaping::Basic,
+                        wrapping,
+                    });
+
+                let text_size = paragraph.min_bounds();
+
+                let text_size = paragraph.min_bounds();
+
+                // 2. Explicitly type the offsets as f32
+                let dx: f32 = match horizontal_alignment {
+                    iced_core::alignment::Horizontal::Left => 0.0,
+                    iced_core::alignment::Horizontal::Center => -text_size.width / 2.0,
+                    iced_core::alignment::Horizontal::Right => -text_size.width,
+                };
+                let dy: f32 = match vertical_alignment {
+                    iced_core::alignment::Vertical::Top => 0.0,
+                    iced_core::alignment::Vertical::Center => -text_size.height / 2.0,
+                    iced_core::alignment::Vertical::Bottom => -text_size.height,
+                };
+
+                let corners: [Point<f32>; 4] = [
+                    Point::new(dx, dy),
+                    Point::new(dx + text_size.width, dy),
+                    Point::new(dx + text_size.width, dy + text_size.height),
+                    Point::new(dx, dy + text_size.height),
+                ];
+
+                let cos_r: f32 = rotation_rads.cos();
+                let sin_r: f32 = rotation_rads.sin();
+
+                let mut rotated_corners = Vec::with_capacity(4);
+                for c in corners {
+                    let rx: f32 = c.x * cos_r - c.y * sin_r;
+                    let ry: f32 = c.x * sin_r + c.y * cos_r;
+                    rotated_corners.push(Point::new(screen_pos.x + rx, screen_pos.y + ry));
+                }
+
+                ResolvedArea::Polygon {
+                    points: rotated_corners,
                 }
             }
             Self::Custom(custom) => ResolvedArea::Custom(custom.resolve_area(transform)),

@@ -244,3 +244,20 @@ impl<D: Float> Label<D> {
         self
     }
 }
+
+impl<D: Float> From<&Label<D>> for crate::interaction::Area<D> {
+    fn from(value: &Label<D>) -> Self {
+        crate::interaction::Area::Label {
+            content: value.content.clone(),
+            position: value.position,
+            size: value.size,
+            font: value.font,
+            horizontal_alignment: value.horizontal_alignment,
+            vertical_alignment: value.vertical_alignment,
+            rotation_rads: value.rotation.0, // Extract f32 from Radians
+            line_height: value.line_height,
+            bounds: value.bounds,
+            wrapping: value.wrapping,
+        }
+    }
+}
