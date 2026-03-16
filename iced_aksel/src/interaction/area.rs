@@ -2,23 +2,39 @@ use crate::Measure;
 use crate::interaction::{InteractionQuery, math};
 use aksel::{Float, PlotPoint, Transform};
 use iced_core::{Point, Rectangle};
+use std::fmt::Debug;
+
+/// A trait for performing precise screen-space collision detection.
+pub trait HitTest: Debug + Send + Sync {
+    /// Returns the fast broad-phase bounding box in screen pixels.
+    fn bounding_box(&self) -> Rectangle;
+
+    /// Performs the precise narrow-phase check against the user's interaction query.
+    fn intersects(&self, query: &InteractionQuery) -> bool;
+}
+
+/// A trait for custom geometries that can be resolved into screen-space hit areas.
+pub trait ResolvableArea<D: Float>: Debug + Send + Sync {
+    /// Converts the data-space geometry into a screen-space `HitTest`.
+    fn resolve_area(&self, transform: &Transform<D, f32, f32>) -> Box<dyn HitTest>;
+}
 
 /// The exact geometric intent for the hit-test.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum Area<D> {
-    /// A simple data-space bounding box (e.g., filled Rectangle)
     Rect {
         x: D,
         y: D,
         width: Measure<D>,
         height: Measure<D>,
     },
-    /// A line segment with a pixel-based thickness for the stroke
     LineSegment {
         p1: PlotPoint<D>,
         p2: PlotPoint<D>,
         width: f32,
     },
+    /// The escape hatch for custom data-space interactions.
+    Custom(Box<dyn ResolvableArea<D>>),
 }
 
 impl<D: Float> Area<D> {
@@ -53,6 +69,7 @@ impl<D: Float> Area<D> {
                     height: height.resolve_y(transform),
                 })
             }
+            Self::Custom(custom_area) => ResolvedArea::Custom(custom_area.resolve_area(transform)),
             _ => todo!("Resolve other areas"),
         }
     }
@@ -65,6 +82,8 @@ pub enum ResolvedArea {
         p2: Point,
         stroke_width_px: f32,
     },
+    /// The escape hatch for custom screen-space hit testing.
+    Custom(Box<dyn HitTest>),
 }
 
 impl ResolvedArea {
@@ -89,6 +108,7 @@ impl ResolvedArea {
                     height: max_y - min_y,
                 }
             }
+            Self::Custom(custom_test) => custom_test.bounding_box(),
         }
     }
 
@@ -129,6 +149,7 @@ impl ResolvedArea {
             (Self::LineSegment { p1, p2, .. }, InteractionQuery::Bounds(bounds)) => {
                 math::line_intersects_rect(*p1, *p2, bounds)
             }
+            (Self::Custom(custom_test), q) => custom_test.intersects(q),
         }
     }
 }
