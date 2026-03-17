@@ -81,8 +81,8 @@
 use aksel::ScreenRect;
 use derive_more::{Display, Error};
 use iced_core::{
-    Clipboard, Color, Element, Event, Font, Layout, Length, Padding, Point, Rectangle, Shell, Size,
-    Widget, keyboard,
+    Border, Clipboard, Color, Element, Event, Font, Layout, Length, Padding, Point, Rectangle,
+    Shell, Size, Widget, keyboard,
     layout::{self, Limits, Node},
     mouse,
     renderer::{Quad, Style},
@@ -1410,6 +1410,25 @@ where
 
         // Draw the currently cached primitives
         cache.draw(renderer, &plot_bounds);
+
+        if self.debug {
+            // Draw a translucent red box over every resolved interaction bounds
+            for (_, interaction) in memory.interaction_cache.borrow().iter() {
+                if let Some(clipped_bounds) = interaction.bounding_box.intersection(&plot_bounds) {
+                    renderer.fill_quad(
+                        Quad {
+                            bounds: clipped_bounds,
+                            // You can adjust borders here if you prefer outlines over fills
+                            border: Border::default()
+                                .color(Color::from_rgba(1.0, 0.0, 0.0, 0.8))
+                                .width(1.0),
+                            ..Default::default()
+                        },
+                        Color::from_rgba(1.0, 0.0, 0.0, 0.1), // Faint red tint
+                    );
+                }
+            }
+        }
     }
 }
 

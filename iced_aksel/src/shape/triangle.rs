@@ -105,6 +105,16 @@ impl<D: Float> Triangle<D> {
             stroke: None,
         }
     }
+    /// Creates a new `Triangle` defined by three specific vertices.
+    ///
+    /// Note: The shape is invisible by default. You must call `.fill()` or `.stroke()` to render it.
+    pub const fn vertices(points: [PlotPoint<D>; 3]) -> Self {
+        Self {
+            geometry: Geometry::Vertices(points),
+            fill: None,
+            stroke: None,
+        }
+    }
 
     /// Creates a new `Triangle` centered at a point with a specific width and height.
     /// The triangle points **Up** (North).
@@ -145,7 +155,11 @@ impl<D: Float> From<&Triangle<D>> for crate::interaction::Area<D> {
                 p2: pts[1],
                 p3: pts[2],
             },
-            Geometry::Centered { center, width, height } => crate::interaction::Area::CenteredTriangle {
+            Geometry::Centered {
+                center,
+                width,
+                height,
+            } => crate::interaction::Area::CenteredTriangle {
                 center: *center,
                 width: *width,
                 height: *height,

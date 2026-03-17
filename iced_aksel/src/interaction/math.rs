@@ -248,3 +248,104 @@ pub fn rect_intersects_arc(rect: &Rectangle, center: Point, outer_r: f32) -> boo
 
     (dx * dx + dy * dy) <= (outer_r * outer_r)
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::interaction::math::{
+        point_in_ellipse, point_in_polygon, point_in_polyline, point_in_triangle,
+    };
+    use iced_core::{Point, Rectangle};
+
+    #[test]
+    fn test_point_in_triangle() {
+        let p1 = Point::new(0.0, 0.0);
+        let p2 = Point::new(10.0, 0.0);
+        let p3 = Point::new(5.0, 10.0);
+
+        // Clearly inside
+        assert!(point_in_triangle(Point::new(5.0, 5.0), p1, p2, p3, 0.0));
+        // Clearly outside
+        assert!(!point_in_triangle(Point::new(10.0, 10.0), p1, p2, p3, 0.0));
+        // Outside, but within hover tolerance of the edge
+        assert!(point_in_triangle(Point::new(5.0, 11.0), p1, p2, p3, 2.0));
+    }
+
+    #[test]
+    fn test_point_in_polygon_ray_casting() {
+        // A concave "Pac-Man" shape pointing right
+        // Bounding box is 0 to 10 on both axes. The "mouth" cuts inward to (5, 5).
+        let polygon = vec![
+            Point::new(0.0, 0.0),
+            Point::new(10.0, 0.0),
+            Point::new(5.0, 5.0), // The concave dent
+            Point::new(10.0, 10.0),
+            Point::new(0.0, 10.0),
+        ];
+
+        // Inside the solid body
+        assert!(point_in_polygon(Point::new(2.0, 5.0), &polygon));
+        // Inside the top jaw
+        assert!(point_in_polygon(Point::new(6.0, 8.0), &polygon));
+        // Outside the shape, inside the concave "mouth" (This proves Ray-Casting works!)
+        assert!(!point_in_polygon(Point::new(8.0, 5.0), &polygon));
+        // Completely outside
+        assert!(!point_in_polygon(Point::new(15.0, 5.0), &polygon));
+    }
+
+    #[test]
+    fn test_point_in_polyline() {
+        let line = vec![
+            Point::new(0.0, 0.0),
+            Point::new(10.0, 0.0),
+            Point::new(10.0, 10.0),
+        ];
+
+        let stroke_width = 2.0;
+        let tolerance = 1.0; // Total allowed distance from center = 2.0
+
+        // Exactly on the line
+        assert!(point_in_polyline(
+            Point::new(5.0, 0.0),
+            &line,
+            stroke_width,
+            tolerance
+        ));
+        // Hovering just near the line segment
+        assert!(point_in_polyline(
+            Point::new(5.0, 1.5),
+            &line,
+            stroke_width,
+            tolerance
+        ));
+        // Hovering near the "elbow" joint
+        assert!(point_in_polyline(
+            Point::new(11.0, 1.0),
+            &line,
+            stroke_width,
+            tolerance
+        ));
+        // Too far away
+        assert!(!point_in_polyline(
+            Point::new(5.0, 5.0),
+            &line,
+            stroke_width,
+            tolerance
+        ));
+    }
+
+    #[test]
+    fn test_point_in_ellipse() {
+        let center = Point::new(5.0, 5.0);
+        let rx = 4.0;
+        let ry = 2.0;
+
+        // Dead center
+        assert!(point_in_ellipse(Point::new(5.0, 5.0), center, rx, ry, 0.0));
+        // Inside
+        assert!(point_in_ellipse(Point::new(7.0, 6.0), center, rx, ry, 0.0));
+        // Outside the mathematical ellipse, but inside the bounding box
+        assert!(!point_in_ellipse(Point::new(8.5, 6.5), center, rx, ry, 0.0));
+        // Outside, but caught by the hover tolerance
+        assert!(point_in_ellipse(Point::new(8.5, 6.5), center, rx, ry, 1.0));
+    }
+}
