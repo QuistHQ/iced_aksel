@@ -738,10 +738,12 @@ where
                         tolerance_px: 5.0,
                     };
 
+
                     for (id, _interaction) in interactions.query(&query).into_iter().rev() {
-                        let identity = HoverIdentity::Interaction((*id).clone());
-                        if memory.last_hovered_identity != identity && new_identity.is_none() {
-                            memory.last_hovered_identity = identity.clone();
+                        
+                        let identity = HoverIdentity::Interaction(id.clone());
+                        if new_identity.is_none() {
+
                             new_identity = Some(identity);
                         }
 
@@ -762,15 +764,10 @@ where
                         shell.publish(message);
                     }
 
-                    if let Some(identity) = new_identity
-                        && memory.last_hovered_identity != identity
-                    {
-                        memory.last_hovered_identity = identity;
-                        return true;
-                    }
+                    let identity = new_identity.unwrap_or(HoverIdentity::Plot);
 
-                    if memory.last_hovered_identity != HoverIdentity::Plot {
-                        memory.last_hovered_identity = HoverIdentity::Plot;
+                    if memory.last_hovered_identity != identity {
+                        memory.last_hovered_identity = identity;
                         return true;
                     }
 
@@ -1209,6 +1206,7 @@ where
             Event::Mouse(mouse::Event::CursorMoved { position }) => {
                 let changed = self.handle_mouse_moved(memory, layout, shell, *position);
                 if changed {
+                    println!("Identity changed! {:?}", memory.last_hovered_identity);
                     match &memory.last_hovered_identity {
                         HoverIdentity::Plot => {
                             if let Some(message) = self
