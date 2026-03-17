@@ -125,7 +125,10 @@ pub use stroke::Stroke;
 pub use style::Catalog;
 
 use crate::interaction::InteractionQuery;
+use crate::interaction::area::ResolvedArea;
 use crate::memory::{CacheSignature, HoverIdentity};
+use crate::render::{LineArrows, LineExtensions, Primitive};
+use crate::stroke::ResolvedStroke;
 use action::Action;
 use axis::{MarkerContext, MarkerPosition, MarkerRequest, Orientation, Position};
 use layer::Layer;
@@ -1374,6 +1377,29 @@ where
                 // User code draws shapes into the plot here
                 layer.items.draw(&mut plot, theme);
             }
+
+            // Populate the debug cache
+            if self.debug {
+                if let Some(debug_cache_cell) = &memory.debug_cache {
+                    let mut debug_cache = debug_cache_cell.borrow_mut();
+
+                    // Safely recreate the mesh to clear old debug primitives
+                    let mut new_debug_cache = match renderer.preferred_backend() {
+                        crate::render::Backend::Mesh => crate::render::RenderCache::new_mesh(),
+                        crate::render::Backend::Path => crate::render::RenderCache::new_path(),
+                    };
+                    new_debug_cache.set_quality(self.quality);
+
+                    for (_, interaction) in interactions.iter() {
+                        if let Some(primitive) = build_debug_primitive(&interaction.area) {
+                            new_debug_cache.add_primitive(primitive);
+                        }
+                    }
+
+                    // Assign the fresh cache
+                    *debug_cache = new_debug_cache;
+                }
+            }
         }
 
         // Draw markers
@@ -1411,20 +1437,26 @@ where
         // Draw the currently cached primitives
         cache.draw(renderer, &plot_bounds);
 
+        // Draw exact mathematical shape interactions if debug is enabled
         if self.debug {
-            // Draw a translucent red box over every resolved interaction bounds
+            if let Some(mut debug_cache) = memory.get_debug_cache_mut() {
+                debug_cache.draw(renderer, &plot_bounds);
+            };
+        }
+        // --- INTERACTION DEBUG VISUALIZER ---
+        if self.debug {
             for (_, interaction) in memory.interaction_cache.borrow().iter() {
+                // Only draw the intersection of the bounding box and the plot area
                 if let Some(clipped_bounds) = interaction.bounding_box.intersection(&plot_bounds) {
                     renderer.fill_quad(
                         Quad {
                             bounds: clipped_bounds,
-                            // You can adjust borders here if you prefer outlines over fills
-                            border: Border::default()
+                            border: iced_core::Border::default()
                                 .color(Color::from_rgba(1.0, 0.0, 0.0, 0.8))
                                 .width(1.0),
                             ..Default::default()
                         },
-                        Color::from_rgba(1.0, 0.0, 0.0, 0.1), // Faint red tint
+                        Color::from_rgba(1.0, 0.0, 0.0, 0.1),
                     );
                 }
             }
@@ -1524,4 +1556,110 @@ fn verify_layer<
     }
 
     true
+}
+
+/// Translates a mathematical interaction area into a renderable stroke outline.
+pub(crate) fn build_debug_primitive(area: &ResolvedArea) -> Option<Primitive> {
+    // A standard 1px red stroke for our X-Ray lines
+    let debug_stroke = ResolvedStroke {
+        thickness: 1.0,
+        fill: Color::from_rgba(1.0, 0.0, 0.0, 0.8),
+        style: crate::stroke::StrokeStyle::Solid,
+    };
+
+    match area {
+        ResolvedArea::Rect(rect) => Some(Primitive::Rectangle {
+            xy1: Point::new(rect.x, rect.y),
+            xy2: Point::new(rect.x + rect.width, rect.y + rect.height),
+            fill: None,
+            stroke: Some(debug_stroke),
+        }),
+        ResolvedArea::LineSegment {
+            p1,
+            p2,
+            stroke_width_px,
+        } => Some(Primitive::Line {
+            start: *p1,
+            end: *p2,
+            stroke: ResolvedStroke {
+                thickness: *stroke_width_px,
+                ..debug_stroke
+            },
+            clip_bounds: Rectangle::INFINITE, // Will be clipped by plot bounds later
+            extensions: LineExtensions {
+                start: false,
+                end: false,
+            },
+            arrows: LineArrows {
+                start: false,
+                end: false,
+                size: 0.0,
+            },
+        }),
+        ResolvedArea::Ellipse { center, rx, ry } => Some(Primitive::Ellipse {
+            center: *center,
+            radii: crate::radii::ResolvedRadii { x: *rx, y: *ry },
+            fill: None,
+            stroke: Some(debug_stroke),
+        }),
+        ResolvedArea::Triangle { p1, p2, p3 } => Some(Primitive::Triangle {
+            points: [*p1, *p2, *p3],
+            fill: None,
+            stroke: Some(debug_stroke),
+        }),
+        ResolvedArea::Polygon { points } => Some(Primitive::Area {
+            points: points.clone(),
+            fill: None,
+            stroke: Some(debug_stroke),
+        }),
+        ResolvedArea::Polyline {
+            points,
+            stroke_width_px,
+        } => Some(Primitive::PolyLine {
+            points: points.clone(),
+            stroke: ResolvedStroke {
+                thickness: *stroke_width_px,
+                ..debug_stroke
+            },
+            clip_bounds: Rectangle::INFINITE,
+            extensions: LineExtensions {
+                start: false,
+                end: false,
+            },
+            arrows: LineArrows {
+                start: false,
+                end: false,
+                size: 0.0,
+            },
+        }),
+        ResolvedArea::RegularPolygon {
+            center,
+            radius_px,
+            vertices,
+            rotation_rads,
+        } => Some(Primitive::Polygon {
+            center: *center,
+            radius: crate::radii::ResolvedRadius(*radius_px),
+            vertices: *vertices,
+            rotation: iced_core::Radians(*rotation_rads),
+            fill: None,
+            stroke: Some(debug_stroke),
+        }),
+        ResolvedArea::Arc {
+            center,
+            radius_outer,
+            radius_inner,
+            start_angle,
+            end_angle,
+        } => Some(Primitive::Arc {
+            center: *center,
+            radius_inner: Some(crate::radii::ResolvedRadius(*radius_inner)),
+            radius_outer: crate::radii::ResolvedRadius(*radius_outer),
+            start_angle: iced_core::Radians(*start_angle),
+            end_angle: iced_core::Radians(*end_angle),
+            fill: None,
+            stroke: Some(debug_stroke),
+        }),
+        ResolvedArea::Custom(_) => None, // Cannot easily draw custom dynamic interactions
+    }
 }

@@ -76,6 +76,7 @@ pub struct Memory<AxisId, Message: Clone, Tag: Hash + Eq + Clone, Renderer: crat
     pub action: Action<AxisId, Tag>,
     pub previous_click: Option<mouse::Click>,
     pub cache: Option<RefCell<RenderCache<Renderer>>>,
+    pub debug_cache: Option<RefCell<RenderCache<Renderer>>>,
     pub last_signature: Option<CacheSignature>,
     pub interaction_cache: RefCell<InteractionsCache<Message, Tag>>,
     pub last_hovered_identity: HoverIdentity<AxisId, Tag>,
@@ -91,6 +92,7 @@ impl<AxisId, Tag: Hash + Eq + Clone, Message: Clone, Renderer: crate::Renderer>
             action: Action::default(),
             previous_click: None,
             cache: None,
+            debug_cache: None,
             interaction_cache: RefCell::new(InteractionsCache::new()),
             last_signature: None,
             last_hovered_identity: HoverIdentity::OutsideBounds,
@@ -173,6 +175,11 @@ impl<AxisId, Tag: Hash + Eq + Clone, Message: Clone, Renderer: crate::Renderer>
                 cache.borrow_mut().request_redraw();
             };
 
+            // Clear debug cache
+            if let Some(debug_cache) = self.debug_cache.as_ref() {
+                debug_cache.borrow_mut().request_redraw();
+            };
+
             // Clear interaction cache
             self.interaction_cache.borrow_mut().clear();
         }
@@ -185,6 +192,7 @@ impl<AxisId, Tag: Hash + Eq + Clone, Message: Clone, Renderer: crate::Renderer>
     }
 
     pub fn make_sure_cache_is_initialized(&mut self, renderer: &Renderer, quality: Quality) {
+        // Initialize main cache
         if let Some(cache) = &self.cache {
             cache.borrow_mut().set_quality(quality);
         } else {
@@ -195,6 +203,18 @@ impl<AxisId, Tag: Hash + Eq + Clone, Message: Clone, Renderer: crate::Renderer>
             cache.set_quality(quality);
             self.cache = Some(RefCell::new(cache));
         }
+
+        // Initialize debug cache
+        if let Some(debug_cache) = &self.debug_cache {
+            debug_cache.borrow_mut().set_quality(quality);
+        } else {
+            let mut debug_cache = match renderer.preferred_backend() {
+                Backend::Mesh => RenderCache::new_mesh(),
+                Backend::Path => RenderCache::new_path(),
+            };
+            debug_cache.set_quality(quality);
+            self.debug_cache = Some(RefCell::new(debug_cache));
+        }
     }
 
     /// Gets a mutable reference to the internal cache
@@ -202,5 +222,12 @@ impl<AxisId, Tag: Hash + Eq + Clone, Message: Clone, Renderer: crate::Renderer>
     /// Panics if the cache isn't initialized
     pub fn get_cache_mut(&self) -> Option<RefMut<'_, RenderCache<Renderer>>> {
         self.cache.as_ref().map(|buf| buf.borrow_mut())
+    }
+
+    /// Gets a mutable reference to the internal cache
+    ///
+    /// Panics if the cache isn't initialized
+    pub fn get_debug_cache_mut(&self) -> Option<RefMut<'_, RenderCache<Renderer>>> {
+        self.debug_cache.as_ref().map(|buf| buf.borrow_mut())
     }
 }

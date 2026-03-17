@@ -8,7 +8,7 @@ use rapidhash::fast::RandomState;
 
 use crate::event::{self, PressEvent, ReleaseEvent};
 
-mod area;
+pub mod area;
 mod id;
 mod math;
 
