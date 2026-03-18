@@ -172,13 +172,25 @@ impl<Message: Clone, T: Hash + Eq + Clone> InteractionsCache<Message, T> {
     pub(crate) fn query(
         &self,
         query: &InteractionQuery,
-    ) -> impl DoubleEndedIterator<Item = (&Id<T>, &ResolvedInteraction<Message, T>)> {
+    ) -> impl Iterator<Item = (&Id<T>, &ResolvedInteraction<Message, T>)> {
         let query_bounds = query.bounds();
 
-        self.0.iter().filter(move |(_, interaction)| {
+        self.0.iter().rev().filter(move |(_, interaction)| {
             math::rect_intersects_rect(&interaction.area.bounding_box(), &query_bounds)
                 && interaction.area.intersects(query)
         })
+    }
+
+    pub(crate) fn query_filtered<P>(
+        &self,
+        query: &InteractionQuery,
+        predicate: P,
+    ) -> impl Iterator<Item = (&Id<T>, &ResolvedInteraction<Message, T>)>
+    where
+        P: Fn(&ResolvedInteraction<Message, T>) -> bool,
+    {
+        self.query(query)
+            .filter(move |(_, interaction)| predicate(interaction))
     }
 
     /// Queries the cache for the interaction that intersect the given query and has the highest
@@ -197,7 +209,7 @@ impl<Message: Clone, T: Hash + Eq + Clone> InteractionsCache<Message, T> {
         self.query(query)
             .filter(|(_, interaction)| predicate(interaction))
             .for_each(|(id, interaction)| {
-                if highest_priority_seen.is_some_and(|p| p < interaction.priority) {
+                if highest_priority_seen.is_none_or(|p| p < interaction.priority) {
                     current = Some((id.clone(), interaction));
                     highest_priority_seen = Some(interaction.priority);
                 }

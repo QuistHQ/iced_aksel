@@ -172,7 +172,7 @@ pub enum Error<AxisId> {
 type ErrorHandler<AxisId, Message> = event::Handler<Message, (Error<AxisId>,)>;
 type MoveHandler<Message> = event::Handler<Message, (MoveEvent<Point>,)>;
 type HoverHandler<Message> = event::Handler<Message, (keyboard::Modifiers,)>;
-type HoverMultipleHandler<Message, T> =
+type HoverAllHandler<Message, T> =
     event::Handler<Message, (Vec<interaction::Id<T>>, keyboard::Modifiers)>;
 type DragHandler<Message> = event::Handler<Message, (DragEvent<Delta>,)>;
 type ScrollHandler<Message> = event::Handler<Message, (ScrollEvent<Point>,)>;
@@ -254,7 +254,7 @@ pub struct Chart<
     on_release: Option<ReleaseHandler<Message>>,
     on_drag: Option<DragHandler<Message>>,
     on_hover: Option<HoverHandler<Message>>,
-    on_hover_all: Option<HoverMultipleHandler<Message, Tag>>,
+    on_hover_all: Option<HoverAllHandler<Message, Tag>>,
     on_move: Option<MoveHandler<Message>>,
     on_scroll: Option<ScrollHandler<Message>>,
 
@@ -520,30 +520,33 @@ where
                 tolerance_px: 5.0,
             };
 
-            // Loop through query for prioritized targets with `on_press` handlers
-            let target = interactions
-                .query_prioritized(&query, |interaction| interaction.on_press.is_some());
+            // Query for prioritized targets with `on_press` handlers
+            let target_id = interactions
+                .query_prioritized(&query, |interaction| interaction.on_press.is_some())
+                // Publish the target's event if any, and save the id to put into memory later
+                .map(|(id, interaction)| {
+                    // SAFETY: We just checked if the on_press handler exists in the prioritized query
+                    // above
+                    let handler = interaction.on_press.as_ref().unwrap();
 
-            // Publish the target's event if any, and save the id to put into memory later
-            let target_id = target.map(|(id, interaction)| {
-                // SAFETY: We just checked if the on_press handler exists in the prioritized query
-                // above
-                let handler = interaction.on_press.as_ref().unwrap();
+                    let normalized = Point::new(
+                        (mouse_pos.x - plot_bounds.x) / plot_bounds.width,
+                        1.0 - ((mouse_pos.y - plot_bounds.y) / plot_bounds.height),
+                    );
 
-                let normalized = Point::new(
-                    (mouse_pos.x - plot_bounds.x) / plot_bounds.width,
-                    1.0 - ((mouse_pos.y - plot_bounds.y) / plot_bounds.height),
-                );
+                    let event = PressEvent::new(
+                        normalized,
+                        button,
+                        click.kind(),
+                        memory.keyboard_modifiers,
+                    );
 
-                let event =
-                    PressEvent::new(normalized, button, click.kind(), memory.keyboard_modifiers);
+                    if let Some(message) = handler.run((id.clone(), event)) {
+                        shell.publish(message);
+                    }
 
-                if let Some(message) = handler.run((id.clone(), event)) {
-                    shell.publish(message);
-                }
-
-                id
-            });
+                    id
+                });
 
             let handled = target_id.is_some();
 
@@ -639,52 +642,67 @@ where
 
         match action {
             Action::Idle => (), // Do nothing
-            Action::DraggingPlot { origin, .. } => {
+            Action::DraggingPlot {
+                origin,
+                interaction_id,
+                ..
+            } => {
                 let plot_bounds = self.get_plot_layout(layout).bounds();
                 let interactions = memory.interaction_cache.borrow();
 
+                let normalized = Point::new(
+                    (origin.x - plot_bounds.x) / plot_bounds.width,
+                    1.0 - ((origin.y - plot_bounds.y) / plot_bounds.height),
+                );
+                let event = ReleaseEvent::new(
+                    normalized,
+                    button,
+                    previous_click_kind,
+                    memory.keyboard_modifiers,
+                    was_dragging,
+                );
+
+                // If interaction started on another interaction, we should prefer using that
+                if let Some(existing_id) = interaction_id
+                    && let Some(interaction) = interactions.get(existing_id)
+                    && let Some(handler) = interaction.on_release.as_ref()
+                {
+                    // Publish message if any and return - Also return otherwise, so we don't
+                    // process any other events
+                    if let Some(message) = handler.run((existing_id.clone(), event)) {
+                        shell.publish(message)
+                    }
+                    return;
+                }
+
+                // If we have no "current" interaction, we look for one before handling chart
                 let query = InteractionQuery::Point {
                     position: *origin,
                     tolerance_px: 5.0,
                 };
-
-                for (id, interaction) in interactions.query(&query).into_iter().rev() {
-                    if let Some(handler) = &interaction.on_release {
-                        let normalized = Point::new(
-                            (origin.x - plot_bounds.x) / plot_bounds.width,
-                            1.0 - ((origin.y - plot_bounds.y) / plot_bounds.height),
-                        );
-                        let event = ReleaseEvent::new(
-                            normalized,
-                            button,
-                            previous_click_kind,
-                            memory.keyboard_modifiers,
-                            was_dragging,
-                        );
+                let target_id = interactions
+                    .query_prioritized(&query, |interaction| interaction.on_release.is_some())
+                    .map(|(id, interaction)| {
+                        // SAFETY: We just checked if the on_press handler exists in the prioritized query
+                        // above
+                        let handler = interaction.on_release.as_ref().unwrap();
 
                         if let Some(message) = handler.run((id.clone(), event)) {
                             shell.publish(message);
-                            // You can't press more than thing at a time
-                            return;
                         }
-                    }
+
+                        id
+                    });
+
+                if target_id.is_some() {
+                    // Don't handle chart if we already hit an interaction
+                    return;
                 }
 
-                if let Some(handler) = &self.on_release {
-                    let normalized = Point::new(
-                        (origin.x - plot_bounds.x) / plot_bounds.width,
-                        1.0 - ((origin.y - plot_bounds.y) / plot_bounds.height),
-                    );
-                    if let Some(message) = handler.run((ReleaseEvent::new(
-                        normalized,
-                        button,
-                        previous_click_kind,
-                        memory.keyboard_modifiers,
-                        was_dragging,
-                    ),))
-                    {
-                        shell.publish(message);
-                    }
+                if let Some(handler) = &self.on_release
+                    && let Some(message) = handler.run((event,))
+                {
+                    shell.publish(message);
                 }
             }
             Action::DraggingAxis { id, origin, .. } => {
@@ -729,19 +747,17 @@ where
             match action {
                 Action::DraggingAxis { .. } => (), // Ignore if dragging axis
                 Action::Idle => {
-                    let normalized = Point::new(
-                        (mouse_pos.x - plot_bounds.x) / plot_bounds.width,
-                        1.0 - ((mouse_pos.y - plot_bounds.y) / plot_bounds.height),
-                    );
                     if let Some(handler) = &self.on_move
-                        && let Some(message) =
-                            handler.run((MoveEvent::new(normalized, memory.keyboard_modifiers),))
+                        && let Some(message) = handler.run((MoveEvent::new(
+                            Point::new(
+                                (mouse_pos.x - plot_bounds.x) / plot_bounds.width,
+                                1.0 - ((mouse_pos.y - plot_bounds.y) / plot_bounds.height),
+                            ),
+                            memory.keyboard_modifiers,
+                        ),))
                     {
                         shell.publish(message);
                     }
-
-                    let mut all = self.on_hover_all.as_ref().map(|_| vec![]);
-                    let mut new_identity = None;
 
                     // Check the Interaction Registry for hovers!
                     let interactions = memory.interaction_cache.borrow();
@@ -750,30 +766,29 @@ where
                         tolerance_px: 5.0,
                     };
 
-                    for (id, _interaction) in interactions.query(&query).into_iter().rev() {
-                        let Some(ids) = &mut all else {
-                            if new_identity.is_none() {
-                                new_identity = Some(HoverIdentity::Interaction(id.clone()));
-                                continue;
-                            }
+                    // TODO: Stupid check - Refactor/optimize later
+                    // We shouldn't query twice
 
-                            // Early return if we don't look for all hovers
-                            break;
-                        };
+                    // Check all, if we need to
+                    self.on_hover_all
+                        .as_ref()
+                        .map(|handler: &HoverAllHandler<Message, Tag>| {
+                            let targets = interactions
+                                .query_filtered(&query, |interaction| {
+                                    interaction.on_hover.is_some()
+                                })
+                                .map(|(id, _)| id.clone())
+                                .collect();
 
-                        ids.push(id.clone());
-                    }
+                            handler.run((targets, memory.keyboard_modifiers))
+                        });
 
-                    if let Some(ids) = all
-                        && let Some(message) = self
-                            .on_hover_all
-                            .as_ref()
-                            .and_then(|f| f.run((ids, memory.keyboard_modifiers)))
-                    {
-                        shell.publish(message);
-                    }
+                    // Check for prioritized `on_hover` interaction
+                    let prioritized_id = interactions
+                        .query_prioritized(&query, |interaction| interaction.on_hover.is_some())
+                        .map(|(id, _)| HoverIdentity::Interaction(id));
 
-                    let identity = new_identity.unwrap_or(HoverIdentity::Plot);
+                    let identity = prioritized_id.unwrap_or(HoverIdentity::Plot);
 
                     if memory.last_hovered_identity != identity {
                         memory.last_hovered_identity = identity;
@@ -1215,7 +1230,6 @@ where
             Event::Mouse(mouse::Event::CursorMoved { position }) => {
                 let changed = self.handle_mouse_moved(memory, layout, shell, *position);
                 if changed {
-                    println!("Identity changed! {:?}", memory.last_hovered_identity);
                     match &memory.last_hovered_identity {
                         HoverIdentity::Plot => {
                             if let Some(message) = self
