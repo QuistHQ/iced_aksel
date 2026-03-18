@@ -17,22 +17,21 @@ pub use id::Id;
 
 use area::ResolvedArea;
 
-type HoverHandler<Message, T = ()> = event::Handler<Message, (Id<T>, keyboard::Modifiers)>;
-type DragHandler<Message, T = ()> =
-    event::Handler<Message, (Id<T>, event::DragEvent<event::Delta>)>;
-type PressHandler<Message, T = ()> = event::Handler<Message, (Id<T>, PressEvent<Point>)>;
-type ReleaseHandler<Message, T = ()> = event::Handler<Message, (Id<T>, ReleaseEvent<Point>)>;
+type HoverHandler<Message, Tag> = event::Handler<Message, (Id<Tag>, keyboard::Modifiers)>;
+type DragHandler<Message, Tag> = event::Handler<Message, (Id<Tag>, event::DragEvent<event::Delta>)>;
+type PressHandler<Message, Tag> = event::Handler<Message, (Id<Tag>, PressEvent<Point>)>;
+type ReleaseHandler<Message, Tag> = event::Handler<Message, (Id<Tag>, ReleaseEvent<Point>)>;
+type CursorHandler = event::Handler<mouse::Interaction, (InteractionStatus,)>;
 
-pub type CursorHandler = event::Handler<mouse::Interaction, (InteractionStatus,)>;
-
-pub struct Interaction<D, Message: Clone, T: Hash + Eq + Clone = ()> {
-    pub(crate) id: Id<T>,
+pub struct Interaction<D, Message: Clone, Tag: Hash + Eq + Clone = ()> {
+    pub(crate) id: Id<Tag>,
+    pub(crate) priority: u8,
     pub(crate) area: Area<D>,
     pub(crate) cursor_handler: Option<CursorHandler>,
-    pub(crate) on_hover: Option<HoverHandler<Message, T>>,
-    pub(crate) on_drag: Option<DragHandler<Message, T>>,
-    pub(crate) on_press: Option<PressHandler<Message, T>>,
-    pub(crate) on_release: Option<ReleaseHandler<Message, T>>,
+    pub(crate) on_hover: Option<HoverHandler<Message, Tag>>,
+    pub(crate) on_drag: Option<DragHandler<Message, Tag>>,
+    pub(crate) on_press: Option<PressHandler<Message, Tag>>,
+    pub(crate) on_release: Option<ReleaseHandler<Message, Tag>>,
 }
 
 impl<D: Float, Message: Clone, T: Hash + Eq + Clone> Interaction<D, Message, T> {
@@ -43,6 +42,7 @@ impl<D: Float, Message: Clone, T: Hash + Eq + Clone> Interaction<D, Message, T> 
     ) -> (Id<T>, ResolvedInteraction<Message, T>) {
         let Self {
             id,
+            priority,
             area,
             cursor_handler,
             on_hover,
@@ -57,6 +57,7 @@ impl<D: Float, Message: Clone, T: Hash + Eq + Clone> Interaction<D, Message, T> 
         (
             id,
             ResolvedInteraction {
+                priority,
                 area,
                 bounding_box,
                 cursor_handler,
@@ -73,6 +74,7 @@ impl<D: Float, Message: Clone, T: Hash + Eq + Clone> Interaction<D, Message, T> 
         let area = area.into();
         Self {
             id,
+            priority: u8::MIN,
             area,
             cursor_handler: None,
             on_hover: None,
@@ -80,6 +82,17 @@ impl<D: Float, Message: Clone, T: Hash + Eq + Clone> Interaction<D, Message, T> 
             on_press: None,
             on_release: None,
         }
+    }
+
+    /// Sets the priority of the interaction.
+    ///
+    /// 255 = highest priority.
+    /// 0 = lowest priority.
+    ///
+    /// Defaults to 0.
+    pub const fn priority(mut self, prio: u8) -> Self {
+        self.priority = prio;
+        self
     }
 
     /// Sets a dynamic cursor for this interaction based on its current status.
@@ -109,20 +122,21 @@ impl<D: Float, Message: Clone, T: Hash + Eq + Clone> Interaction<D, Message, T> 
 /// A stored interaction waiting to be tested against mouse events.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub(crate) struct ResolvedInteraction<Message: Clone, T: Hash + Eq + Clone = ()> {
+pub(crate) struct ResolvedInteraction<Message: Clone, Tag: Hash + Eq + Clone> {
+    pub priority: u8,
     pub area: ResolvedArea,
     pub bounding_box: Rectangle,
 
     #[derivative(Debug = "ignore")]
     pub cursor_handler: Option<CursorHandler>,
     #[derivative(Debug = "ignore")]
-    pub on_hover: Option<HoverHandler<Message, T>>,
+    pub on_hover: Option<HoverHandler<Message, Tag>>,
     #[derivative(Debug = "ignore")]
-    pub on_drag: Option<DragHandler<Message, T>>,
+    pub on_drag: Option<DragHandler<Message, Tag>>,
     #[derivative(Debug = "ignore")]
-    pub on_press: Option<PressHandler<Message, T>>,
+    pub on_press: Option<PressHandler<Message, Tag>>,
     #[derivative(Debug = "ignore")]
-    pub on_release: Option<ReleaseHandler<Message, T>>,
+    pub on_release: Option<ReleaseHandler<Message, Tag>>,
 }
 
 /// The registry that collects hitboxes during the drawing phase.
@@ -155,22 +169,41 @@ impl<Message: Clone, T: Hash + Eq + Clone> InteractionsCache<Message, T> {
     }
 
     /// Queries the cache for all interactions that intersect the given query.
-    pub fn query(
+    pub(crate) fn query(
         &self,
         query: &InteractionQuery,
-    ) -> Vec<(&Id<T>, &ResolvedInteraction<Message, T>)> {
-        let mut hits = Vec::new();
+    ) -> impl DoubleEndedIterator<Item = (&Id<T>, &ResolvedInteraction<Message, T>)> {
         let query_bounds = query.bounds();
 
-        for (id, interaction) in self.0.iter() {
-            if math::rect_intersects_rect(&interaction.area.bounding_box(), &query_bounds) {
-                if interaction.area.intersects(query) {
-                    hits.push((id, interaction));
-                }
-            }
-        }
+        self.0.iter().filter(move |(_, interaction)| {
+            math::rect_intersects_rect(&interaction.area.bounding_box(), &query_bounds)
+                && interaction.area.intersects(query)
+        })
+    }
 
-        hits
+    /// Queries the cache for the interaction that intersect the given query and has the highest
+    /// priority.
+    pub(crate) fn query_prioritized<P>(
+        &self,
+        query: &InteractionQuery,
+        predicate: P,
+    ) -> Option<(Id<T>, &ResolvedInteraction<Message, T>)>
+    where
+        P: Fn(&ResolvedInteraction<Message, T>) -> bool,
+    {
+        let mut current = None;
+        let mut highest_priority_seen = None;
+
+        self.query(query)
+            .filter(|(_, interaction)| predicate(interaction))
+            .for_each(|(id, interaction)| {
+                if highest_priority_seen.is_some_and(|p| p < interaction.priority) {
+                    current = Some((id.clone(), interaction));
+                    highest_priority_seen = Some(interaction.priority);
+                }
+            });
+
+        current
     }
 }
 

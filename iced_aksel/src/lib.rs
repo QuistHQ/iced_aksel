@@ -512,7 +512,6 @@ where
         if plot_bounds.contains(mouse_pos) {
             shell.capture_event();
 
-            let mut target_id = None;
             let interactions = memory.interaction_cache.borrow();
 
             // Build the query with a 5px hover/click tolerance
@@ -521,35 +520,30 @@ where
                 tolerance_px: 5.0,
             };
 
-            for (id, interaction) in interactions.query(&query).into_iter().rev() {
-                if let Some(handler) = &interaction.on_press {
-                    // TODO: Priority sorting - Which id should we actually save?
-                    // 1. We hit a shape! Register it as the active drag/hold target immediately.
-                    target_id = Some(id.clone());
+            // Loop through query for prioritized targets with `on_press` handlers
+            let target = interactions
+                .query_prioritized(&query, |interaction| interaction.on_press.is_some());
 
-                    // 2. If it has a specific on_press handler, fire it.
-                    if let Some(handler) = &interaction.on_press {
-                        let normalized = Point::new(
-                            (mouse_pos.x - plot_bounds.x) / plot_bounds.width,
-                            1.0 - ((mouse_pos.y - plot_bounds.y) / plot_bounds.height),
-                        );
+            // Publish the target's event if any, and save the id to put into memory later
+            let target_id = target.map(|(id, interaction)| {
+                // SAFETY: We just checked if the on_press handler exists in the prioritized query
+                // above
+                let handler = interaction.on_press.as_ref().unwrap();
 
-                        let event = PressEvent::new(
-                            normalized,
-                            button,
-                            click.kind(),
-                            memory.keyboard_modifiers,
-                        );
+                let normalized = Point::new(
+                    (mouse_pos.x - plot_bounds.x) / plot_bounds.width,
+                    1.0 - ((mouse_pos.y - plot_bounds.y) / plot_bounds.height),
+                );
 
-                        if let Some(message) = handler.run((id.clone(), event)) {
-                            shell.publish(message);
-                        }
-                    }
+                let event =
+                    PressEvent::new(normalized, button, click.kind(), memory.keyboard_modifiers);
 
-                    // 3. Break on the first (top-most) shape so we don't click through layers
-                    break;
+                if let Some(message) = handler.run((id.clone(), event)) {
+                    shell.publish(message);
                 }
-            }
+
+                id
+            });
 
             let handled = target_id.is_some();
 

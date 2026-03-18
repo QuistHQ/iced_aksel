@@ -393,6 +393,7 @@ impl PlotData<f64, Message> for DrawingData {
 
                     plot.add_interaction(
                         Interaction::new(item.id.clone(), &shape)
+                            .priority(255)
                             .on_hover(Message::ShapeHovered)
                             .on_press(|id, event: PressEvent<Point>| {
                                 (event.button == mouse::Button::Left)
