@@ -2,7 +2,7 @@ use std::hash::Hash;
 
 use aksel::{Float, Transform};
 use derivative::Derivative;
-use iced_core::{Point, Rectangle, keyboard};
+use iced_core::{Point, Rectangle, keyboard, mouse};
 use indexmap::IndexMap;
 use rapidhash::fast::RandomState;
 
@@ -23,9 +23,12 @@ type DragHandler<Message, T = ()> =
 type PressHandler<Message, T = ()> = event::Handler<Message, (Id<T>, PressEvent<Point>)>;
 type ReleaseHandler<Message, T = ()> = event::Handler<Message, (Id<T>, ReleaseEvent<Point>)>;
 
+pub type CursorHandler = event::Handler<mouse::Interaction, (InteractionStatus,)>;
+
 pub struct Interaction<D, Message: Clone, T: Hash + Eq + Clone = ()> {
     pub(crate) id: Id<T>,
     pub(crate) area: Area<D>,
+    pub(crate) cursor_handler: Option<CursorHandler>,
     pub(crate) on_hover: Option<HoverHandler<Message, T>>,
     pub(crate) on_drag: Option<DragHandler<Message, T>>,
     pub(crate) on_press: Option<PressHandler<Message, T>>,
@@ -41,6 +44,7 @@ impl<D: Float, Message: Clone, T: Hash + Eq + Clone> Interaction<D, Message, T> 
         let Self {
             id,
             area,
+            cursor_handler,
             on_hover,
             on_drag,
             on_press,
@@ -55,6 +59,7 @@ impl<D: Float, Message: Clone, T: Hash + Eq + Clone> Interaction<D, Message, T> 
             ResolvedInteraction {
                 area,
                 bounding_box,
+                cursor_handler,
                 on_hover,
                 on_drag,
                 on_press,
@@ -69,11 +74,21 @@ impl<D: Float, Message: Clone, T: Hash + Eq + Clone> Interaction<D, Message, T> 
         Self {
             id,
             area,
+            cursor_handler: None,
             on_hover: None,
             on_drag: None,
             on_press: None,
             on_release: None,
         }
+    }
+
+    /// Sets a dynamic cursor for this interaction based on its current status.
+    pub fn cursor<F>(mut self, f: F) -> Self
+    where
+        F: crate::event::IntoHandler<mouse::Interaction, (InteractionStatus,)>,
+    {
+        self.cursor_handler = Some(f.into_handler());
+        self
     }
 
     event::impl_handlers!(
@@ -98,6 +113,8 @@ pub(crate) struct ResolvedInteraction<Message: Clone, T: Hash + Eq + Clone = ()>
     pub area: ResolvedArea,
     pub bounding_box: Rectangle,
 
+    #[derivative(Debug = "ignore")]
+    pub cursor_handler: Option<CursorHandler>,
     #[derivative(Debug = "ignore")]
     pub on_hover: Option<HoverHandler<Message, T>>,
     #[derivative(Debug = "ignore")]
@@ -190,4 +207,22 @@ impl InteractionQuery {
             Self::Bounds(rect) => *rect,
         }
     }
+}
+
+/// The current state of an interaction, used to determine dynamic styling like cursors.
+#[derive(Debug, Clone, Copy)]
+pub struct InteractionStatus {
+    /// Whether the mouse is currently hovering over this specific interaction.
+    pub is_hovered: bool,
+    /// Whether the mouse button is currently pressed down on this interaction.
+    pub is_pressed: bool,
+    /// Whether the interaction is currently being dragged (surpassed the drag deadband).
+    pub is_dragging: bool,
+
+    /// The button held. Only present if dragging or pressed.
+    pub button_held: Option<mouse::Button>,
+    /// The kind of click used to start dragging or pressing.
+    pub click_kind: Option<mouse::click::Kind>,
+    /// The current state of keyboard modifiers (Shift, Control, Alt, etc.).
+    pub modifiers: iced_core::keyboard::Modifiers,
 }

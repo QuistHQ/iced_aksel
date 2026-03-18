@@ -81,8 +81,8 @@
 use aksel::ScreenRect;
 use derive_more::{Display, Error};
 use iced_core::{
-    Border, Clipboard, Color, Element, Event, Font, Layout, Length, Padding, Point, Rectangle,
-    Shell, Size, Widget, keyboard,
+    Clipboard, Color, Element, Event, Font, Layout, Length, Padding, Point, Rectangle, Shell, Size,
+    Widget, keyboard,
     layout::{self, Limits, Node},
     mouse,
     renderer::{Quad, Style},
@@ -246,6 +246,9 @@ pub struct Chart<
     // Interaction Handlers
     on_error: Option<ErrorHandler<AxisId, Message>>,
 
+    // Cursor
+    background_cursor: mouse::Interaction,
+
     // Plot Area Handlers
     on_press: Option<PressHandler<Message>>,
     on_release: Option<ReleaseHandler<Message>>,
@@ -295,6 +298,9 @@ where
             // Handlers and fonts default to None
             axis_font: None,
             on_error: None,
+
+            background_cursor: mouse::Interaction::Idle,
+
             on_drag: None,
             on_hover: None,
             on_hover_all: None,
@@ -389,6 +395,14 @@ where
     /// Default is 10 pixels. This helps prevent accidental drags when the user intended to click.
     pub const fn drag_deadband(mut self, distance: f32) -> Self {
         self.drag_deadband = distance;
+        self
+    }
+
+    /// Sets the default mouse cursor to display when hovering over the empty plot background.
+    ///
+    /// If an interactive shape overrides the cursor, this background cursor will be temporarily hidden.
+    pub const fn background_cursor(mut self, cursor: mouse::Interaction) -> Self {
+        self.background_cursor = cursor;
         self
     }
 
@@ -498,7 +512,7 @@ where
         if plot_bounds.contains(mouse_pos) {
             shell.capture_event();
 
-            let mut interaction_id = None;
+            let mut target_id = None;
             let interactions = memory.interaction_cache.borrow();
 
             // Build the query with a 5px hover/click tolerance
@@ -510,36 +524,37 @@ where
             for (id, interaction) in interactions.query(&query).into_iter().rev() {
                 if let Some(handler) = &interaction.on_press {
                     // TODO: Priority sorting - Which id should we actually save?
-                    // We just save the top-most Id for now
-                    if interaction_id.is_none() && interaction.on_drag.is_some() {
-                        interaction_id = Some(id.clone());
+                    // 1. We hit a shape! Register it as the active drag/hold target immediately.
+                    target_id = Some(id.clone());
+
+                    // 2. If it has a specific on_press handler, fire it.
+                    if let Some(handler) = &interaction.on_press {
+                        let normalized = Point::new(
+                            (mouse_pos.x - plot_bounds.x) / plot_bounds.width,
+                            1.0 - ((mouse_pos.y - plot_bounds.y) / plot_bounds.height),
+                        );
+
+                        let event = PressEvent::new(
+                            normalized,
+                            button,
+                            click.kind(),
+                            memory.keyboard_modifiers,
+                        );
+
+                        if let Some(message) = handler.run((id.clone(), event)) {
+                            shell.publish(message);
+                        }
                     }
 
-                    let normalized = Point::new(
-                        (mouse_pos.x - plot_bounds.x) / plot_bounds.width,
-                        1.0 - ((mouse_pos.y - plot_bounds.y) / plot_bounds.height),
-                    );
-
-                    let event = PressEvent::new(
-                        normalized,
-                        button,
-                        click.kind(),
-                        memory.keyboard_modifiers,
-                    );
-
-                    if let Some(message) = handler.run((id.clone(), event)) {
-                        shell.publish(message);
-                    }
-
-                    // You can't press more than thing at a time
+                    // 3. Break on the first (top-most) shape so we don't click through layers
                     break;
                 }
             }
 
-            let handled = interaction_id.is_some();
+            let handled = target_id.is_some();
 
             memory.action = Action::DraggingPlot {
-                interaction_id,
+                interaction_id: target_id,
                 origin: mouse_pos,
                 last_position: mouse_pos,
                 total_delta: 0.0,
@@ -1455,6 +1470,78 @@ where
                     );
                 }
             }
+        }
+    }
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        _viewport: &Rectangle,
+        _renderer: &Renderer,
+    ) -> mouse::Interaction {
+        let memory: &Memory<AxisId, Message, Tag, Renderer> = tree.state.downcast_ref();
+        let interactions = memory.interaction_cache.borrow();
+
+        // 1. Identify if we are interacting with a specific shape
+        let (target_id, click_kind, button_held, drag_delta) = match &memory.action {
+            Action::DraggingPlot {
+                interaction_id,
+                click_kind,
+                button,
+                total_delta,
+                ..
+            } => (
+                interaction_id.clone(),
+                Some(*click_kind),
+                Some(*button),
+                Some(*total_delta),
+            ),
+            Action::Idle => {
+                let id = if let HoverIdentity::Interaction(id) = &memory.last_hovered_identity {
+                    Some(id.clone())
+                } else {
+                    None
+                };
+                (id, None, None, None)
+            }
+            _ => (None, None, None, None),
+        };
+
+        // 2. Query for a Specific Interaction Cursor
+        if let Some(id) = target_id
+            && let Some(interaction) = interactions.get(&id)
+            && let Some(handler) = interaction.cursor_handler.as_ref()
+        {
+            // Calculate mutually exclusive states
+            let is_dragging = drag_delta.is_some_and(|delta| delta >= self.drag_deadband);
+            let is_pressed = drag_delta.is_some_and(|_| !is_dragging);
+            let is_hovered = !is_pressed
+                && !is_dragging
+                && matches!(memory.last_hovered_identity, HoverIdentity::Interaction(ref i) if i == &id);
+
+            let status = interaction::InteractionStatus {
+                is_hovered,
+                is_pressed,
+                is_dragging,
+                button_held,
+                click_kind,
+                modifiers: memory.keyboard_modifiers,
+            };
+
+            // If the user provided a specific cursor, return it immediately
+            if let Some(preferred_cursor) = handler.run((status,)) {
+                return preferred_cursor;
+            }
+        }
+
+        // 3. System Default Fallback
+        // If the mouse is over the plot bounds, use the user's custom background cursor.
+        // Otherwise, if outside the chart entirely, return the standard arrow.
+        if cursor.position_over(layout.bounds()).is_some() {
+            self.background_cursor
+        } else {
+            mouse::Interaction::Idle
         }
     }
 }

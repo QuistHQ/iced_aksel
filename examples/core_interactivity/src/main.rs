@@ -6,7 +6,8 @@ use iced::{
 };
 use iced_aksel::{
     Axis, Cached, Chart, Delta, DragEvent, Interaction, Measure, PlotPoint, PressEvent,
-    ReleaseEvent, ScrollEvent, State, Stroke, axis, interaction,
+    ReleaseEvent, ScrollEvent, State, Stroke, axis,
+    interaction::{self, InteractionStatus},
     plot::{Plot, PlotData},
     radii::{Radii, Radius},
     scale::Linear,
@@ -279,6 +280,7 @@ impl DrawingApp {
         let chart = Chart::new(&self.chart_state)
             .debug(true)
             .plot_data(&self.data, Self::X, Self::Y)
+            .background_cursor(mouse::Interaction::Crosshair)
             .on_hover(|_| Message::BackgroundHovered)
             .on_press(|event: PressEvent<Point>| match event.button {
                 mouse::Button::Left => Some(Message::BackgroundPressed),
@@ -575,7 +577,18 @@ impl PlotData<f64, Message> for DrawingData {
                                 (event.button == mouse::Button::Right)
                                     .then_some(Message::DeleteShape(id))
                             })
-                            .on_drag(Message::ShapeDragged),
+                            .on_drag(Message::ShapeDragged)
+                            .cursor(|c: InteractionStatus| {
+                                if c.is_pressed {
+                                    Some(mouse::Interaction::Help)
+                                } else if c.is_dragging {
+                                    Some(mouse::Interaction::Grab)
+                                } else if c.is_hovered {
+                                    Some(mouse::Interaction::Cell)
+                                } else {
+                                    None
+                                }
+                            }),
                     );
                     plot.render(shape);
                 }
