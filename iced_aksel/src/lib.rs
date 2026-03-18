@@ -1511,6 +1511,7 @@ where
         // 2. Query for a Specific Interaction Cursor
         if let Some(id) = target_id
             && let Some(interaction) = interactions.get(&id)
+            && let Some(handler) = interaction.cursor_handler.as_ref()
         {
             // Calculate mutually exclusive states
             let is_dragging = drag_delta.is_some_and(|delta| delta >= self.drag_deadband);
@@ -1529,7 +1530,7 @@ where
             };
 
             // If the user provided a specific cursor, return it immediately
-            if let Some(preferred_cursor) = (interaction.cursor_query)(status) {
+            if let Some(preferred_cursor) = handler.run((status,)) {
                 return preferred_cursor;
             }
         }

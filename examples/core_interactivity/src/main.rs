@@ -6,7 +6,8 @@ use iced::{
 };
 use iced_aksel::{
     Axis, Cached, Chart, Delta, DragEvent, Interaction, Measure, PlotPoint, PressEvent,
-    ReleaseEvent, ScrollEvent, State, Stroke, axis, interaction,
+    ReleaseEvent, ScrollEvent, State, Stroke, axis,
+    interaction::{self, InteractionStatus},
     plot::{Plot, PlotData},
     radii::{Radii, Radius},
     scale::Linear,
@@ -577,7 +578,7 @@ impl PlotData<f64, Message> for DrawingData {
                                     .then_some(Message::DeleteShape(id))
                             })
                             .on_drag(Message::ShapeDragged)
-                            .cursor(|c| {
+                            .cursor(|c: InteractionStatus| {
                                 if c.is_pressed {
                                     Some(mouse::Interaction::Help)
                                 } else if c.is_dragging {
