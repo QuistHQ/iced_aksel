@@ -219,6 +219,11 @@ pub struct InteractionStatus {
     pub is_pressed: bool,
     /// Whether the interaction is currently being dragged (surpassed the drag deadband).
     pub is_dragging: bool,
+
+    /// The button held. Only present if dragging or pressed.
+    pub button_held: Option<mouse::Button>,
+    /// The kind of click used to start dragging or pressing.
+    pub click_kind: Option<mouse::click::Kind>,
     /// The current state of keyboard modifiers (Shift, Control, Alt, etc.).
     pub modifiers: iced_core::keyboard::Modifiers,
 }
