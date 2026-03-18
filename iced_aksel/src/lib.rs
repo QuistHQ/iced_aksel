@@ -135,7 +135,8 @@ use layer::Layer;
 use memory::Memory;
 
 /// Default movement threshold (in pixels) to distinguish a click from a drag operation.
-const DEFAULT_DRAG_DEADBAND: f32 = 10.0;
+const DEFAULT_DRAG_DEADBAND: f32 = 5.0;
+const INTERACTION_HIT_TOLERANCE: f32 = 1.0;
 
 /// Errors that can occur during chart construction or rendering.
 #[derive(Debug, Clone, Error, Display)]
@@ -517,7 +518,7 @@ where
             // Build the query with a 5px hover/click tolerance
             let query = InteractionQuery::Point {
                 position: mouse_pos,
-                tolerance_px: 5.0,
+                tolerance_px: INTERACTION_HIT_TOLERANCE,
             };
 
             // Query for prioritized targets with `on_press` handlers
@@ -678,7 +679,7 @@ where
                 // If we have no "current" interaction, we look for one before handling chart
                 let query = InteractionQuery::Point {
                     position: *origin,
-                    tolerance_px: 5.0,
+                    tolerance_px: INTERACTION_HIT_TOLERANCE,
                 };
                 let target_id = interactions
                     .query_prioritized(&query, |interaction| interaction.on_release.is_some())
@@ -763,7 +764,7 @@ where
                     let interactions = memory.interaction_cache.borrow();
                     let query = InteractionQuery::Point {
                         position: mouse_pos,
-                        tolerance_px: 5.0,
+                        tolerance_px: INTERACTION_HIT_TOLERANCE,
                     };
 
                     // TODO: Stupid check - Refactor/optimize later
