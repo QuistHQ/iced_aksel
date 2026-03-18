@@ -246,6 +246,9 @@ pub struct Chart<
     // Interaction Handlers
     on_error: Option<ErrorHandler<AxisId, Message>>,
 
+    // Cursor
+    background_cursor: mouse::Interaction,
+
     // Plot Area Handlers
     on_press: Option<PressHandler<Message>>,
     on_release: Option<ReleaseHandler<Message>>,
@@ -295,6 +298,9 @@ where
             // Handlers and fonts default to None
             axis_font: None,
             on_error: None,
+
+            background_cursor: mouse::Interaction::Idle,
+
             on_drag: None,
             on_hover: None,
             on_hover_all: None,
@@ -389,6 +395,14 @@ where
     /// Default is 10 pixels. This helps prevent accidental drags when the user intended to click.
     pub const fn drag_deadband(mut self, distance: f32) -> Self {
         self.drag_deadband = distance;
+        self
+    }
+
+    /// Sets the default mouse cursor to display when hovering over the empty plot background.
+    ///
+    /// If an interactive shape overrides the cursor, this background cursor will be temporarily hidden.
+    pub const fn background_cursor(mut self, cursor: mouse::Interaction) -> Self {
+        self.background_cursor = cursor;
         self
     }
 
@@ -1462,7 +1476,7 @@ where
         &self,
         tree: &Tree,
         layout: Layout<'_>,
-        _cursor: mouse::Cursor,
+        cursor: mouse::Cursor,
         _viewport: &Rectangle,
         _renderer: &Renderer,
     ) -> mouse::Interaction {
@@ -1529,8 +1543,13 @@ where
         }
 
         // 3. System Default Fallback
-        // Returns the standard arrow (Idle) for everything else (plot background, axes, etc.)
-        mouse::Interaction::Idle
+        // If the mouse is over the plot bounds, use the user's custom background cursor.
+        // Otherwise, if outside the chart entirely, return the standard arrow.
+        if cursor.position_over(layout.bounds()).is_some() {
+            self.background_cursor
+        } else {
+            mouse::Interaction::Idle
+        }
     }
 }
 
