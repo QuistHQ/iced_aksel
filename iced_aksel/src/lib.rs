@@ -1482,19 +1482,47 @@ where
             _ => None,
         };
 
-        // 2. If so, ask that shape for its cursor preference
-        if let Some(id) = target_id
+        // 2. Query for a Specific Interaction Cursor
+        if let Some(id) = target_id.clone()
             && let Some(interaction) = interactions.get(&id)
         {
+            // Calculate mutually exclusive states
+            let is_dragging = matches!(memory.action, Action::DraggingPlot { total_delta, .. } if total_delta >= self.drag_deadband);
+            let is_pressed = matches!(memory.action, Action::DraggingPlot { .. }) && !is_dragging;
+            let is_hovered = matches!(memory.last_hovered_identity, HoverIdentity::Interaction(ref i) if i == &id)
+                && !is_pressed
+                && !is_dragging;
+
             let status = interaction::InteractionStatus {
-                is_hovered: matches!(memory.last_hovered_identity, HoverIdentity::Interaction(ref i) if i == &id),
-                is_pressed: matches!(memory.action, Action::DraggingPlot { .. }),
-                is_dragging: matches!(memory.action, Action::DraggingPlot { total_delta, .. } if total_delta >= self.drag_deadband),
+                is_hovered,
+                is_pressed,
+                is_dragging,
                 modifiers: memory.keyboard_modifiers,
             };
 
-            // If the user's closure returns Some(cursor), use it.
-            // If it returns None (our new default), we return Idle.
+            // If the user provided a specific cursor, return it immediately
+            if let Some(preferred_cursor) = (interaction.cursor_query)(status) {
+                return preferred_cursor;
+            }
+        } // 2. Query for a Specific Interaction Cursor
+        if let Some(id) = target_id
+            && let Some(interaction) = interactions.get(&id)
+        {
+            // Calculate mutually exclusive states
+            let is_dragging = matches!(memory.action, Action::DraggingPlot { total_delta, .. } if total_delta >= self.drag_deadband);
+            let is_pressed = matches!(memory.action, Action::DraggingPlot { .. }) && !is_dragging;
+            let is_hovered = matches!(memory.last_hovered_identity, HoverIdentity::Interaction(ref i) if i == &id)
+                && !is_pressed
+                && !is_dragging;
+
+            let status = interaction::InteractionStatus {
+                is_hovered,
+                is_pressed,
+                is_dragging,
+                modifiers: memory.keyboard_modifiers,
+            };
+
+            // If the user provided a specific cursor, return it immediately
             if let Some(preferred_cursor) = (interaction.cursor_query)(status) {
                 return preferred_cursor;
             }
