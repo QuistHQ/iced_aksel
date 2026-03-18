@@ -206,8 +206,7 @@ impl<Message: Clone, T: Hash + Eq + Clone> InteractionsCache<Message, T> {
         let mut current = None;
         let mut highest_priority_seen = None;
 
-        self.query(query)
-            .filter(|(_, interaction)| predicate(interaction))
+        self.query_filtered(query, predicate)
             .for_each(|(id, interaction)| {
                 if highest_priority_seen.is_none_or(|p| p < interaction.priority) {
                     current = Some((id.clone(), interaction));
