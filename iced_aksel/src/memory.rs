@@ -179,9 +179,6 @@ impl<AxisId, Tag: Hash + Eq + Clone, Message: Clone, Renderer: crate::Renderer>
             if let Some(debug_cache) = self.debug_cache.as_ref() {
                 debug_cache.borrow_mut().request_redraw();
             };
-
-            // Clear interaction cache
-            self.interaction_cache.borrow_mut().clear();
         }
     }
 

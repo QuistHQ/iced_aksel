@@ -577,10 +577,12 @@ impl PlotData<f64, Message> for DrawingData {
                             })
                             .on_drag(Message::ShapeDragged)
                             .cursor(|c| {
-                                if c.is_hovered {
-                                    Some(mouse::Interaction::Crosshair)
+                                if c.is_dragging {
+                                    Some(mouse::Interaction::Help)
                                 } else if c.is_pressed {
                                     Some(mouse::Interaction::Grab)
+                                } else if c.is_hovered {
+                                    Some(mouse::Interaction::Crosshair)
                                 } else {
                                     None
                                 }

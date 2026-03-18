@@ -498,7 +498,7 @@ where
         if plot_bounds.contains(mouse_pos) {
             shell.capture_event();
 
-            let mut interaction_id = None;
+            let mut target_id = None;
             let interactions = memory.interaction_cache.borrow();
 
             // Build the query with a 5px hover/click tolerance
@@ -510,36 +510,37 @@ where
             for (id, interaction) in interactions.query(&query).into_iter().rev() {
                 if let Some(handler) = &interaction.on_press {
                     // TODO: Priority sorting - Which id should we actually save?
-                    // We just save the top-most Id for now
-                    if interaction_id.is_none() && interaction.on_drag.is_some() {
-                        interaction_id = Some(id.clone());
+                    // 1. We hit a shape! Register it as the active drag/hold target immediately.
+                    target_id = Some(id.clone());
+
+                    // 2. If it has a specific on_press handler, fire it.
+                    if let Some(handler) = &interaction.on_press {
+                        let normalized = Point::new(
+                            (mouse_pos.x - plot_bounds.x) / plot_bounds.width,
+                            1.0 - ((mouse_pos.y - plot_bounds.y) / plot_bounds.height),
+                        );
+
+                        let event = PressEvent::new(
+                            normalized,
+                            button,
+                            click.kind(),
+                            memory.keyboard_modifiers,
+                        );
+
+                        if let Some(message) = handler.run((id.clone(), event)) {
+                            shell.publish(message);
+                        }
                     }
 
-                    let normalized = Point::new(
-                        (mouse_pos.x - plot_bounds.x) / plot_bounds.width,
-                        1.0 - ((mouse_pos.y - plot_bounds.y) / plot_bounds.height),
-                    );
-
-                    let event = PressEvent::new(
-                        normalized,
-                        button,
-                        click.kind(),
-                        memory.keyboard_modifiers,
-                    );
-
-                    if let Some(message) = handler.run((id.clone(), event)) {
-                        shell.publish(message);
-                    }
-
-                    // You can't press more than thing at a time
+                    // 3. Break on the first (top-most) shape so we don't click through layers
                     break;
                 }
             }
 
-            let handled = interaction_id.is_some();
+            let handled = target_id.is_some();
 
             memory.action = Action::DraggingPlot {
-                interaction_id,
+                interaction_id: target_id,
                 origin: mouse_pos,
                 last_position: mouse_pos,
                 total_delta: 0.0,
