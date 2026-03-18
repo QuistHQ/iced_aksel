@@ -575,7 +575,16 @@ impl PlotData<f64, Message> for DrawingData {
                                 (event.button == mouse::Button::Right)
                                     .then_some(Message::DeleteShape(id))
                             })
-                            .on_drag(Message::ShapeDragged),
+                            .on_drag(Message::ShapeDragged)
+                            .cursor(|c| {
+                                if c.is_hovered {
+                                    Some(mouse::Interaction::Crosshair)
+                                } else if c.is_pressed {
+                                    Some(mouse::Interaction::Grab)
+                                } else {
+                                    None
+                                }
+                            }),
                     );
                     plot.render(shape);
                 }

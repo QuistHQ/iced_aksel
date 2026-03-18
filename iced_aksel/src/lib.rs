@@ -1457,6 +1457,52 @@ where
             }
         }
     }
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        _cursor: mouse::Cursor,
+        _viewport: &Rectangle,
+        _renderer: &Renderer,
+    ) -> mouse::Interaction {
+        let memory: &Memory<AxisId, Message, Tag, Renderer> = tree.state.downcast_ref();
+        let interactions = memory.interaction_cache.borrow();
+
+        // 1. Identify if we are interacting with a specific shape
+        let target_id = match &memory.action {
+            Action::DraggingPlot { interaction_id, .. } => interaction_id.clone(),
+            Action::Idle => {
+                if let HoverIdentity::Interaction(id) = &memory.last_hovered_identity {
+                    Some(id.clone())
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
+
+        // 2. If so, ask that shape for its cursor preference
+        if let Some(id) = target_id
+            && let Some(interaction) = interactions.get(&id)
+        {
+            let status = interaction::InteractionStatus {
+                is_hovered: matches!(memory.last_hovered_identity, HoverIdentity::Interaction(ref i) if i == &id),
+                is_pressed: matches!(memory.action, Action::DraggingPlot { .. }),
+                is_dragging: matches!(memory.action, Action::DraggingPlot { total_delta, .. } if total_delta >= self.drag_deadband),
+                modifiers: memory.keyboard_modifiers,
+            };
+
+            // If the user's closure returns Some(cursor), use it.
+            // If it returns None (our new default), we return Idle.
+            if let Some(preferred_cursor) = (interaction.cursor_query)(status) {
+                return preferred_cursor;
+            }
+        }
+
+        // 3. System Default Fallback
+        // Returns the standard arrow (Idle) for everything else (plot background, axes, etc.)
+        mouse::Interaction::Idle
+    }
 }
 
 // Boilerplate conversions and helpers
