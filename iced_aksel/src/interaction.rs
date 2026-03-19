@@ -27,7 +27,7 @@ type CursorHandler = event::Handler<mouse::Interaction, (InteractionStatus,)>;
 
 pub struct Interaction<D, Message: Clone, Tag: Hash + Eq + Clone = ()> {
     pub(crate) id: Id<Tag>,
-    pub(crate) priority: u8,
+    pub(crate) priority: u16,
     pub(crate) area: Area<D>,
     pub(crate) cursor_handler: Option<CursorHandler>,
     pub(crate) on_hover: Option<HoverHandler<Message, Tag>>,
@@ -76,7 +76,7 @@ impl<D: Float, Message: Clone, T: Hash + Eq + Clone> Interaction<D, Message, T> 
         let area = area.into();
         Self {
             id,
-            priority: u8::MIN,
+            priority: u16::MAX,
             area,
             cursor_handler: None,
             on_hover: None,
@@ -88,19 +88,19 @@ impl<D: Float, Message: Clone, T: Hash + Eq + Clone> Interaction<D, Message, T> 
 
     /// Sets the priority of the interaction.
     ///
-    /// 255 = highest priority.
-    /// 0 = lowest priority.
+    /// 0 = highest priority.
+    /// 255 = lowest priority.
     ///
-    /// Defaults to 0.
-    pub const fn priority(mut self, prio: u8) -> Self {
+    /// Defaults to 255.
+    pub const fn priority(mut self, prio: u16) -> Self {
         self.priority = prio;
         self
     }
 
     /// Sets a dynamic cursor for this interaction based on its current status.
-    pub fn cursor<F>(mut self, f: F) -> Self
+    pub fn cursor<F, Mk>(mut self, f: F) -> Self
     where
-        F: crate::event::IntoHandler<mouse::Interaction, (InteractionStatus,)>,
+        F: crate::event::IntoHandler<mouse::Interaction, (InteractionStatus,), Mk>,
     {
         self.cursor_handler = Some(f.into_handler());
         self
@@ -125,7 +125,7 @@ impl<D: Float, Message: Clone, T: Hash + Eq + Clone> Interaction<D, Message, T> 
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub(crate) struct ResolvedInteraction<Message: Clone, Tag: Hash + Eq + Clone> {
-    pub priority: u8,
+    pub priority: u16,
     pub area: ResolvedArea,
     pub bounding_box: Rectangle,
 
@@ -210,7 +210,7 @@ impl<Message: Clone, T: Hash + Eq + Clone> InteractionsCache<Message, T> {
 
         self.query_filtered(query, predicate)
             .for_each(|(id, interaction)| {
-                if highest_priority_seen.is_none_or(|p| p < interaction.priority) {
+                if highest_priority_seen.is_none_or(|p| p > interaction.priority) {
                     current = Some((id.clone(), interaction));
                     highest_priority_seen = Some(interaction.priority);
                 }

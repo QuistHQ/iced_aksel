@@ -28,6 +28,11 @@ pub enum Area<D> {
         width: Measure<D>,
         height: Measure<D>,
     },
+    CenteredRect {
+        center: PlotPoint<D>,
+        width: Measure<D>,
+        height: Measure<D>,
+    },
     LineSegment {
         p1: PlotPoint<D>,
         p2: PlotPoint<D>,
@@ -129,6 +134,21 @@ impl<D: Float> Area<D> {
                     y: p1.y.min(p2.y),
                     width: width.resolve_x(transform),
                     height: height.resolve_y(transform),
+                })
+            }
+            Self::CenteredRect {
+                center,
+                width,
+                height,
+            } => {
+                let center = transform.chart_to_screen(&center);
+                let width = width.resolve_x(transform);
+                let height = height.resolve_y(transform);
+                ResolvedArea::Rect(Rectangle {
+                    x: center.x - width / 2.0,
+                    y: center.y - height / 2.0,
+                    width,
+                    height,
                 })
             }
             Self::LineSegment { p1, p2, width } => {

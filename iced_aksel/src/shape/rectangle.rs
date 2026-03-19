@@ -117,7 +117,15 @@ impl<D: Float> From<&Rectangle<D>> for Area<D> {
                 width: Measure::Plot((p2.x - p1.x).abs()),
                 height: Measure::Plot((p2.y - p1.y).abs()),
             },
-            Geometry::Centered { .. } => todo!(),
+            Geometry::Centered {
+                center,
+                width,
+                height,
+            } => Self::CenteredRect {
+                center,
+                width,
+                height,
+            },
         }
     }
 }

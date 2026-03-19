@@ -248,7 +248,7 @@ pub struct Chart<
     on_error: Option<ErrorHandler<AxisId, Message>>,
 
     // Cursor
-    background_cursor: mouse::Interaction,
+    default_cursor: mouse::Interaction,
 
     // Plot Area Handlers
     on_press: Option<PressHandler<Message>>,
@@ -300,7 +300,7 @@ where
             axis_font: None,
             on_error: None,
 
-            background_cursor: mouse::Interaction::Idle,
+            default_cursor: mouse::Interaction::Idle,
 
             on_drag: None,
             on_hover: None,
@@ -402,8 +402,8 @@ where
     /// Sets the default mouse cursor to display when hovering over the empty plot background.
     ///
     /// If an interactive shape overrides the cursor, this background cursor will be temporarily hidden.
-    pub const fn background_cursor(mut self, cursor: mouse::Interaction) -> Self {
-        self.background_cursor = cursor;
+    pub const fn default_cursor(mut self, cursor: mouse::Interaction) -> Self {
+        self.default_cursor = cursor;
         self
     }
 
@@ -1399,26 +1399,26 @@ where
             }
 
             // Populate the debug cache
-            if self.debug {
-                if let Some(debug_cache_cell) = &memory.debug_cache {
-                    let mut debug_cache = debug_cache_cell.borrow_mut();
+            if self.debug
+                && let Some(debug_cache_cell) = &memory.debug_cache
+            {
+                let mut debug_cache = debug_cache_cell.borrow_mut();
 
-                    // Safely recreate the mesh to clear old debug primitives
-                    let mut new_debug_cache = match renderer.preferred_backend() {
-                        crate::render::Backend::Mesh => crate::render::RenderCache::new_mesh(),
-                        crate::render::Backend::Path => crate::render::RenderCache::new_path(),
-                    };
-                    new_debug_cache.set_quality(self.quality);
+                // Safely recreate the mesh to clear old debug primitives
+                let mut new_debug_cache = match renderer.preferred_backend() {
+                    crate::render::Backend::Mesh => crate::render::RenderCache::new_mesh(),
+                    crate::render::Backend::Path => crate::render::RenderCache::new_path(),
+                };
+                new_debug_cache.set_quality(self.quality);
 
-                    for (_, interaction) in interactions.iter() {
-                        if let Some(primitive) = build_debug_primitive(&interaction.area) {
-                            new_debug_cache.add_primitive(primitive);
-                        }
+                for (_, interaction) in interactions.iter() {
+                    if let Some(primitive) = build_debug_primitive(&interaction.area) {
+                        new_debug_cache.add_primitive(primitive);
                     }
-
-                    // Assign the fresh cache
-                    *debug_cache = new_debug_cache;
                 }
+
+                // Assign the fresh cache
+                *debug_cache = new_debug_cache;
             }
         }
 
@@ -1458,11 +1458,12 @@ where
         cache.draw(renderer, &plot_bounds);
 
         // Draw exact mathematical shape interactions if debug is enabled
-        if self.debug {
-            if let Some(mut debug_cache) = memory.get_debug_cache_mut() {
-                debug_cache.draw(renderer, &plot_bounds);
-            };
+        if self.debug
+            && let Some(mut debug_cache) = memory.get_debug_cache_mut()
+        {
+            debug_cache.draw(renderer, &plot_bounds);
         }
+
         // --- INTERACTION DEBUG VISUALIZER ---
         if self.debug {
             for (_, interaction) in memory.interaction_cache.borrow().iter() {
@@ -1549,7 +1550,7 @@ where
         // If the mouse is over the plot bounds, use the user's custom background cursor.
         // Otherwise, if outside the chart entirely, return the standard arrow.
         if cursor.position_over(layout.bounds()).is_some() {
-            self.background_cursor
+            self.default_cursor
         } else {
             mouse::Interaction::Idle
         }
