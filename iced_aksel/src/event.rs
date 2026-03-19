@@ -172,8 +172,21 @@ impl<Message: Clone, Args> Handler<Message, Args> {
     }
 }
 
-pub trait IntoHandler<Message, Args> {
+// Marker traits to circumvent rust overlapping traits.
+pub struct FnMarker;
+pub struct DirectMarker;
+
+pub trait IntoHandler<Message, Args, Marker> {
     fn into_handler(self) -> Handler<Message, Args>;
+}
+
+impl<Message, Args> IntoHandler<Message, Args, DirectMarker> for Message
+where
+    Message: Clone + 'static,
+{
+    fn into_handler(self) -> Handler<Message, Args> {
+        Handler::Direct(self)
+    }
 }
 
 /// Implmements `on_<action>` and `on_<action>_with` methods for event handlers
@@ -189,9 +202,9 @@ macro_rules! impl_handlers {
         paste::paste! {
             $(
                 $(#[$doc])*
-                pub fn [<on_ $action>]<H>(mut self, h: H) -> Self
+                pub fn [<on_ $action>]<H, Marker>(mut self, h: H) -> Self
                 where
-                    H: crate::event::IntoHandler<Message, $Args>,
+                    H: crate::event::IntoHandler<Message, $Args, Marker>,
                 {
                     self.[<on_ $action>] = Some(h.into_handler());
                     self
@@ -206,7 +219,7 @@ pub(crate) use impl_handlers;
 macro_rules! impl_into_handler_for_fn {
     // 0 args
     () => {
-        impl<Message, F, R> IntoHandler<Message, ()> for F
+        impl<Message, F, R> IntoHandler<Message, (), FnMarker> for F
         where
             F: Fn() -> R + 'static,
             R: Into<Option<Message>>,
@@ -221,7 +234,7 @@ macro_rules! impl_into_handler_for_fn {
     // N args (stored as a tuple Args = (A, B, ...))
     ($($A:ident),+ $(,)?) => {
         #[allow(non_snake_case)]
-        impl<Message, F, R, $($A),+> IntoHandler<Message, ($($A,)+)> for F
+        impl<Message, F, R, $($A),+> IntoHandler<Message, ($($A,)+), FnMarker> for F
         where
             F: Fn($($A),+) -> R + 'static,
             R: Into<Option<Message>>,

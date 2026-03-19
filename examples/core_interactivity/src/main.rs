@@ -35,7 +35,7 @@ enum Message {
     ShapeDragged(interaction::Id, DragEvent<Delta>),
     ShapeSelected(interaction::Id),
 
-    // Global Interactions
+    // Global/Plot Interactions
     AddShape(Point),
     DeleteShape(interaction::Id),
     BackgroundHovered,
@@ -281,7 +281,7 @@ impl DrawingApp {
             .debug(true)
             .plot_data(&self.data, Self::X, Self::Y)
             .background_cursor(mouse::Interaction::Crosshair)
-            .on_hover(|_| Message::BackgroundHovered)
+            .on_hover(Message::BackgroundHovered)
             .on_press(|event: PressEvent<Point>| match event.button {
                 mouse::Button::Left => Some(Message::BackgroundPressed),
                 _ => None,
@@ -383,7 +383,7 @@ impl PlotData<f64, Message> for DrawingData {
                 color = palette.success; // Turns green on hover!
             }
 
-            match &item.shape {
+            let interaction = match &item.shape {
                 GalleryShape::Rect { x, y, w, h } => {
                     let shape = Rectangle::corners(
                         PlotPoint::new(*x, *y),
@@ -391,21 +391,10 @@ impl PlotData<f64, Message> for DrawingData {
                     )
                     .fill(color);
 
-                    plot.add_interaction(
-                        Interaction::new(item.id.clone(), &shape)
-                            .priority(255)
-                            .on_hover(Message::ShapeHovered)
-                            .on_press(|id, event: PressEvent<Point>| {
-                                (event.button == mouse::Button::Left)
-                                    .then_some(Message::ShapeSelected(id))
-                            })
-                            .on_release(|id, event: ReleaseEvent<Point>| {
-                                (event.button == mouse::Button::Right)
-                                    .then_some(Message::DeleteShape(id))
-                            })
-                            .on_drag(Message::ShapeDragged),
-                    );
+                    // Rectangle interactions has the highest priority of all shapes
+                    let interaction = Interaction::new(item.id.clone(), &shape).priority(0);
                     plot.render(shape);
+                    interaction
                 }
                 GalleryShape::Ellipse { x, y, rx, ry } => {
                     let shape = Ellipse::new(
@@ -414,23 +403,11 @@ impl PlotData<f64, Message> for DrawingData {
                             x: Radius(Measure::Plot(*rx)),
                             y: Radius(Measure::Plot(*ry)),
                         },
-                    )
-                    .fill(color);
-
-                    plot.add_interaction(
-                        Interaction::new(item.id.clone(), &shape)
-                            .on_hover(Message::ShapeHovered)
-                            .on_press(|id, event: PressEvent<Point>| {
-                                (event.button == mouse::Button::Left)
-                                    .then_some(Message::ShapeSelected(id))
-                            })
-                            .on_release(|id, event: ReleaseEvent<Point>| {
-                                (event.button == mouse::Button::Right)
-                                    .then_some(Message::DeleteShape(id))
-                            })
-                            .on_drag(Message::ShapeDragged),
                     );
+
+                    let interaction = Interaction::new(item.id.clone(), &shape);
                     plot.render(shape);
+                    interaction
                 }
                 GalleryShape::Triangle { p1, p2, p3 } => {
                     let shape = Triangle::vertices([
@@ -440,40 +417,18 @@ impl PlotData<f64, Message> for DrawingData {
                     ])
                     .fill(color);
 
-                    plot.add_interaction(
-                        Interaction::new(item.id.clone(), &shape)
-                            .on_hover(Message::ShapeHovered)
-                            .on_press(|id, event: PressEvent<Point>| {
-                                (event.button == mouse::Button::Left)
-                                    .then_some(Message::ShapeSelected(id))
-                            })
-                            .on_release(|id, event: ReleaseEvent<Point>| {
-                                (event.button == mouse::Button::Right)
-                                    .then_some(Message::DeleteShape(id))
-                            })
-                            .on_drag(Message::ShapeDragged),
-                    );
+                    let interaction = Interaction::new(item.id.clone(), &shape);
                     plot.render(shape);
+                    interaction
                 }
                 GalleryShape::Polygon { points } => {
                     let plot_points: Vec<PlotPoint<f64>> =
                         points.iter().map(|p| PlotPoint::new(p.0, p.1)).collect();
                     let shape = Area::new(plot_points).fill(color);
 
-                    plot.add_interaction(
-                        Interaction::new(item.id.clone(), &shape)
-                            .on_hover(Message::ShapeHovered)
-                            .on_press(|id, event: PressEvent<Point>| {
-                                (event.button == mouse::Button::Left)
-                                    .then_some(Message::ShapeSelected(id))
-                            })
-                            .on_release(|id, event: ReleaseEvent<Point>| {
-                                (event.button == mouse::Button::Right)
-                                    .then_some(Message::DeleteShape(id))
-                            })
-                            .on_drag(Message::ShapeDragged),
-                    );
+                    let interaction = Interaction::new(item.id.clone(), &shape);
                     plot.render(shape);
+                    interaction
                 }
                 GalleryShape::Polyline {
                     points,
@@ -486,20 +441,9 @@ impl PlotData<f64, Message> for DrawingData {
                         Stroke::new(color, Measure::Screen(*stroke_width)),
                     );
 
-                    plot.add_interaction(
-                        Interaction::new(item.id.clone(), &shape)
-                            .on_hover(Message::ShapeHovered)
-                            .on_press(|id, event: PressEvent<Point>| {
-                                (event.button == mouse::Button::Left)
-                                    .then_some(Message::ShapeSelected(id))
-                            })
-                            .on_release(|id, event: ReleaseEvent<Point>| {
-                                (event.button == mouse::Button::Right)
-                                    .then_some(Message::DeleteShape(id))
-                            })
-                            .on_drag(Message::ShapeDragged),
-                    );
+                    let interaction = Interaction::new(item.id.clone(), &shape);
                     plot.render(shape);
+                    interaction
                 }
                 GalleryShape::Bezier { start, c1, c2, end } => {
                     let shape = shape::Bezier::cubic(
@@ -510,20 +454,9 @@ impl PlotData<f64, Message> for DrawingData {
                         Stroke::new(color, Measure::Screen(10.0)), // Nice thick line to test tolerance
                     );
 
-                    plot.add_interaction(
-                        Interaction::new(item.id.clone(), &shape)
-                            .on_hover(Message::ShapeHovered)
-                            .on_press(|id, event: PressEvent<Point>| {
-                                (event.button == mouse::Button::Left)
-                                    .then_some(Message::ShapeSelected(id))
-                            })
-                            .on_release(|id, event: ReleaseEvent<Point>| {
-                                (event.button == mouse::Button::Right)
-                                    .then_some(Message::DeleteShape(id))
-                            })
-                            .on_drag(Message::ShapeDragged),
-                    );
+                    let interaction = Interaction::new(item.id.clone(), &shape);
                     plot.render(shape);
+                    interaction
                 }
                 GalleryShape::Arc {
                     center,
@@ -541,20 +474,9 @@ impl PlotData<f64, Message> for DrawingData {
                     .inner_radius(Measure::Plot(*inner_r))
                     .fill(color);
 
-                    plot.add_interaction(
-                        Interaction::new(item.id.clone(), &shape)
-                            .on_hover(Message::ShapeHovered)
-                            .on_press(|id, event: PressEvent<Point>| {
-                                (event.button == mouse::Button::Left)
-                                    .then_some(Message::ShapeSelected(id))
-                            })
-                            .on_release(|id, event: ReleaseEvent<Point>| {
-                                (event.button == mouse::Button::Right)
-                                    .then_some(Message::DeleteShape(id))
-                            })
-                            .on_drag(Message::ShapeDragged),
-                    );
+                    let interaction = Interaction::new(item.id.clone(), &shape);
                     plot.render(shape);
+                    interaction
                 }
                 GalleryShape::Label {
                     text,
@@ -567,33 +489,34 @@ impl PlotData<f64, Message> for DrawingData {
                         .rotation(*rotation)
                         .fill(color);
 
-                    plot.add_interaction(
-                        Interaction::new(item.id.clone(), &shape)
-                            .on_hover(Message::ShapeHovered)
-                            .on_press(|id, event: PressEvent<Point>| {
-                                (event.button == mouse::Button::Left)
-                                    .then_some(Message::ShapeSelected(id))
-                            })
-                            .on_release(|id, event: ReleaseEvent<Point>| {
-                                (event.button == mouse::Button::Right)
-                                    .then_some(Message::DeleteShape(id))
-                            })
-                            .on_drag(Message::ShapeDragged)
-                            .cursor(|c: InteractionStatus| {
-                                if c.is_pressed {
-                                    Some(mouse::Interaction::Help)
-                                } else if c.is_dragging {
-                                    Some(mouse::Interaction::Grab)
-                                } else if c.is_hovered {
-                                    Some(mouse::Interaction::Cell)
-                                } else {
-                                    None
-                                }
-                            }),
-                    );
+                    let interaction = Interaction::new(item.id.clone(), &shape);
                     plot.render(shape);
+                    interaction
                 }
-            }
+            };
+
+            plot.add_interaction(
+                interaction
+                    .on_hover(Message::ShapeHovered)
+                    .on_press(|id, event: PressEvent<Point>| {
+                        (event.button == mouse::Button::Left).then_some(Message::ShapeSelected(id))
+                    })
+                    .on_release(|id, event: ReleaseEvent<Point>| {
+                        (event.button == mouse::Button::Right).then_some(Message::DeleteShape(id))
+                    })
+                    .on_drag(Message::ShapeDragged)
+                    .cursor(|c: InteractionStatus| {
+                        if c.is_pressed {
+                            Some(mouse::Interaction::Help)
+                        } else if c.is_dragging {
+                            Some(mouse::Interaction::Grab)
+                        } else if c.is_hovered {
+                            Some(mouse::Interaction::Cell)
+                        } else {
+                            None
+                        }
+                    }),
+            );
         }
     }
 }
