@@ -1383,6 +1383,7 @@ where
         // Draw data layers if the cache needs redraw
         if cache.needs_redraw() {
             let mut interactions = memory.interaction_cache.borrow_mut();
+            interactions.clear();
 
             for layer in &self.layers {
                 // These axes are guaranteed to exist because of `verify_layer` check
