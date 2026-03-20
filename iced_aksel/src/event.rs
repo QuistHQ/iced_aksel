@@ -16,6 +16,28 @@ impl<P> MoveEvent<P> {
 }
 
 #[derive(Debug, Clone, Copy)]
+pub struct EnterEvent {
+    pub modifiers: keyboard::Modifiers,
+}
+
+impl EnterEvent {
+    pub(crate) const fn new(modifiers: keyboard::Modifiers) -> Self {
+        Self { modifiers }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ExitEvent {
+    pub modifiers: keyboard::Modifiers,
+}
+
+impl ExitEvent {
+    pub(crate) const fn new(modifiers: keyboard::Modifiers) -> Self {
+        Self { modifiers }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct ScrollEvent<P> {
     pub position: P,
     pub delta: mouse::ScrollDelta,

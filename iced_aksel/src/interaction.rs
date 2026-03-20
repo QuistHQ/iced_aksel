@@ -2,7 +2,7 @@ use std::hash::Hash;
 
 use aksel::{Float, Transform};
 use derivative::Derivative;
-use iced_core::{Point, Rectangle, keyboard, mouse};
+use iced_core::{Point, Rectangle, mouse};
 use indexmap::IndexMap;
 use rapidhash::fast::RandomState;
 
@@ -19,7 +19,8 @@ pub use query::InteractionQuery;
 
 use area::ResolvedArea;
 
-type HoverHandler<Message, Tag> = event::Handler<Message, (Id<Tag>, keyboard::Modifiers)>;
+type EnterHandler<Message, Tag> = event::Handler<Message, (Id<Tag>, event::EnterEvent)>;
+type ExitHandler<Message, Tag> = event::Handler<Message, (Id<Tag>, event::ExitEvent)>;
 type DragHandler<Message, Tag> = event::Handler<Message, (Id<Tag>, event::DragEvent<event::Delta>)>;
 type PressHandler<Message, Tag> = event::Handler<Message, (Id<Tag>, PressEvent<Point>)>;
 type ReleaseHandler<Message, Tag> = event::Handler<Message, (Id<Tag>, ReleaseEvent<Point>)>;
@@ -30,7 +31,8 @@ pub struct Interaction<D, Message: Clone, Tag: Hash + Eq + Clone = ()> {
     pub(crate) priority: u16,
     pub(crate) area: Area<D>,
     pub(crate) cursor_handler: Option<CursorHandler>,
-    pub(crate) on_hover: Option<HoverHandler<Message, Tag>>,
+    pub(crate) on_enter: Option<EnterHandler<Message, Tag>>,
+    pub(crate) on_exit: Option<ExitHandler<Message, Tag>>,
     pub(crate) on_drag: Option<DragHandler<Message, Tag>>,
     pub(crate) on_press: Option<PressHandler<Message, Tag>>,
     pub(crate) on_release: Option<ReleaseHandler<Message, Tag>>,
@@ -47,7 +49,8 @@ impl<D: Float, Message: Clone, T: Hash + Eq + Clone> Interaction<D, Message, T> 
             priority,
             area,
             cursor_handler,
-            on_hover,
+            on_enter,
+            on_exit,
             on_drag,
             on_press,
             on_release,
@@ -63,7 +66,8 @@ impl<D: Float, Message: Clone, T: Hash + Eq + Clone> Interaction<D, Message, T> 
                 area,
                 bounding_box,
                 cursor_handler,
-                on_hover,
+                on_enter,
+                on_exit,
                 on_drag,
                 on_press,
                 on_release,
@@ -79,7 +83,8 @@ impl<D: Float, Message: Clone, T: Hash + Eq + Clone> Interaction<D, Message, T> 
             priority: u16::MAX,
             area,
             cursor_handler: None,
-            on_hover: None,
+            on_enter: None,
+            on_exit: None,
             on_drag: None,
             on_press: None,
             on_release: None,
@@ -107,8 +112,11 @@ impl<D: Float, Message: Clone, T: Hash + Eq + Clone> Interaction<D, Message, T> 
     }
 
     event::impl_handlers!(
-        /// Sets the event handler for interaction hovering
-        hover: (Id<T>, keyboard::Modifiers);
+        /// Sets the event handler for when the cursor enters the interaction
+        enter: (Id<T>, event::EnterEvent);
+
+        /// Sets the event handler for when the cursor enters the interaction
+        exit: (Id<T>, event::ExitEvent);
 
         /// Sets the event handler for interaction dragging
         drag: (Id<T>, event::DragEvent<event::Delta>);
@@ -132,7 +140,9 @@ pub(crate) struct ResolvedInteraction<Message: Clone, Tag: Hash + Eq + Clone> {
     #[derivative(Debug = "ignore")]
     pub cursor_handler: Option<CursorHandler>,
     #[derivative(Debug = "ignore")]
-    pub on_hover: Option<HoverHandler<Message, Tag>>,
+    pub on_enter: Option<EnterHandler<Message, Tag>>,
+    #[derivative(Debug = "ignore")]
+    pub on_exit: Option<ExitHandler<Message, Tag>>,
     #[derivative(Debug = "ignore")]
     pub on_drag: Option<DragHandler<Message, Tag>>,
     #[derivative(Debug = "ignore")]
