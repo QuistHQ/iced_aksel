@@ -1,11 +1,11 @@
-use iced_core::{Point, Rectangle};
+use iced_core::{Pixels, Point, Rectangle};
 
 /// Represents a spatial query in screen-space to test against interactions.
 #[derive(Debug, Clone, Copy)]
 pub enum InteractionQuery {
     /// A precise point check (e.g., hovering or clicking).
     /// `tolerance_px` expands the hit area to make thin lines/points clickable.
-    Point { position: Point, tolerance_px: f32 },
+    Point { position: Point, tolerance: Pixels },
 
     /// A bounding box check (e.g., marquee drag selection).
     Bounds(Rectangle),
@@ -17,12 +17,12 @@ impl InteractionQuery {
         match self {
             Self::Point {
                 position,
-                tolerance_px,
+                tolerance,
             } => Rectangle {
-                x: position.x - tolerance_px,
-                y: position.y - tolerance_px,
-                width: tolerance_px * 2.0,
-                height: tolerance_px * 2.0,
+                x: position.x - tolerance.0,
+                y: position.y - tolerance.0,
+                width: tolerance.0 * 2.0,
+                height: tolerance.0 * 2.0,
             },
             Self::Bounds(rect) => *rect,
         }

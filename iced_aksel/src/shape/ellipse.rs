@@ -1,4 +1,9 @@
-use crate::{Measure, Radii, Shape, Stroke, plot, render::Primitive};
+use crate::{
+    Measure, Radii, Shape, Stroke,
+    interaction::{Area, AreaContext, IntoArea},
+    plot,
+    render::Primitive,
+};
 use aksel::{Float, PlotPoint};
 use iced_core::{Color, Point};
 
@@ -115,12 +120,12 @@ impl<D: Float> Ellipse<D> {
     }
 }
 
-impl<D: Float> From<&Ellipse<D>> for crate::interaction::Area<D> {
-    fn from(value: &Ellipse<D>) -> Self {
-        crate::interaction::Area::Ellipse {
-            center: value.center,
-            radius_x: value.radii.x.0,
-            radius_y: value.radii.y.0,
-        }
+impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Ellipse<D> {
+    fn resolve_area(self, ctx: &AreaContext<'a, D, Renderer>) -> Option<Area> {
+        let center = ctx.chart_to_screen(&self.center);
+        Some(Area::Ellipse {
+            center: Point::new(center.x, center.y),
+            radii: self.radii.resolve(ctx)?,
+        })
     }
 }

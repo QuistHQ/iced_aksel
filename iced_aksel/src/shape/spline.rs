@@ -1,5 +1,10 @@
-use crate::{Shape, Stroke, plot, render::Primitive};
-use aksel::{Float, PlotPoint};
+use crate::{
+    Shape, Stroke,
+    interaction::{Area, AreaContext, IntoArea},
+    plot,
+    render::Primitive,
+};
+use aksel::{Float, PlotPoint, ScreenPoint};
 use iced_core::Point;
 
 /// A primitive representing a smooth curve passing through a list of points.
@@ -85,12 +90,55 @@ impl<D: Float> Spline<D> {
         self
     }
 }
-impl<D: Float> From<&Spline<D>> for crate::interaction::Area<D> {
-    fn from(value: &Spline<D>) -> Self {
-        crate::interaction::Area::Spline {
-            points: value.points.clone(),
-            width: value.stroke.thickness,
-            tension: value.tension,
+
+impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Spline<D> {
+    fn resolve_area(self, ctx: &AreaContext<'a, D, Renderer>) -> Option<Area> {
+        let stroke = self.stroke.resolve(ctx);
+
+        if self.points.len() < 2 {
+            return None;
         }
+
+        // Map to screen points
+        let sp: Vec<ScreenPoint> = self.points.iter().map(|p| ctx.chart_to_screen(p)).collect();
+
+        let mut flattened = Vec::new();
+        let segments_per_curve = 15;
+
+        // Catmull-Rom Spline flattening
+        for i in 0..sp.len().saturating_sub(1) {
+            let p0 = if i == 0 { sp[0] } else { sp[i - 1] };
+            let p1 = sp[i];
+            let p2 = sp[i + 1];
+            let p3 = if i + 2 < sp.len() { sp[i + 2] } else { p2 };
+
+            for step in 0..=segments_per_curve {
+                let t = step as f32 / segments_per_curve as f32;
+                let t2 = t * t;
+                let t3 = t2 * t;
+
+                // Catmull-Rom math incorporating the user's tension parameter
+                let alpha = 1.0 - self.tension;
+
+                let x = 0.5
+                    * ((2.0 * p1.x)
+                        + (-p0.x + p2.x) * t * alpha
+                        + (2.0 * p0.x - 5.0 * p1.x + 4.0 * p2.x - p3.x) * t2 * alpha
+                        + (-p0.x + 3.0 * p1.x - 3.0 * p2.x + p3.x) * t3 * alpha);
+
+                let y = 0.5
+                    * ((2.0 * p1.y)
+                        + (-p0.y + p2.y) * t * alpha
+                        + (2.0 * p0.y - 5.0 * p1.y + 4.0 * p2.y - p3.y) * t2 * alpha
+                        + (-p0.y + 3.0 * p1.y - 3.0 * p2.y + p3.y) * t3 * alpha);
+
+                flattened.push(Point::new(x, y));
+            }
+        }
+
+        Some(Area::Polyline {
+            points: flattened,
+            stroke_width: stroke.thickness.into(),
+        })
     }
 }

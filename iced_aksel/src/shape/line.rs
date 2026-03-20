@@ -1,10 +1,12 @@
 use crate::{
-    Float, Shape, Stroke, plot,
+    Float, Shape, Stroke,
+    interaction::{Area, AreaContext, IntoArea},
+    plot,
     render::{LineArrows, LineExtensions, Primitive},
 };
 
 use aksel::PlotPoint;
-use iced_core::Point;
+use iced_core::{Pixels, Point};
 
 /// A primitive representing a straight segment between two points.
 ///
@@ -131,5 +133,18 @@ impl<D: Float> Line<D> {
     pub const fn arrow_size(mut self, multiplier: f32) -> Self {
         self.arrows.size = multiplier;
         self
+    }
+}
+
+impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Line<D> {
+    fn resolve_area(self, ctx: &AreaContext<'a, D, Renderer>) -> Option<Area> {
+        let p1 = ctx.chart_to_screen(&self.p1);
+        let p2 = ctx.chart_to_screen(&self.p2);
+        let stroke = self.stroke.resolve(ctx);
+        Some(Area::LineSegment {
+            p1: Point::new(p1.x, p1.y),
+            p2: Point::new(p2.x, p2.y),
+            stroke_width: Pixels(stroke.thickness),
+        })
     }
 }

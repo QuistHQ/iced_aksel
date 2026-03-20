@@ -7,7 +7,7 @@ use std::hash::Hash;
 use std::ops::Deref;
 
 use crate::{
-    interaction::Interaction,
+    interaction::{self, Interaction, IntoArea},
     layer::LayerId,
     render::{Primitive, RenderCache},
 };
@@ -71,8 +71,8 @@ where
 ///
 /// Manages layer ordering and caching for efficient rendering.
 pub struct Context<'a, D: Float, Renderer: crate::Renderer = iced_renderer::Renderer> {
-    transform: &'a Transform<'a, D, f32, f32>,
-    renderer: &'a mut Renderer,
+    pub(crate) transform: &'a Transform<'a, D, f32, f32>,
+    pub(crate) renderer: &'a mut Renderer,
     cache: &'a mut RenderCache<Renderer>,
 }
 
@@ -121,26 +121,26 @@ pub struct Plot<
     'a,
     D: Float,
     Message: Clone,
-    Tag: Hash + Eq + Clone = (),
-    R: crate::Renderer = iced_renderer::Renderer,
+    Tag = (),
+    Renderer: crate::Renderer = iced_renderer::Renderer,
 > {
-    context: Context<'a, D, R>,
+    pub(crate) context: Context<'a, D, Renderer>,
     interactions: &'a mut InteractionsCache<Message, Tag>,
 }
 
-impl<'a, D, Message, Tag, R> Plot<'a, D, Message, Tag, R>
+impl<'a, D, Message, Tag, Renderer> Plot<'a, D, Message, Tag, Renderer>
 where
     Message: Clone,
     Tag: Hash + Eq + Clone,
     D: Float,
-    R: crate::Renderer,
+    Renderer: crate::Renderer,
 {
     /// Creates a new plot context.
     ///
     /// This is typically called internally by the Chart widget.
     pub const fn new(
-        renderer: &'a mut R,
-        cache: &'a mut RenderCache<R>,
+        renderer: &'a mut Renderer,
+        cache: &'a mut RenderCache<Renderer>,
         transform: &'a Transform<'a, D, f32, f32>,
         interactions: &'a mut InteractionsCache<Message, Tag>,
     ) -> Self {
@@ -174,7 +174,7 @@ where
         self.context.transform.plot_bounds()
     }
 
-    /// Redners a shape to the plot.
+    /// Renders a shape to the plot.
     ///
     /// # Example
     ///
@@ -191,13 +191,27 @@ where
     /// #     }
     /// # }
     /// ```
-    pub fn render<S: crate::shape::Shape<D, R>>(&mut self, shape: S) {
+    pub fn render<S: crate::shape::Shape<D, Renderer>>(&mut self, shape: S) {
         shape.render(&mut self.context);
     }
 
-    pub fn add_interaction(&mut self, interaction: impl Into<Interaction<D, Message, Tag>>) {
+    pub fn new_interaction<'b, A>(&'b self, area: A) -> Interaction<Message, Tag>
+    where
+        A: IntoArea<'b, D, Renderer>,
+    {
+        Interaction::new(&self.context, area)
+    }
+
+    /// Pushes an interaction to the plot
+    pub fn push_interaction(
+        &mut self,
+        id: impl Into<interaction::Id<Tag>>,
+        interaction: impl Into<Interaction<Message, Tag>>,
+    ) {
         let interaction = interaction.into();
-        let (id, resolved) = interaction.resolve(&self.context.transform, self.context.renderer);
-        self.interactions.insert(id, resolved);
+        let Some(interaction) = interaction::ResolvedInteraction::new(interaction) else {
+            return;
+        };
+        self.interactions.insert(id.into(), interaction);
     }
 }

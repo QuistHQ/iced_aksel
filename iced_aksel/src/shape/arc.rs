@@ -1,4 +1,10 @@
-use crate::{Measure, Shape, Stroke, plot, radii::Radius, render::Primitive};
+use crate::{
+    Measure, Shape, Stroke,
+    interaction::{Area, AreaContext, IntoArea},
+    plot,
+    radii::Radius,
+    render::Primitive,
+};
 
 use aksel::{Float, PlotPoint};
 use iced_core::{Color, Point, Radians};
@@ -117,14 +123,18 @@ impl<D: Float> Arc<D> {
     }
 }
 
-impl<D: Float> From<&Arc<D>> for crate::interaction::Area<D> {
-    fn from(value: &Arc<D>) -> Self {
-        crate::interaction::Area::Arc {
-            center: value.center,
-            radius_outer: value.radius.0,
-            radius_inner: value.inner_radius.0,
-            start_angle_rads: value.start_angle.0,
-            end_angle_rads: value.end_angle.0,
-        }
+impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Arc<D> {
+    fn resolve_area(self, ctx: &AreaContext<'a, D, Renderer>) -> Option<Area> {
+        let center = ctx.chart_to_screen(&self.center);
+        Some(Area::Arc {
+            center: Point::new(center.x, center.y),
+            radius_outer: self.radius.resolve_isotropic(ctx)?,
+            radius_inner: self
+                .inner_radius
+                .resolve_isotropic(ctx)
+                .unwrap_or(crate::radii::ResolvedRadius(0.0)),
+            start_angle: self.start_angle,
+            end_angle: self.end_angle,
+        })
     }
 }

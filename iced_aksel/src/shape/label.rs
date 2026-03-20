@@ -1,6 +1,7 @@
+use crate::interaction::{Area, AreaContext, IntoArea};
 use crate::render::Primitive;
 use crate::{Measure, Shape, plot};
-use aksel::{Float, PlotPoint};
+use aksel::{Float, PlotPoint, ScreenPoint};
 use iced_core::text::LineHeight;
 use iced_core::{
     Color, Font, Point, Radians, Size,
@@ -245,19 +246,58 @@ impl<D: Float> Label<D> {
     }
 }
 
-impl<D: Float> From<&Label<D>> for crate::interaction::Area<D> {
-    fn from(value: &Label<D>) -> Self {
-        Self::Label {
-            content: value.content.clone(),
-            position: value.position,
-            size: value.size,
-            font: value.font,
-            horizontal_alignment: value.horizontal_alignment,
-            vertical_alignment: value.vertical_alignment,
-            rotation_rads: value.rotation.0, // Extract f32 from Radians
-            line_height: value.line_height,
-            bounds: value.bounds,
-            wrapping: value.wrapping,
+impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Label<D> {
+    fn resolve_area(self, ctx: &AreaContext<'a, D, Renderer>) -> Option<Area> {
+        let sc = ctx.chart_to_screen(&self.position);
+        let screen_pos = Point::new(sc.x as f32, sc.y as f32); // Force f32
+
+        let font_size_px = self.size.resolve_y(ctx);
+        let bounds_size = self.bounds.resolve(ctx, &self.position);
+        let font = self.font.unwrap_or_else(|| ctx.default_font());
+
+        let text_size = ctx.measure_text(iced_core::text::Text {
+            content: self.content.as_str(),
+            bounds: bounds_size,
+            size: iced_core::Pixels(font_size_px),
+            line_height: iced_core::text::LineHeight::Relative(self.line_height),
+            font,
+            align_x: self.horizontal_alignment.into(),
+            align_y: self.vertical_alignment.into(),
+            shaping: iced_core::text::Shaping::Basic,
+            wrapping: self.wrapping,
+        });
+
+        // 2. Explicitly type the offsets as f32
+        let dx: f32 = match self.horizontal_alignment {
+            iced_core::alignment::Horizontal::Left => 0.0,
+            iced_core::alignment::Horizontal::Center => -text_size.width / 2.0,
+            iced_core::alignment::Horizontal::Right => -text_size.width,
+        };
+        let dy: f32 = match self.vertical_alignment {
+            iced_core::alignment::Vertical::Top => 0.0,
+            iced_core::alignment::Vertical::Center => -text_size.height / 2.0,
+            iced_core::alignment::Vertical::Bottom => -text_size.height,
+        };
+
+        let corners: [Point<f32>; 4] = [
+            Point::new(dx, dy),
+            Point::new(dx + text_size.width, dy),
+            Point::new(dx + text_size.width, dy + text_size.height),
+            Point::new(dx, dy + text_size.height),
+        ];
+
+        let cos_r: f32 = self.rotation.0.cos();
+        let sin_r: f32 = self.rotation.0.sin();
+
+        let mut rotated_corners = Vec::with_capacity(4);
+        for c in corners {
+            let rx: f32 = c.x * cos_r - c.y * sin_r;
+            let ry: f32 = c.x * sin_r + c.y * cos_r;
+            rotated_corners.push(Point::new(screen_pos.x + rx, screen_pos.y + ry));
         }
+
+        Some(Area::Polygon {
+            points: rotated_corners,
+        })
     }
 }

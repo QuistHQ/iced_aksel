@@ -8,7 +8,7 @@ static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
 /// An identifier for an interaction.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Id<Tag: Hash + Eq + Clone = ()> {
+pub struct Id<Tag = ()> {
     identifier: Identifier,
     tag: Option<Tag>,
 }

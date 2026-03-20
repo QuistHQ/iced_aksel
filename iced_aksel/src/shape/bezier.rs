@@ -1,4 +1,9 @@
-use crate::{Shape, Stroke, plot, render::Primitive};
+use crate::{
+    Shape, Stroke,
+    interaction::{Area, AreaContext, IntoArea},
+    plot,
+    render::Primitive,
+};
 use aksel::{Float, PlotPoint};
 use iced_core::Point;
 
@@ -111,14 +116,52 @@ impl<D: Float> Bezier<D> {
         self
     }
 }
-impl<D: Float> From<&Bezier<D>> for crate::interaction::Area<D> {
-    fn from(value: &Bezier<D>) -> Self {
-        crate::interaction::Area::Bezier {
-            start: value.start,
-            control_1: value.control_1,
-            control_2: value.control_2,
-            end: value.end,
-            width: value.stroke.thickness,
+
+impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Bezier<D> {
+    fn resolve_area(self, ctx: &AreaContext<'a, D, Renderer>) -> Option<Area> {
+        let p0 = ctx.chart_to_screen(&self.start);
+        let p1 = ctx.chart_to_screen(&self.control_1);
+        let p3 = ctx.chart_to_screen(&self.end);
+        let stroke = self.stroke.resolve(ctx);
+        let segments = 30; // 30 segments is plenty for accurate UI hit-testing
+        let mut points = Vec::with_capacity(segments + 1);
+
+        if let Some(c2) = self.control_2 {
+            // Cubic Bezier Evaluation
+            let p2 = ctx.chart_to_screen(&c2);
+            for i in 0..=segments {
+                let t = i as f32 / segments as f32;
+                let t_inv = 1.0 - t;
+
+                let x = t_inv.powi(3) * p0.x
+                    + 3.0 * t_inv.powi(2) * t * p1.x
+                    + 3.0 * t_inv * t.powi(2) * p2.x
+                    + t.powi(3) * p3.x;
+
+                let y = t_inv.powi(3) * p0.y
+                    + 3.0 * t_inv.powi(2) * t * p1.y
+                    + 3.0 * t_inv * t.powi(2) * p2.y
+                    + t.powi(3) * p3.y;
+
+                points.push(Point::new(x, y));
+            }
+        } else {
+            // Quadratic Bezier Evaluation
+            for i in 0..=segments {
+                let t = i as f32 / segments as f32;
+                let t_inv = 1.0 - t;
+
+                let x = t_inv.powi(2) * p0.x + 2.0 * t_inv * t * p1.x + t.powi(2) * p3.x;
+                let y = t_inv.powi(2) * p0.y + 2.0 * t_inv * t * p1.y + t.powi(2) * p3.y;
+
+                points.push(Point::new(x, y));
+            }
         }
+
+        // MAGIC: We return it as a Polyline, so no new hit-test math is needed!
+        Some(Area::Polyline {
+            points,
+            stroke_width: stroke.thickness.into(),
+        })
     }
 }

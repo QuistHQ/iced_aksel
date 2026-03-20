@@ -81,8 +81,8 @@
 use aksel::ScreenRect;
 use derive_more::{Display, Error};
 use iced_core::{
-    Clipboard, Color, Element, Event, Font, Layout, Length, Padding, Point, Rectangle, Shell, Size,
-    Widget, keyboard,
+    Clipboard, Color, Element, Event, Font, Layout, Length, Padding, Pixels, Point, Rectangle,
+    Shell, Size, Widget, keyboard,
     layout::{self, Limits, Node},
     mouse,
     renderer::{Quad, Style},
@@ -117,14 +117,14 @@ pub use interaction::Interaction;
 pub use layer::{Cached, LayerId};
 pub use measure::Measure;
 pub use plot::{Plot, PlotData};
-pub use radii::Radii;
+pub use radii::{Radii, Radius};
 pub use render::{Quality, Renderer};
 pub use shape::Shape;
 pub use state::State;
 pub use stroke::Stroke;
 pub use style::Catalog;
 
-use crate::interaction::{InteractionQuery, ResolvedArea};
+use crate::interaction::{Area, InteractionQuery};
 use crate::memory::{CacheSignature, HoverIdentity};
 use crate::render::{LineArrows, LineExtensions, Primitive};
 use crate::stroke::ResolvedStroke;
@@ -135,7 +135,7 @@ use memory::Memory;
 
 /// Default movement threshold (in pixels) to distinguish a click from a drag operation.
 const DEFAULT_DRAG_DEADBAND: f32 = 5.0;
-const INTERACTION_HIT_TOLERANCE: f32 = 1.0;
+const INTERACTION_HIT_TOLERANCE: Pixels = Pixels(1.0);
 
 /// Errors that can occur during chart construction or rendering.
 #[derive(Debug, Clone, Error, Display)]
@@ -528,7 +528,7 @@ where
             // Build the query with a 5px hover/click tolerance
             let query = InteractionQuery::Point {
                 position: mouse_pos,
-                tolerance_px: INTERACTION_HIT_TOLERANCE,
+                tolerance: INTERACTION_HIT_TOLERANCE,
             };
 
             // Query for prioritized targets with `on_press` handlers
@@ -689,7 +689,7 @@ where
                 // If we have no "current" interaction, we look for one before handling chart
                 let query = InteractionQuery::Point {
                     position: *origin,
-                    tolerance_px: INTERACTION_HIT_TOLERANCE,
+                    tolerance: INTERACTION_HIT_TOLERANCE,
                 };
                 let target_id = interactions
                     .query_prioritized(&query, |interaction| interaction.on_release.is_some())
@@ -774,7 +774,7 @@ where
                     let interactions = memory.interaction_cache.borrow();
                     let query = InteractionQuery::Point {
                         position: mouse_pos,
-                        tolerance_px: INTERACTION_HIT_TOLERANCE,
+                        tolerance: INTERACTION_HIT_TOLERANCE,
                     };
 
                     // Check for prioritized `on_enter` interaction
@@ -1658,7 +1658,7 @@ fn verify_layer<
 }
 
 /// Translates a mathematical interaction area into a renderable stroke outline.
-pub(crate) fn build_debug_primitive(area: &ResolvedArea) -> Option<Primitive> {
+pub(crate) fn build_debug_primitive(area: &Area) -> Option<Primitive> {
     // A standard 1px red stroke for our X-Ray lines
     let debug_stroke = ResolvedStroke {
         thickness: 1.0,
@@ -1667,21 +1667,21 @@ pub(crate) fn build_debug_primitive(area: &ResolvedArea) -> Option<Primitive> {
     };
 
     match area {
-        ResolvedArea::Rect(rect) => Some(Primitive::Rectangle {
-            xy1: Point::new(rect.x, rect.y),
-            xy2: Point::new(rect.x + rect.width, rect.y + rect.height),
+        Area::Rectangle { top_left, size } => Some(Primitive::Rectangle {
+            xy1: Point::new(top_left.x, top_left.y),
+            xy2: Point::new(top_left.x + size.width, top_left.y + size.height),
             fill: None,
             stroke: Some(debug_stroke),
         }),
-        ResolvedArea::LineSegment {
+        Area::LineSegment {
             p1,
             p2,
-            stroke_width_px,
+            stroke_width,
         } => Some(Primitive::Line {
             start: *p1,
             end: *p2,
             stroke: ResolvedStroke {
-                thickness: *stroke_width_px,
+                thickness: stroke_width.0,
                 ..debug_stroke
             },
             clip_bounds: Rectangle::INFINITE, // Will be clipped by plot bounds later
@@ -1695,29 +1695,29 @@ pub(crate) fn build_debug_primitive(area: &ResolvedArea) -> Option<Primitive> {
                 size: 0.0,
             },
         }),
-        ResolvedArea::Ellipse { center, rx, ry } => Some(Primitive::Ellipse {
+        Area::Ellipse { center, radii } => Some(Primitive::Ellipse {
             center: *center,
-            radii: crate::radii::ResolvedRadii { x: *rx, y: *ry },
+            radii: *radii,
             fill: None,
             stroke: Some(debug_stroke),
         }),
-        ResolvedArea::Triangle { p1, p2, p3 } => Some(Primitive::Triangle {
+        Area::Triangle { p1, p2, p3 } => Some(Primitive::Triangle {
             points: [*p1, *p2, *p3],
             fill: None,
             stroke: Some(debug_stroke),
         }),
-        ResolvedArea::Polygon { points } => Some(Primitive::Area {
+        Area::Polygon { points } => Some(Primitive::Area {
             points: points.clone(),
             fill: None,
             stroke: Some(debug_stroke),
         }),
-        ResolvedArea::Polyline {
+        Area::Polyline {
             points,
-            stroke_width_px,
+            stroke_width,
         } => Some(Primitive::PolyLine {
             points: points.clone(),
             stroke: ResolvedStroke {
-                thickness: *stroke_width_px,
+                thickness: stroke_width.0,
                 ..debug_stroke
             },
             clip_bounds: Rectangle::INFINITE,
@@ -1731,20 +1731,20 @@ pub(crate) fn build_debug_primitive(area: &ResolvedArea) -> Option<Primitive> {
                 size: 0.0,
             },
         }),
-        ResolvedArea::RegularPolygon {
+        Area::RegularPolygon {
             center,
-            radius_px,
+            radius,
             vertices,
-            rotation_rads,
+            rotation,
         } => Some(Primitive::Polygon {
             center: *center,
-            radius: crate::radii::ResolvedRadius(*radius_px),
+            radius: *radius,
             vertices: *vertices,
-            rotation: iced_core::Radians(*rotation_rads),
+            rotation: *rotation,
             fill: None,
             stroke: Some(debug_stroke),
         }),
-        ResolvedArea::Arc {
+        Area::Arc {
             center,
             radius_outer,
             radius_inner,
@@ -1752,13 +1752,13 @@ pub(crate) fn build_debug_primitive(area: &ResolvedArea) -> Option<Primitive> {
             end_angle,
         } => Some(Primitive::Arc {
             center: *center,
-            radius_inner: Some(crate::radii::ResolvedRadius(*radius_inner)),
-            radius_outer: crate::radii::ResolvedRadius(*radius_outer),
-            start_angle: iced_core::Radians(*start_angle),
-            end_angle: iced_core::Radians(*end_angle),
+            radius_inner: Some(*radius_inner),
+            radius_outer: *radius_outer,
+            start_angle: *start_angle,
+            end_angle: *end_angle,
             fill: None,
             stroke: Some(debug_stroke),
         }),
-        ResolvedArea::Custom(_) => None, // Cannot easily draw custom dynamic interactions
+        Area::Custom(_) => None, // Cannot easily draw custom dynamic interactions
     }
 }

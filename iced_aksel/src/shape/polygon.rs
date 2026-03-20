@@ -1,4 +1,10 @@
-use crate::{Measure, Shape, Stroke, plot, radii::Radius, render::Primitive};
+use crate::{
+    Measure, Shape, Stroke,
+    interaction::{Area, AreaContext, IntoArea},
+    plot,
+    radii::Radius,
+    render::Primitive,
+};
 use aksel::{Float, PlotPoint};
 use iced_core::{Color, Point, Radians};
 
@@ -97,13 +103,15 @@ impl<D: Float> Polygon<D> {
         self
     }
 }
-impl<D: Float> From<&crate::shape::Polygon<D>> for crate::interaction::Area<D> {
-    fn from(value: &crate::shape::Polygon<D>) -> Self {
-        crate::interaction::Area::RegularPolygon {
-            center: value.center,
-            radius: value.radius.0,
-            vertices: value.vertices,
-            rotation_rads: value.rotation.0,
-        }
+
+impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Polygon<D> {
+    fn resolve_area(self, ctx: &AreaContext<'a, D, Renderer>) -> Option<Area> {
+        let center = ctx.chart_to_screen(&self.center);
+        Some(Area::RegularPolygon {
+            center: Point::new(center.x, center.y),
+            radius: self.radius.resolve_isotropic(ctx)?,
+            vertices: self.vertices,
+            rotation: self.rotation,
+        })
     }
 }

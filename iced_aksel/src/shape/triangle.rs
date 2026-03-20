@@ -1,4 +1,9 @@
-use crate::{Measure, Shape, Stroke, plot, render::Primitive};
+use crate::{
+    Measure, Shape, Stroke,
+    interaction::{Area, AreaContext, IntoArea},
+    plot,
+    render::Primitive,
+};
 use aksel::{Float, PlotPoint};
 use iced_core::{Color, Point};
 
@@ -147,23 +152,40 @@ impl<D: Float> Triangle<D> {
     }
 }
 
-impl<D: Float> From<&Triangle<D>> for crate::interaction::Area<D> {
-    fn from(value: &Triangle<D>) -> Self {
-        match &value.geometry {
-            Geometry::Vertices(pts) => crate::interaction::Area::Triangle {
-                p1: pts[0],
-                p2: pts[1],
-                p3: pts[2],
-            },
+impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Triangle<D> {
+    fn resolve_area(self, ctx: &AreaContext<'a, D, Renderer>) -> Option<Area> {
+        match self.geometry {
+            Geometry::Vertices(pts) => {
+                let p1 = ctx.chart_to_screen(&pts[0]);
+                let p2 = ctx.chart_to_screen(&pts[1]);
+                let p3 = ctx.chart_to_screen(&pts[2]);
+                Some(Area::Triangle {
+                    p1: Point::new(p1.x, p1.y),
+                    p2: Point::new(p2.x, p2.y),
+                    p3: Point::new(p3.x, p3.y),
+                })
+            }
             Geometry::Centered {
                 center,
                 width,
                 height,
-            } => crate::interaction::Area::CenteredTriangle {
-                center: *center,
-                width: *width,
-                height: *height,
-            },
+            } => {
+                let sc = ctx.chart_to_screen(&center);
+                let center_x = sc.x;
+                let center_y = sc.y;
+
+                let w = width.resolve_x(ctx);
+                let h = height.resolve_y(ctx);
+
+                let half_w = w / 2.0;
+                let half_h = h / 2.0;
+
+                Some(Area::Triangle {
+                    p1: Point::new(center_x, center_y - half_h),
+                    p2: Point::new(center_x + half_w, center_y + half_h),
+                    p3: Point::new(center_x - half_w, center_y + half_h),
+                })
+            }
         }
     }
 }

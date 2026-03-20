@@ -4,7 +4,7 @@
 
 use std::hash::Hash;
 
-use aksel::{Float, Transform};
+use aksel::Float;
 use derivative::Derivative;
 use iced_core::{Point, Rectangle, mouse};
 use indexmap::IndexMap;
@@ -17,11 +17,9 @@ mod id;
 mod math;
 mod query;
 
-pub use area::Area;
+pub use area::{Area, AreaContext, IntoArea};
 pub use id::Id;
 pub use query::InteractionQuery;
-
-pub(crate) use area::ResolvedArea;
 
 type EnterHandler<Message, Tag> = event::Handler<Message, (Id<Tag>, event::EnterEvent)>;
 type ExitHandler<Message, Tag> = event::Handler<Message, (Id<Tag>, event::ExitEvent)>;
@@ -31,10 +29,9 @@ type ReleaseHandler<Message, Tag> = event::Handler<Message, (Id<Tag>, ReleaseEve
 type CursorHandler = event::Handler<mouse::Interaction, (InteractionStatus,)>;
 
 /// An interactable plot-area
-pub struct Interaction<D, Message: Clone, Tag: Hash + Eq + Clone = ()> {
-    pub(crate) id: Id<Tag>,
+pub struct Interaction<Message: Clone, Tag = ()> {
     pub(crate) priority: u16,
-    pub(crate) area: Area<D>,
+    pub(crate) area: Option<Area>,
     pub(crate) cursor_handler: Option<CursorHandler>,
     pub(crate) on_enter: Option<EnterHandler<Message, Tag>>,
     pub(crate) on_exit: Option<ExitHandler<Message, Tag>>,
@@ -43,49 +40,19 @@ pub struct Interaction<D, Message: Clone, Tag: Hash + Eq + Clone = ()> {
     pub(crate) on_release: Option<ReleaseHandler<Message, Tag>>,
 }
 
-impl<D: Float, Message: Clone, T: Hash + Eq + Clone> Interaction<D, Message, T> {
-    pub(crate) fn resolve<R: iced_core::text::Renderer<Font = iced_core::Font>>(
-        self,
-        transform: &Transform<D, f32, f32>,
-        renderer: &R,
-    ) -> (Id<T>, ResolvedInteraction<Message, T>) {
-        let Self {
-            id,
-            priority,
-            area,
-            cursor_handler,
-            on_enter,
-            on_exit,
-            on_drag,
-            on_press,
-            on_release,
-        } = self;
-
-        let area = area.resolve(transform, renderer);
-        let bounding_box = area.bounding_box();
-
-        (
-            id,
-            ResolvedInteraction {
-                priority,
-                area,
-                bounding_box,
-                cursor_handler,
-                on_enter,
-                on_exit,
-                on_drag,
-                on_press,
-                on_release,
-            },
-        )
-    }
-
+impl<Message: Clone, Tag: Hash + Eq + Clone> Interaction<Message, Tag> {
     /// Creates a new [`Interaction`]
-    pub fn new(id: impl Into<Id<T>>, area: impl Into<Area<D>>) -> Self {
-        let id = id.into();
-        let area = area.into();
+    pub(crate) fn new<'a, A, D, Renderer>(
+        ctx: impl Into<AreaContext<'a, D, Renderer>>,
+        area: A,
+    ) -> Self
+    where
+        A: IntoArea<'a, D, Renderer>,
+        D: Float + 'a,
+        Renderer: crate::Renderer + 'a,
+    {
+        let area = area.resolve_area(&ctx.into());
         Self {
-            id,
             priority: u16::MAX,
             area,
             cursor_handler: None,
@@ -119,28 +86,28 @@ impl<D: Float, Message: Clone, T: Hash + Eq + Clone> Interaction<D, Message, T> 
 
     event::impl_handlers!(
         /// Sets the event handler for when the cursor enters the interaction
-        enter: (Id<T>, event::EnterEvent);
+        enter: (Id<Tag>, event::EnterEvent);
 
         /// Sets the event handler for when the cursor enters the interaction
-        exit: (Id<T>, event::ExitEvent);
+        exit: (Id<Tag>, event::ExitEvent);
 
         /// Sets the event handler for interaction dragging
-        drag: (Id<T>, event::DragEvent<event::Delta>);
+        drag: (Id<Tag>, event::DragEvent<event::Delta>);
 
         /// Sets the event handler for interaction mouse presses
-        press: (Id<T>, PressEvent<Point>);
+        press: (Id<Tag>, PressEvent<Point>);
 
         /// Sets the event handler for interaction mouse releases
-        release: (Id<T>, ReleaseEvent<Point>);
+        release: (Id<Tag>, ReleaseEvent<Point>);
     );
 }
 
 /// A stored interaction waiting to be tested against mouse events.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub(crate) struct ResolvedInteraction<Message: Clone, Tag: Hash + Eq + Clone> {
+pub(crate) struct ResolvedInteraction<Message: Clone, Tag> {
     pub priority: u16,
-    pub area: ResolvedArea,
+    pub area: Area,
     pub bounding_box: Rectangle,
 
     #[derivative(Debug = "ignore")]
@@ -157,27 +124,58 @@ pub(crate) struct ResolvedInteraction<Message: Clone, Tag: Hash + Eq + Clone> {
     pub on_release: Option<ReleaseHandler<Message, Tag>>,
 }
 
+impl<Message: Clone, Tag> ResolvedInteraction<Message, Tag> {
+    pub fn new(interaction: Interaction<Message, Tag>) -> Option<Self> {
+        let Interaction {
+            priority,
+            area,
+            cursor_handler,
+            on_enter,
+            on_exit,
+            on_drag,
+            on_press,
+            on_release,
+            ..
+        } = interaction;
+        let area = area?;
+        let bounding_box = area.bounding_box();
+        Some(Self {
+            priority,
+            area,
+            bounding_box,
+            cursor_handler,
+            on_enter,
+            on_exit,
+            on_drag,
+            on_press,
+            on_release,
+        })
+    }
+}
+
 /// The registry that collects hitboxes during the drawing phase.
 #[derive(Debug)]
-pub struct InteractionsCache<Message: Clone, Tag: Hash + Eq + Clone>(
+pub struct InteractionsCache<Message: Clone, Tag>(
     IndexMap<Id<Tag>, ResolvedInteraction<Message, Tag>, RandomState>,
 );
 
-impl<Message: Clone, T: Hash + Eq + Clone> InteractionsCache<Message, T> {
+impl<Message: Clone, Tag: Hash + Eq + Clone> InteractionsCache<Message, Tag> {
     pub(crate) fn new() -> Self {
         Self(IndexMap::with_hasher(RandomState::new()))
     }
 
-    pub(crate) fn iter(&self) -> indexmap::map::Iter<'_, Id<T>, ResolvedInteraction<Message, T>> {
+    pub(crate) fn iter(
+        &self,
+    ) -> indexmap::map::Iter<'_, Id<Tag>, ResolvedInteraction<Message, Tag>> {
         self.0.iter()
     }
 
-    pub(crate) fn get(&self, id: &Id<T>) -> Option<&ResolvedInteraction<Message, T>> {
+    pub(crate) fn get(&self, id: &Id<Tag>) -> Option<&ResolvedInteraction<Message, Tag>> {
         self.0.get(id)
     }
 
     /// Push an interaction to the cache
-    pub(crate) fn insert(&mut self, id: Id<T>, interaction: ResolvedInteraction<Message, T>) {
+    pub(crate) fn insert(&mut self, id: Id<Tag>, interaction: ResolvedInteraction<Message, Tag>) {
         self.0.insert(id, interaction);
     }
 
@@ -190,7 +188,7 @@ impl<Message: Clone, T: Hash + Eq + Clone> InteractionsCache<Message, T> {
     pub(crate) fn query(
         &self,
         query: &InteractionQuery,
-    ) -> impl Iterator<Item = (&Id<T>, &ResolvedInteraction<Message, T>)> {
+    ) -> impl Iterator<Item = (&Id<Tag>, &ResolvedInteraction<Message, Tag>)> {
         let query_bounds = query.bounds();
 
         self.0.iter().rev().filter(move |(_, interaction)| {
@@ -203,9 +201,9 @@ impl<Message: Clone, T: Hash + Eq + Clone> InteractionsCache<Message, T> {
         &self,
         query: &InteractionQuery,
         predicate: P,
-    ) -> impl Iterator<Item = (&Id<T>, &ResolvedInteraction<Message, T>)>
+    ) -> impl Iterator<Item = (&Id<Tag>, &ResolvedInteraction<Message, Tag>)>
     where
-        P: Fn(&ResolvedInteraction<Message, T>) -> bool,
+        P: Fn(&ResolvedInteraction<Message, Tag>) -> bool,
     {
         self.query(query)
             .filter(move |(_, interaction)| predicate(interaction))
@@ -217,9 +215,9 @@ impl<Message: Clone, T: Hash + Eq + Clone> InteractionsCache<Message, T> {
         &self,
         query: &InteractionQuery,
         predicate: P,
-    ) -> Option<(Id<T>, &ResolvedInteraction<Message, T>)>
+    ) -> Option<(Id<Tag>, &ResolvedInteraction<Message, Tag>)>
     where
-        P: Fn(&ResolvedInteraction<Message, T>) -> bool,
+        P: Fn(&ResolvedInteraction<Message, Tag>) -> bool,
     {
         let mut current = None;
         let mut highest_priority_seen = None;
@@ -236,7 +234,7 @@ impl<Message: Clone, T: Hash + Eq + Clone> InteractionsCache<Message, T> {
     }
 }
 
-impl<Message: Clone, T: Hash + Eq + Clone> Default for InteractionsCache<Message, T> {
+impl<Message: Clone, Tag: Hash + Eq + Clone> Default for InteractionsCache<Message, Tag> {
     fn default() -> Self {
         Self::new()
     }

@@ -193,7 +193,7 @@ impl PlotData<f64, Message> for DrawingData {
                     .fill(color);
 
                     // Rectangle interactions has the highest priority of all shapes
-                    let interaction = Interaction::new(item.id.clone(), &shape).priority(0);
+                    let interaction = plot.new_interaction(&shape).priority(0);
                     plot.render(shape);
                     interaction
                 }
@@ -207,13 +207,14 @@ impl PlotData<f64, Message> for DrawingData {
                     .inner_radius(Measure::Plot(5.0))
                     .fill(color);
 
-                    let interaction = Interaction::new(item.id.clone(), &shape);
+                    let interaction = plot.new_interaction(&shape);
                     plot.render(shape);
                     interaction
                 }
             };
 
-            plot.add_interaction(
+            plot.push_interaction(
+                item.id.clone(),
                 interaction
                     .on_enter(Message::ShapeEnter)
                     .on_exit(Message::ShapeExit)
