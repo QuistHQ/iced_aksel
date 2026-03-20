@@ -171,16 +171,17 @@ pub enum Error<AxisId> {
 // Internal type aliases for plot event handlers
 type ErrorHandler<AxisId, Message> = event::Handler<Message, (Error<AxisId>,)>;
 type MoveHandler<Message> = event::Handler<Message, (MoveEvent<Point>,)>;
-type HoverHandler<Message> = event::Handler<Message, (keyboard::Modifiers,)>;
-type HoverAllHandler<Message, T> =
-    event::Handler<Message, (Vec<interaction::Id<T>>, keyboard::Modifiers)>;
+type EnterHandler<Message> = event::Handler<Message, (EnterEvent,)>;
+type ExitHandler<Message> = event::Handler<Message, (ExitEvent,)>;
 type DragHandler<Message> = event::Handler<Message, (DragEvent<Delta>,)>;
 type ScrollHandler<Message> = event::Handler<Message, (ScrollEvent<Point>,)>;
 type PressHandler<Message> = event::Handler<Message, (PressEvent<Point>,)>;
 type ReleaseHandler<Message> = event::Handler<Message, (ReleaseEvent<Point>,)>;
 
 // Internal type aliases for axis event handlers
-type AxisHoverHandler<AxisId, Message> = event::Handler<Message, (AxisId, f32)>;
+type AxisMoveHandler<AxisId, Message> = event::Handler<Message, (AxisId, MoveEvent<f32>)>;
+type AxisEnterHandler<AxisId, Message> = event::Handler<Message, (AxisId, EnterEvent)>;
+type AxisExitHandler<AxisId, Message> = event::Handler<Message, (AxisId, ExitEvent)>;
 type AxisDragHandler<AxisId, Message> = event::Handler<Message, (AxisId, DragEvent<f32>)>;
 type AxisScrollHandler<AxisId, Message> = event::Handler<Message, (AxisId, ScrollEvent<f32>)>;
 type AxisPressHandler<AxisId, Message> = event::Handler<Message, (AxisId, PressEvent<f32>)>;
@@ -253,8 +254,8 @@ pub struct Chart<
     on_press: Option<PressHandler<Message>>,
     on_release: Option<ReleaseHandler<Message>>,
     on_drag: Option<DragHandler<Message>>,
-    on_hover: Option<HoverHandler<Message>>,
-    on_hover_all: Option<HoverAllHandler<Message, Tag>>,
+    on_enter: Option<EnterHandler<Message>>,
+    on_exit: Option<ExitHandler<Message>>,
     on_move: Option<MoveHandler<Message>>,
     on_scroll: Option<ScrollHandler<Message>>,
 
@@ -262,7 +263,9 @@ pub struct Chart<
     on_axis_press: Option<AxisPressHandler<AxisId, Message>>,
     on_axis_release: Option<AxisReleaseHandler<AxisId, Message>>,
     on_axis_drag: Option<AxisDragHandler<AxisId, Message>>,
-    on_axis_hover: Option<AxisHoverHandler<AxisId, Message>>,
+    on_axis_move: Option<AxisMoveHandler<AxisId, Message>>,
+    on_axis_enter: Option<AxisEnterHandler<AxisId, Message>>,
+    on_axis_exit: Option<AxisExitHandler<AxisId, Message>>,
     on_axis_scroll: Option<AxisScrollHandler<AxisId, Message>>,
 
     debug: bool,
@@ -302,16 +305,19 @@ where
             default_cursor: mouse::Interaction::Idle,
 
             on_drag: None,
-            on_hover: None,
-            on_hover_all: None,
+            on_enter: None,
+            on_exit: None,
             on_move: None,
             on_scroll: None,
             on_press: None,
             on_release: None,
+
             on_axis_press: None,
             on_axis_release: None,
             on_axis_drag: None,
-            on_axis_hover: None,
+            on_axis_move: None,
+            on_axis_enter: None,
+            on_axis_exit: None,
             on_axis_scroll: None,
 
             debug: false,
@@ -461,14 +467,13 @@ where
         drag: (DragEvent<Delta>,);
 
         /// Sets the event handler for when the mouse hovers the main plot area.
-        hover: (keyboard::Modifiers,);
-
-        /// Sets the event handler for when multiple interactions are hovered at once,
-        /// returning every interaction::Id currently hovered.
-        hover_all: (Vec<interaction::Id<Tag>>, keyboard::Modifiers);
-
-        /// Sets the event handler for hover identity changes
         move: (MoveEvent<Point>,);
+
+        /// Sets the event handler for when the mouse enters the plot
+        enter: (EnterEvent,);
+
+        /// Sets the event handler for when the mouse exits the plot
+        exit: (ExitEvent,);
 
         /// Sets a callback for scroll events (mouse wheel) on the main plot area.
         scroll: (ScrollEvent<Point>,);
@@ -484,7 +489,13 @@ where
         axis_drag: (AxisId, DragEvent<f32>);
 
         /// Sets the event handler for hovering on an axis.
-        axis_hover: (AxisId, f32);
+        axis_move: (AxisId, MoveEvent<f32>);
+
+        /// Sets the event handler for hovering on an axis.
+        axis_enter: (AxisId, EnterEvent);
+
+        /// Sets the event handler for hovering on an axis.
+        axis_exit: (AxisId, ExitEvent);
 
         /// Sets the event handler for scrolling on an axis
         axis_scroll: (AxisId, ScrollEvent<f32>);
@@ -731,14 +742,14 @@ where
     /// Internal handler for mouse movement.
     /// Manages hover states and processes drag deltas.
     ///
-    /// Return true if hover identity has changed
+    /// Return the last hover identity if hover identity has changed
     fn handle_mouse_moved(
         &self,
         memory: &mut Memory<AxisId, Message, Tag, Renderer>,
         layout: Layout,
         shell: &mut Shell<'_, Message>,
         mouse_pos: Point,
-    ) -> bool {
+    ) -> Option<HoverIdentity<AxisId, Tag>> {
         let Memory { action, .. } = memory;
         let plot_bounds = self.get_plot_layout(layout).bounds();
 
@@ -766,36 +777,19 @@ where
                         tolerance_px: INTERACTION_HIT_TOLERANCE,
                     };
 
-                    // TODO: Stupid check - Refactor/optimize later
-                    // We shouldn't query twice
-
-                    // Check all, if we need to
-                    self.on_hover_all
-                        .as_ref()
-                        .map(|handler: &HoverAllHandler<Message, Tag>| {
-                            let targets = interactions
-                                .query_filtered(&query, |interaction| {
-                                    interaction.on_hover.is_some()
-                                })
-                                .map(|(id, _)| id.clone())
-                                .collect();
-
-                            handler.run((targets, memory.keyboard_modifiers))
-                        });
-
-                    // Check for prioritized `on_hover` interaction
+                    // Check for prioritized `on_enter` interaction
                     let prioritized_id = interactions
-                        .query_prioritized(&query, |interaction| interaction.on_hover.is_some())
+                        .query_prioritized(&query, |interaction| interaction.on_enter.is_some())
                         .map(|(id, _)| HoverIdentity::Interaction(id));
 
                     let identity = prioritized_id.unwrap_or(HoverIdentity::Plot);
 
                     if memory.last_hovered_identity != identity {
-                        memory.last_hovered_identity = identity;
-                        return true;
+                        let last = std::mem::replace(&mut memory.last_hovered_identity, identity);
+                        return Some(last);
                     }
 
-                    return false;
+                    return None;
                 }
                 Action::DraggingPlot {
                     last_position,
@@ -811,7 +805,7 @@ where
                     *last_position = mouse_pos;
 
                     if *total_delta < self.drag_deadband {
-                        return false;
+                        return None;
                     };
 
                     // Interaction present - Use that instead
@@ -819,13 +813,7 @@ where
                         shell.capture_event();
 
                         let interactions = memory.interaction_cache.borrow();
-                        let Some(interaction) = interactions.get(id) else {
-                            return false;
-                        };
-
-                        let Some(handler) = interaction.on_drag.as_ref() else {
-                            return false;
-                        };
+                        let handler = interactions.get(id)?.on_drag.as_ref()?;
 
                         // For interaction: shape/interaction moves with cursor
                         // x: positive right, y: negative down (chart coords go up)
@@ -844,7 +832,7 @@ where
                         if let Some(message) = handler.run((id.clone(), event)) {
                             shell.publish(message);
                             // Drag events can never propagate, so we return here
-                            return false;
+                            return None;
                         };
                     }
 
@@ -870,7 +858,7 @@ where
                         }
                     }
 
-                    return false;
+                    return None;
                 }
             }
         }
@@ -886,13 +874,7 @@ where
         } = action
         {
             shell.capture_event();
-            if let Some((i, (id, axis))) = self
-                .state
-                .axes()
-                .iter()
-                .enumerate()
-                .find(|(_, (axis_id, _))| *axis_id == dragging_id)
-            {
+            if let Some((i, id, axis)) = self.state.axes().get_full(dragging_id) {
                 let axis_bounds = layout.children().nth(i).unwrap().bounds();
                 let screen_value = match axis.orientation() {
                     axis::Orientation::Horizontal => mouse_pos.x,
@@ -929,13 +911,16 @@ where
                     continue;
                 }
 
-                if let Some(handler) = &self.on_axis_hover {
+                if let Some(handler) = &self.on_axis_move {
                     let screen_value = match axis.orientation() {
                         axis::Orientation::Horizontal => mouse_pos.x,
                         axis::Orientation::Vertical => mouse_pos.y,
                     };
                     let normalized = axis.screen_to_normalized(screen_value, &axis_bounds);
-                    if let Some(message) = handler.run((id.clone(), normalized)) {
+                    if let Some(message) = handler.run((
+                        id.clone(),
+                        MoveEvent::new(normalized, memory.keyboard_modifiers),
+                    )) {
                         shell.publish(message);
                     }
                 }
@@ -944,7 +929,7 @@ where
             }
         }
 
-        false
+        None
     }
 
     #[inline(always)]
@@ -1229,39 +1214,61 @@ where
             }
             Event::Mouse(mouse::Event::CursorMoved { position }) => {
                 let changed = self.handle_mouse_moved(memory, layout, shell, *position);
-                if changed {
-                    match &memory.last_hovered_identity {
-                        HoverIdentity::Plot => {
-                            if let Some(message) = self
-                                .on_hover
-                                .as_ref()
-                                .and_then(|handler| handler.run((memory.keyboard_modifiers,)))
-                            {
-                                shell.publish(message);
-                            }
-                        }
-                        HoverIdentity::Interaction(id) => {
-                            if let Some(message) = memory
-                                .interaction_cache
-                                .borrow()
-                                .get(id)
-                                .and_then(|interaction| {
-                                    interaction.on_hover.as_ref().map(
-                                        |handler: &Handler<
-                                            Message,
-                                            (interaction::Id<Tag>, keyboard::Modifiers),
-                                        >| {
-                                            handler.run((id.clone(), memory.keyboard_modifiers))
-                                        },
-                                    )
-                                })
-                                .flatten()
-                            {
-                                shell.publish(message);
-                            }
-                        }
-                        _ => unimplemented!(),
-                    }
+
+                let Some(last) = changed else {
+                    shell.request_redraw();
+                    return;
+                };
+
+                // match the last event
+                let exit_message = match last {
+                    HoverIdentity::Plot => self.on_exit.as_ref().and_then(|handler| {
+                        handler.run((ExitEvent::new(memory.keyboard_modifiers),))
+                    }),
+                    HoverIdentity::Axis(id) => self.on_axis_exit.as_ref().and_then(|handler| {
+                        handler.run((id.clone(), ExitEvent::new(memory.keyboard_modifiers)))
+                    }),
+                    HoverIdentity::Interaction(id) => memory
+                        .interaction_cache
+                        .borrow()
+                        .get(&id)
+                        .and_then(|interaction| {
+                            interaction.on_exit.as_ref().map(|handler| {
+                                handler.run((id.clone(), ExitEvent::new(memory.keyboard_modifiers)))
+                            })
+                        })
+                        .flatten(),
+                    HoverIdentity::OutsideBounds => None, // Do nothing
+                };
+
+                // Match the new event:
+                let enter_message = match &memory.last_hovered_identity {
+                    HoverIdentity::Plot => self.on_enter.as_ref().and_then(|handler| {
+                        handler.run((EnterEvent::new(memory.keyboard_modifiers),))
+                    }),
+                    HoverIdentity::Axis(id) => self.on_axis_enter.as_ref().and_then(|handler| {
+                        handler.run((id.clone(), EnterEvent::new(memory.keyboard_modifiers)))
+                    }),
+                    HoverIdentity::Interaction(id) => memory
+                        .interaction_cache
+                        .borrow()
+                        .get(id)
+                        .and_then(|interaction| {
+                            interaction.on_enter.as_ref().map(|handler| {
+                                handler
+                                    .run((id.clone(), EnterEvent::new(memory.keyboard_modifiers)))
+                            })
+                        })
+                        .flatten(),
+                    HoverIdentity::OutsideBounds => None, // Do nothing
+                };
+
+                if let Some(message) = exit_message {
+                    shell.publish(message);
+                }
+
+                if let Some(message) = enter_message {
+                    shell.publish(message);
                 }
             }
             Event::Mouse(mouse::Event::WheelScrolled { delta }) => {

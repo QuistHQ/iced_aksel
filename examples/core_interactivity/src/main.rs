@@ -1,12 +1,12 @@
 //! iced_aksel Drawing Library Example (Hit-Test Debugger Gallery)
 use iced::{
-    Element, Length, Point, Theme, keyboard,
+    Element, Length, Point, Theme,
     mouse::{self},
     widget::{column, container, text},
 };
 use iced_aksel::{
-    Axis, Cached, Chart, Delta, DragEvent, Interaction, Measure, PlotPoint, PressEvent, State,
-    axis,
+    Axis, Cached, Chart, Delta, DragEvent, EnterEvent, Interaction, Measure, PlotPoint, PressEvent,
+    State, axis,
     interaction::{self, InteractionStatus},
     plot::{Plot, PlotData},
     scale::Linear,
@@ -30,12 +30,12 @@ struct DrawingApp {
 #[derive(Debug, Clone)]
 enum Message {
     // Shape Interactions
-    ShapeHovered(interaction::Id, keyboard::Modifiers),
+    ShapeExit,
+    ShapeEnter(interaction::Id, EnterEvent),
     ShapeDragged(interaction::Id, DragEvent<Delta>),
     ShapeSelected(interaction::Id),
 
     // Global/Plot Interactions
-    BackgroundHovered,
     BackgroundPressed,
 }
 
@@ -85,7 +85,8 @@ impl DrawingApp {
     fn update(&mut self, message: Message) {
         match message {
             // --- Shape Interactions ---
-            Message::ShapeHovered(id, _modifiers) => self.data.edit().hovered_id = Some(id),
+            Message::ShapeExit => self.data.edit().hovered_id = None,
+            Message::ShapeEnter(id, _modifiers) => self.data.edit().hovered_id = Some(id),
             Message::ShapeDragged(id, DragEvent { delta, .. }) => {
                 let data = self.data.edit();
 
@@ -113,7 +114,6 @@ impl DrawingApp {
             }
 
             // --- Background Interactions ---
-            Message::BackgroundHovered => self.data.edit().hovered_id = None,
             Message::BackgroundPressed => {
                 let data = self.data.edit();
                 data.selected_id = None;
@@ -127,7 +127,6 @@ impl DrawingApp {
             .debug(true)
             .plot_data(&self.data, Self::X, Self::Y)
             .default_cursor(mouse::Interaction::Crosshair)
-            .on_hover(Message::BackgroundHovered)
             .on_press(|event: PressEvent<Point>| match event.button {
                 mouse::Button::Left => Some(Message::BackgroundPressed),
                 _ => None,
@@ -216,7 +215,8 @@ impl PlotData<f64, Message> for DrawingData {
 
             plot.add_interaction(
                 interaction
-                    .on_hover(Message::ShapeHovered)
+                    .on_enter(Message::ShapeEnter)
+                    .on_exit(Message::ShapeExit)
                     .on_press(|id, event: PressEvent<Point>| {
                         (event.button == mouse::Button::Left).then_some(Message::ShapeSelected(id))
                     })

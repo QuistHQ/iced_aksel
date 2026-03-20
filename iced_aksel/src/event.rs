@@ -20,6 +20,28 @@ impl<P> MoveEvent<P> {
 
 /// An event omitted for `on_scroll` handlers
 #[derive(Debug, Clone, Copy)]
+pub struct EnterEvent {
+    pub modifiers: keyboard::Modifiers,
+}
+
+impl EnterEvent {
+    pub(crate) const fn new(modifiers: keyboard::Modifiers) -> Self {
+        Self { modifiers }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ExitEvent {
+    pub modifiers: keyboard::Modifiers,
+}
+
+impl ExitEvent {
+    pub(crate) const fn new(modifiers: keyboard::Modifiers) -> Self {
+        Self { modifiers }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct ScrollEvent<P> {
     /// Normalized position of the cursor
     pub position: P,
