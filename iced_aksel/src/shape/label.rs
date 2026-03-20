@@ -247,7 +247,7 @@ impl<D: Float> Label<D> {
 
 impl<D: Float> From<&Label<D>> for crate::interaction::Area<D> {
     fn from(value: &Label<D>) -> Self {
-        crate::interaction::Area::Label {
+        Self::Label {
             content: value.content.clone(),
             position: value.position,
             size: value.size,

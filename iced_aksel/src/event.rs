@@ -1,8 +1,11 @@
 use iced_core::{keyboard, mouse};
 
+/// An event omitted for `on_move` handlers
 #[derive(Debug, Clone, Copy)]
 pub struct MoveEvent<P> {
+    /// Normalized position of the cursor
     pub position: P,
+    /// Keyboard modifiers
     pub modifiers: keyboard::Modifiers,
 }
 
@@ -15,10 +18,14 @@ impl<P> MoveEvent<P> {
     }
 }
 
+/// An event omitted for `on_scroll` handlers
 #[derive(Debug, Clone, Copy)]
 pub struct ScrollEvent<P> {
+    /// Normalized position of the cursor
     pub position: P,
+    /// Delta of the scroll
     pub delta: mouse::ScrollDelta,
+    /// Keyboard modifiers
     pub modifiers: keyboard::Modifiers,
 }
 
@@ -56,11 +63,16 @@ pub struct Delta {
     pub y: f32,
 }
 
+/// An event omitted for `on_drag` handlers
 #[derive(Debug, Clone, Copy)]
 pub struct DragEvent<D> {
+    /// Normalized delta of the drag
     pub delta: D,
+    /// Button held during drag
     pub button_held: mouse::Button,
+    /// Click kind before starting the drag
     pub click_kind: mouse::click::Kind,
+    /// Current keyboard modifiers
     pub modifiers: keyboard::Modifiers,
 }
 
@@ -80,11 +92,16 @@ impl<D> DragEvent<D> {
     }
 }
 
+/// An event omitted for `on_press` events
 #[derive(Debug, Clone, Copy)]
 pub struct PressEvent<P> {
+    /// Normalized position of the cursor
     pub position: P,
+    /// Button pressed
     pub button: mouse::Button,
+    /// Click kind
     pub click_kind: mouse::click::Kind,
+    /// Keyboard modifiers
     pub modifiers: keyboard::Modifiers,
 }
 
@@ -103,25 +120,36 @@ impl<P> PressEvent<P> {
         }
     }
 
+    /// Returns true if the `click_kind` was a `Kind::Single`
     pub fn is_single_click(&self) -> bool {
         self.click_kind == mouse::click::Kind::Single
     }
 
+    /// Returns true if the `click_kind` was a `Kind::Double`
     pub fn is_double_click(&self) -> bool {
         self.click_kind == mouse::click::Kind::Double
     }
 
+    /// Returns true if the `click_kind` was a `Kind::Triple`
     pub fn is_triple_click(&self) -> bool {
         self.click_kind == mouse::click::Kind::Triple
     }
 }
 
+/// An event omitted for `on_release` handlers
 #[derive(Debug, Clone, Copy)]
 pub struct ReleaseEvent<P> {
+    /// Normalized position of the cursor
     pub position: P,
+    /// Button released
     pub button: mouse::Button,
+    /// Click kind before releasing
+    ///
+    /// Will be None if the click originated from outside the Chart
     pub click_kind: Option<mouse::click::Kind>,
+    /// Keyboard modifiers
     pub modifiers: keyboard::Modifiers,
+    /// Wether the user was dragging the cursor before releasing
     pub was_dragging: bool,
 }
 
@@ -142,29 +170,35 @@ impl<P> ReleaseEvent<P> {
         }
     }
 
+    /// Returns true if the `click_kind` was a `Some(Kind::Single)`
     pub fn is_single_click(&self) -> bool {
         self.click_kind
             .is_some_and(|kind| kind == mouse::click::Kind::Single)
     }
 
+    /// Returns true if the `click_kind` was a `Some(Kind::Double)`
     pub fn is_double_click(&self) -> bool {
         self.click_kind
             .is_some_and(|kind| kind == mouse::click::Kind::Double)
     }
 
+    /// Returns true if the `click_kind` was a `Some(Kind::Triple)`
     pub fn is_triple_click(&self) -> bool {
         self.click_kind
             .is_some_and(|kind| kind == mouse::click::Kind::Triple)
     }
 }
 
+/// A handler that can either be a direct `Message` or a closure with arguments
 pub enum Handler<Message, Args> {
+    /// A direct message value
     Direct(Message),
+    /// A closure, returning an optional message
     Closure(Box<dyn Fn(Args) -> Option<Message> + 'static>),
 }
 
 impl<Message: Clone, Args> Handler<Message, Args> {
-    pub fn run(&self, args: Args) -> Option<Message> {
+    pub(crate) fn run(&self, args: Args) -> Option<Message> {
         match self {
             Self::Direct(m) => Some(m.clone()),
             Self::Closure(f) => f(args),
@@ -172,11 +206,15 @@ impl<Message: Clone, Args> Handler<Message, Args> {
     }
 }
 
-// Marker traits to circumvent rust overlapping traits.
+// Marker struct to circumvent rust overlapping traits.
+/// Fn marker for closures
 pub struct FnMarker;
+/// Direct marker for messages
 pub struct DirectMarker;
 
+/// Converts direct messages or closures into a [`Handler`]
 pub trait IntoHandler<Message, Args, Marker> {
+    /// Convert `self` into a [`Handler`]
     fn into_handler(self) -> Handler<Message, Args>;
 }
 

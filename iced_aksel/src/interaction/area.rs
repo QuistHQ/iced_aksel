@@ -22,50 +22,58 @@ pub trait ResolvableArea<D: Float>: Debug {
 /// The exact geometric intent for the hit-test.
 #[derive(Debug)]
 pub enum Area<D> {
+    /// A rectangular area
     Rect {
         x: D,
         y: D,
         width: Measure<D>,
         height: Measure<D>,
     },
+    /// A centered rectangular area
     CenteredRect {
         center: PlotPoint<D>,
         width: Measure<D>,
         height: Measure<D>,
     },
+    /// LineSegment area
     LineSegment {
         p1: PlotPoint<D>,
         p2: PlotPoint<D>,
         width: f32,
     },
+    /// Elliptical area
     Ellipse {
         center: PlotPoint<D>,
         radius_x: Measure<D>,
         radius_y: Measure<D>,
     },
+    /// Triangular area
     Triangle {
         p1: PlotPoint<D>,
         p2: PlotPoint<D>,
         p3: PlotPoint<D>,
     },
+    /// Centered triangular area
     CenteredTriangle {
         center: PlotPoint<D>,
         width: Measure<D>,
         height: Measure<D>,
     },
-    Polygon {
-        points: Vec<PlotPoint<D>>,
-    },
+    /// Arbritrary polygonal area
+    Polygon { points: Vec<PlotPoint<D>> },
+    /// Polygonal area
     RegularPolygon {
         center: PlotPoint<D>,
         radius: Measure<D>,
         vertices: u16,
         rotation_rads: f32,
     },
+    /// Polygonal line area
     Polyline {
         points: Vec<PlotPoint<D>>,
         width: Measure<D>,
     },
+    /// Bezier curve area
     Bezier {
         start: PlotPoint<D>,
         control_1: PlotPoint<D>,
@@ -73,11 +81,13 @@ pub enum Area<D> {
         end: PlotPoint<D>,
         width: Measure<D>,
     },
+    /// Spline area
     Spline {
         points: Vec<PlotPoint<D>>,
         width: Measure<D>,
         tension: f32,
     },
+    /// Arc area
     Arc {
         center: PlotPoint<D>,
         radius_outer: Measure<D>,
@@ -85,6 +95,7 @@ pub enum Area<D> {
         start_angle_rads: f32,
         end_angle_rads: f32,
     },
+    /// Label area
     Label {
         content: String,
         position: PlotPoint<D>,
@@ -97,7 +108,7 @@ pub enum Area<D> {
         bounds: crate::shape::Bounds<D>,
         wrapping: iced_core::text::Wrapping,
     },
-    /// The escape hatch for custom data-space interactions.
+    /// Custom data-space interactions area
     Custom(Box<dyn ResolvableArea<D>>),
 }
 
@@ -407,8 +418,6 @@ impl<D: Float> Area<D> {
                         shaping: iced_core::text::Shaping::Basic,
                         wrapping,
                     });
-
-                let text_size = paragraph.min_bounds();
 
                 let text_size = paragraph.min_bounds();
 

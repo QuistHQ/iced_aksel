@@ -124,8 +124,7 @@ pub use state::State;
 pub use stroke::Stroke;
 pub use style::Catalog;
 
-use crate::interaction::InteractionQuery;
-use crate::interaction::area::ResolvedArea;
+use crate::interaction::{InteractionQuery, ResolvedArea};
 use crate::memory::{CacheSignature, HoverIdentity};
 use crate::render::{LineArrows, LineExtensions, Primitive};
 use crate::stroke::ResolvedStroke;

@@ -84,7 +84,7 @@ impl<D: Float> Area<D> {
 
 impl<D: Float> From<&crate::shape::Area<D>> for crate::interaction::Area<D> {
     fn from(value: &crate::shape::Area<D>) -> Self {
-        crate::interaction::Area::Polygon {
+        Self::Polygon {
             points: value.points.clone(),
         }
     }

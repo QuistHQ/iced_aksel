@@ -1,3 +1,7 @@
+//! Interaction module
+//!
+//! Describes plot interaction structures and methods
+
 use std::hash::Hash;
 
 use aksel::{Float, Transform};
@@ -8,7 +12,7 @@ use rapidhash::fast::RandomState;
 
 use crate::event::{self, PressEvent, ReleaseEvent};
 
-pub mod area;
+mod area;
 mod id;
 mod math;
 mod query;
@@ -17,7 +21,7 @@ pub use area::Area;
 pub use id::Id;
 pub use query::InteractionQuery;
 
-use area::ResolvedArea;
+pub(crate) use area::ResolvedArea;
 
 type HoverHandler<Message, Tag> = event::Handler<Message, (Id<Tag>, keyboard::Modifiers)>;
 type DragHandler<Message, Tag> = event::Handler<Message, (Id<Tag>, event::DragEvent<event::Delta>)>;
@@ -25,6 +29,7 @@ type PressHandler<Message, Tag> = event::Handler<Message, (Id<Tag>, PressEvent<P
 type ReleaseHandler<Message, Tag> = event::Handler<Message, (Id<Tag>, ReleaseEvent<Point>)>;
 type CursorHandler = event::Handler<mouse::Interaction, (InteractionStatus,)>;
 
+/// An interactable plot-area
 pub struct Interaction<D, Message: Clone, Tag: Hash + Eq + Clone = ()> {
     pub(crate) id: Id<Tag>,
     pub(crate) priority: u16,
@@ -71,6 +76,7 @@ impl<D: Float, Message: Clone, T: Hash + Eq + Clone> Interaction<D, Message, T> 
         )
     }
 
+    /// Creates a new [`Interaction`]
     pub fn new(id: impl Into<Id<T>>, area: impl Into<Area<D>>) -> Self {
         let id = id.into();
         let area = area.into();
@@ -148,7 +154,7 @@ pub struct InteractionsCache<Message: Clone, Tag: Hash + Eq + Clone>(
 );
 
 impl<Message: Clone, T: Hash + Eq + Clone> InteractionsCache<Message, T> {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self(IndexMap::with_hasher(RandomState::new()))
     }
 
@@ -166,7 +172,7 @@ impl<Message: Clone, T: Hash + Eq + Clone> InteractionsCache<Message, T> {
     }
 
     // Clear the inner vector, re-using the allocated space next time we push
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.0.clear();
     }
 
