@@ -1,8 +1,8 @@
 use crate::{
     Measure, Shape, Stroke,
-    interaction::{Area, AreaContext, IntoArea},
+    interaction::{Area, IntoArea},
     plot,
-    radii::Radius,
+    radii::{Radius, ResolvedRadius},
     render::Primitive,
 };
 use aksel::{Float, PlotPoint};
@@ -105,13 +105,16 @@ impl<D: Float> Polygon<D> {
 }
 
 impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Polygon<D> {
-    fn resolve_area(self, ctx: &AreaContext<'a, D, Renderer>) -> Option<Area> {
+    fn resolve_area(self, ctx: &plot::Context<'a, D, Renderer>) -> Area {
         let center = ctx.chart_to_screen(&self.center);
-        Some(Area::RegularPolygon {
+        Area::RegularPolygon {
             center: Point::new(center.x, center.y),
-            radius: self.radius.resolve_isotropic(ctx)?,
+            radius: self
+                .radius
+                .resolve_isotropic(ctx)
+                .unwrap_or(ResolvedRadius::ZERO),
             vertices: self.vertices,
             rotation: self.rotation,
-        })
+        }
     }
 }

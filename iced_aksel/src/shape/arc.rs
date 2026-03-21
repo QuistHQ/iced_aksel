@@ -1,8 +1,8 @@
 use crate::{
     Measure, Shape, Stroke,
-    interaction::{Area, AreaContext, IntoArea},
+    interaction::{Area, IntoArea},
     plot,
-    radii::Radius,
+    radii::{Radius, ResolvedRadius},
     render::Primitive,
 };
 
@@ -124,17 +124,20 @@ impl<D: Float> Arc<D> {
 }
 
 impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Arc<D> {
-    fn resolve_area(self, ctx: &AreaContext<'a, D, Renderer>) -> Option<Area> {
+    fn resolve_area(self, ctx: &plot::Context<'a, D, Renderer>) -> Area {
         let center = ctx.chart_to_screen(&self.center);
-        Some(Area::Arc {
+        Area::Arc {
             center: Point::new(center.x, center.y),
-            radius_outer: self.radius.resolve_isotropic(ctx)?,
+            radius_outer: self
+                .radius
+                .resolve_isotropic(ctx)
+                .unwrap_or(ResolvedRadius::ZERO),
             radius_inner: self
                 .inner_radius
                 .resolve_isotropic(ctx)
-                .unwrap_or(crate::radii::ResolvedRadius(0.0)),
+                .unwrap_or(ResolvedRadius::ZERO),
             start_angle: self.start_angle,
             end_angle: self.end_angle,
-        })
+        }
     }
 }

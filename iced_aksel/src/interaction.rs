@@ -4,7 +4,6 @@
 
 use std::hash::Hash;
 
-use aksel::Float;
 use derivative::Derivative;
 use iced_core::{Point, Rectangle, mouse};
 use indexmap::IndexMap;
@@ -17,7 +16,7 @@ mod id;
 mod math;
 mod query;
 
-pub use area::{Area, AreaContext, IntoArea};
+pub use area::{Area, IntoArea};
 pub use id::Id;
 pub use query::InteractionQuery;
 
@@ -31,7 +30,7 @@ type CursorHandler = event::Handler<mouse::Interaction, (InteractionStatus,)>;
 /// An interactable plot-area
 pub struct Interaction<Message: Clone, Tag = ()> {
     pub(crate) priority: u16,
-    pub(crate) area: Option<Area>,
+    pub(crate) area: Area,
     pub(crate) cursor_handler: Option<CursorHandler>,
     pub(crate) on_enter: Option<EnterHandler<Message, Tag>>,
     pub(crate) on_exit: Option<ExitHandler<Message, Tag>>,
@@ -42,16 +41,7 @@ pub struct Interaction<Message: Clone, Tag = ()> {
 
 impl<Message: Clone, Tag: Hash + Eq + Clone> Interaction<Message, Tag> {
     /// Creates a new [`Interaction`]
-    pub(crate) fn new<'a, A, D, Renderer>(
-        ctx: impl Into<AreaContext<'a, D, Renderer>>,
-        area: A,
-    ) -> Self
-    where
-        A: IntoArea<'a, D, Renderer>,
-        D: Float + 'a,
-        Renderer: crate::Renderer + 'a,
-    {
-        let area = area.resolve_area(&ctx.into());
+    pub fn new(area: Area) -> Self {
         Self {
             priority: u16::MAX,
             area,
@@ -137,7 +127,6 @@ impl<Message: Clone, Tag> ResolvedInteraction<Message, Tag> {
             on_release,
             ..
         } = interaction;
-        let area = area?;
         let bounding_box = area.bounding_box();
         Some(Self {
             priority,

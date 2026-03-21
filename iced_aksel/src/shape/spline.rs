@@ -1,6 +1,6 @@
 use crate::{
     Shape, Stroke,
-    interaction::{Area, AreaContext, IntoArea},
+    interaction::{Area, IntoArea},
     plot,
     render::Primitive,
 };
@@ -92,11 +92,14 @@ impl<D: Float> Spline<D> {
 }
 
 impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Spline<D> {
-    fn resolve_area(self, ctx: &AreaContext<'a, D, Renderer>) -> Option<Area> {
+    fn resolve_area(self, ctx: &plot::Context<'a, D, Renderer>) -> Area {
         let stroke = self.stroke.resolve(ctx);
 
         if self.points.len() < 2 {
-            return None;
+            return Area::Polyline {
+                points: vec![],
+                stroke_width: 0.0.into(),
+            };
         }
 
         // Map to screen points
@@ -136,9 +139,9 @@ impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Spl
             }
         }
 
-        Some(Area::Polyline {
+        Area::Polyline {
             points: flattened,
             stroke_width: stroke.thickness.into(),
-        })
+        }
     }
 }

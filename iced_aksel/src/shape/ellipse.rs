@@ -1,7 +1,8 @@
 use crate::{
     Measure, Radii, Shape, Stroke,
-    interaction::{Area, AreaContext, IntoArea},
+    interaction::{Area, IntoArea},
     plot,
+    radii::ResolvedRadii,
     render::Primitive,
 };
 use aksel::{Float, PlotPoint};
@@ -121,11 +122,11 @@ impl<D: Float> Ellipse<D> {
 }
 
 impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Ellipse<D> {
-    fn resolve_area(self, ctx: &AreaContext<'a, D, Renderer>) -> Option<Area> {
+    fn resolve_area(self, ctx: &plot::Context<'a, D, Renderer>) -> Area {
         let center = ctx.chart_to_screen(&self.center);
-        Some(Area::Ellipse {
+        Area::Ellipse {
             center: Point::new(center.x, center.y),
-            radii: self.radii.resolve(ctx)?,
-        })
+            radii: self.radii.resolve(ctx).unwrap_or(ResolvedRadii::ZERO),
+        }
     }
 }

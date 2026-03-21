@@ -1,7 +1,7 @@
-use crate::interaction::{Area, AreaContext, IntoArea};
+use crate::interaction::{Area, IntoArea};
 use crate::render::Primitive;
 use crate::{Measure, Shape, plot};
-use aksel::{Float, PlotPoint, ScreenPoint};
+use aksel::{Float, PlotPoint};
 use iced_core::text::LineHeight;
 use iced_core::{
     Color, Font, Point, Radians, Size,
@@ -247,7 +247,7 @@ impl<D: Float> Label<D> {
 }
 
 impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Label<D> {
-    fn resolve_area(self, ctx: &AreaContext<'a, D, Renderer>) -> Option<Area> {
+    fn resolve_area(self, ctx: &plot::Context<'a, D, Renderer>) -> Area {
         let sc = ctx.chart_to_screen(&self.position);
         let screen_pos = Point::new(sc.x as f32, sc.y as f32); // Force f32
 
@@ -296,8 +296,8 @@ impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Lab
             rotated_corners.push(Point::new(screen_pos.x + rx, screen_pos.y + ry));
         }
 
-        Some(Area::Polygon {
+        Area::Polygon {
             points: rotated_corners,
-        })
+        }
     }
 }

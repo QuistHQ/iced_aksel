@@ -1,6 +1,6 @@
 use crate::{
     Shape, Stroke,
-    interaction::{self, AreaContext, IntoArea},
+    interaction::{self, IntoArea},
     plot::{self},
     render::Primitive,
 };
@@ -84,8 +84,8 @@ impl<D: Float> Area<D> {
 }
 
 impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Area<D> {
-    fn resolve_area(self, ctx: &AreaContext<'a, D, Renderer>) -> Option<interaction::Area> {
-        Some(interaction::Area::Polygon {
+    fn resolve_area(self, ctx: &plot::Context<'a, D, Renderer>) -> interaction::Area {
+        interaction::Area::Polygon {
             points: self
                 .points
                 .iter()
@@ -94,6 +94,6 @@ impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Are
                     Point::new(sp.x, sp.y)
                 })
                 .collect(),
-        })
+        }
     }
 }

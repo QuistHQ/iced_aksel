@@ -1,10 +1,10 @@
 use crate::{
     Measure, Shape, Stroke,
-    interaction::{Area, AreaContext, IntoArea},
+    interaction::{Area, IntoArea},
     plot,
     render::Primitive,
 };
-use aksel::{Float, PlotPoint, ScreenPoint};
+use aksel::{Float, PlotPoint};
 use iced_core::{Color, Point, Size};
 use std::fmt::Debug;
 
@@ -115,7 +115,7 @@ impl<D: Float> Rectangle<D> {
 }
 
 impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Rectangle<D> {
-    fn resolve_area(self, ctx: &AreaContext<'a, D, Renderer>) -> Option<Area> {
+    fn resolve_area(self, ctx: &plot::Context<'a, D, Renderer>) -> Area {
         match self.geometry {
             Geometry::Corners { p1, p2 } => {
                 let p1 = ctx.chart_to_screen(&p1);
@@ -130,10 +130,10 @@ impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Rec
 
                 let top_left = Point::new(left, top);
 
-                Some(Area::Rectangle {
+                Area::Rectangle {
                     top_left,
                     size: Size::new(width, height),
-                })
+                }
             }
             Geometry::Centered {
                 center,
@@ -141,16 +141,16 @@ impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Rec
                 height,
             } => {
                 let center = ctx.chart_to_screen(&center);
-                let width = width.resolve_x(ctx) / 2.0;
-                let height = height.resolve_y(ctx) / 2.0;
+                let width = width.resolve_x(ctx);
+                let height = height.resolve_y(ctx);
                 let half_width = width / 2.0;
                 let half_height = height / 2.0;
                 let top_left = Point::new(center.x - half_width, center.y - half_height);
 
-                Some(Area::Rectangle {
+                Area::Rectangle {
                     top_left,
                     size: Size::new(width, height),
-                })
+                }
             }
         }
     }

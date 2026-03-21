@@ -101,6 +101,12 @@ impl<'a, D: Float, Renderer: crate::Renderer> Context<'a, D, Renderer> {
         self.cache.add_primitive(primitive);
     }
 
+    /// Measures a Text to get it's bounds
+    pub fn measure_text(&self, text: iced_core::text::Text<&str>) -> iced_core::Size {
+        use iced_core::text::Paragraph as _;
+        <Renderer as iced_core::text::Renderer>::Paragraph::with_text(text).min_bounds()
+    }
+
     /// Returns the screen bounds bounds of the plot
     pub const fn clip_bounds(&self) -> Rectangle {
         let bounds = self.transform.screen_bounds();
@@ -126,6 +132,16 @@ pub struct Plot<
 > {
     pub(crate) context: Context<'a, D, Renderer>,
     interactions: &'a mut InteractionsCache<Message, Tag>,
+}
+
+impl<'a, D: Float, Message: Clone, Tag, Renderer: crate::Renderer> Deref
+    for Plot<'a, D, Message, Tag, Renderer>
+{
+    type Target = Context<'a, D, Renderer>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.context
+    }
 }
 
 impl<'a, D, Message, Tag, Renderer> Plot<'a, D, Message, Tag, Renderer>
@@ -193,13 +209,6 @@ where
     /// ```
     pub fn render<S: crate::shape::Shape<D, Renderer>>(&mut self, shape: S) {
         shape.render(&mut self.context);
-    }
-
-    pub fn new_interaction<'b, A>(&'b self, area: A) -> Interaction<Message, Tag>
-    where
-        A: IntoArea<'b, D, Renderer>,
-    {
-        Interaction::new(&self.context, area)
     }
 
     /// Pushes an interaction to the plot

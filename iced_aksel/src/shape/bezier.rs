@@ -1,6 +1,6 @@
 use crate::{
     Shape, Stroke,
-    interaction::{Area, AreaContext, IntoArea},
+    interaction::{Area, IntoArea},
     plot,
     render::Primitive,
 };
@@ -118,7 +118,7 @@ impl<D: Float> Bezier<D> {
 }
 
 impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Bezier<D> {
-    fn resolve_area(self, ctx: &AreaContext<'a, D, Renderer>) -> Option<Area> {
+    fn resolve_area(self, ctx: &plot::Context<'a, D, Renderer>) -> Area {
         let p0 = ctx.chart_to_screen(&self.start);
         let p1 = ctx.chart_to_screen(&self.control_1);
         let p3 = ctx.chart_to_screen(&self.end);
@@ -159,9 +159,9 @@ impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Bez
         }
 
         // MAGIC: We return it as a Polyline, so no new hit-test math is needed!
-        Some(Area::Polyline {
+        Area::Polyline {
             points,
             stroke_width: stroke.thickness.into(),
-        })
+        }
     }
 }

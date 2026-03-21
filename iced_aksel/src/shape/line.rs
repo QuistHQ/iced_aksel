@@ -1,6 +1,6 @@
 use crate::{
     Float, Shape, Stroke,
-    interaction::{Area, AreaContext, IntoArea},
+    interaction::{Area, IntoArea},
     plot,
     render::{LineArrows, LineExtensions, Primitive},
 };
@@ -137,14 +137,14 @@ impl<D: Float> Line<D> {
 }
 
 impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Line<D> {
-    fn resolve_area(self, ctx: &AreaContext<'a, D, Renderer>) -> Option<Area> {
+    fn resolve_area(self, ctx: &plot::Context<'a, D, Renderer>) -> Area {
         let p1 = ctx.chart_to_screen(&self.p1);
         let p2 = ctx.chart_to_screen(&self.p2);
         let stroke = self.stroke.resolve(ctx);
-        Some(Area::LineSegment {
+        Area::LineSegment {
             p1: Point::new(p1.x, p1.y),
             p2: Point::new(p2.x, p2.y),
             stroke_width: Pixels(stroke.thickness),
-        })
+        }
     }
 }

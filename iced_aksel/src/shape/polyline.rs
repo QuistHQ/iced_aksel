@@ -1,6 +1,6 @@
 use crate::{
     Shape, Stroke,
-    interaction::{Area, AreaContext, IntoArea},
+    interaction::{Area, IntoArea},
     plot,
     render::{LineArrows, LineExtensions, Primitive},
 };
@@ -128,7 +128,7 @@ impl<D: Float> Polyline<D> {
 }
 
 impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Polyline<D> {
-    fn resolve_area(self, ctx: &AreaContext<'a, D, Renderer>) -> Option<Area> {
+    fn resolve_area(self, ctx: &plot::Context<'a, D, Renderer>) -> Area {
         let stroke = self.stroke.resolve(ctx);
         let points = self
             .points
@@ -139,9 +139,9 @@ impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Pol
             })
             .collect();
 
-        Some(Area::Polyline {
+        Area::Polyline {
             points,
             stroke_width: stroke.thickness.into(),
-        })
+        }
     }
 }

@@ -1,10 +1,9 @@
 use crate::interaction::{InteractionQuery, math};
 use crate::plot;
 use crate::radii::{ResolvedRadii, ResolvedRadius};
-use aksel::{Float, Transform};
-use iced_core::{Font, Pixels, Point, Radians, Rectangle, Size};
+use aksel::Float;
+use iced_core::{Pixels, Point, Radians, Rectangle, Size};
 use std::fmt::Debug;
-use std::ops::Deref;
 
 /// A trait for performing precise screen-space collision detection.
 pub trait HitTest: Debug {
@@ -15,68 +14,17 @@ pub trait HitTest: Debug {
     fn intersects(&self, query: &InteractionQuery) -> bool;
 }
 
-/// Internal context for Areas.
-pub struct AreaContext<'a, D: Float, Renderer: crate::Renderer = iced_renderer::Renderer> {
-    pub(crate) transform: &'a Transform<'a, D, f32, f32>,
-    pub(crate) renderer: &'a Renderer,
-}
-
-impl<'a, 'b, D, Renderer> From<&'b plot::Context<'a, D, Renderer>> for AreaContext<'b, D, Renderer>
-where
-    D: Float,
-    Renderer: crate::Renderer,
-{
-    fn from(value: &'b plot::Context<'a, D, Renderer>) -> Self {
-        Self {
-            transform: value.transform,
-            renderer: value.renderer,
-        }
-    }
-}
-
-impl<'a, D: Float, Renderer: crate::Renderer> Deref for AreaContext<'a, D, Renderer> {
-    type Target = Transform<'a, D, f32, f32>;
-
-    fn deref(&self) -> &Self::Target {
-        self.transform
-    }
-}
-
-impl<'a, D: Float, Renderer: crate::Renderer> AreaContext<'a, D, Renderer> {
-    /// Returns the default font of the underlying renderer
-    #[inline(always)]
-    pub fn default_font(&self) -> Font {
-        self.renderer.default_font()
-    }
-
-    pub fn measure_text(&self, text: iced_core::text::Text<&str>) -> iced_core::Size {
-        use iced_core::text::Paragraph as _;
-        <Renderer as iced_core::text::Renderer>::Paragraph::with_text(text).min_bounds()
-    }
-
-    /// Returns the screen bounds bounds of the plot
-    pub const fn clip_bounds(&self) -> Rectangle {
-        let bounds = self.transform.screen_bounds();
-        Rectangle {
-            x: bounds.x,
-            y: bounds.y,
-            width: bounds.width,
-            height: bounds.height,
-        }
-    }
-}
-
 /// A trait for any geometries that can be resolved into screen-space hit areas.
 ///
 /// The trait allows for None to be returned to allow not rendering when some requirements aren't
 /// met (e.g. Area is too small).
 pub trait IntoArea<'a, D: Float, Renderer: crate::Renderer> {
-    fn resolve_area(self, ctx: &AreaContext<'a, D, Renderer>) -> Option<Area>;
+    fn resolve_area(self, ctx: &plot::Context<'a, D, Renderer>) -> Area;
 }
 
-impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for Area {
-    fn resolve_area(self, _: &AreaContext<'a, D, Renderer>) -> Option<Area> {
-        Some(self)
+impl<'a, D: Float + 'a, Renderer: crate::Renderer + 'a> IntoArea<'a, D, Renderer> for Area {
+    fn resolve_area(self, _: &plot::Context<'a, D, Renderer>) -> Area {
+        self
     }
 }
 

@@ -7,7 +7,7 @@ use iced::{
 use iced_aksel::{
     Axis, Cached, Chart, Delta, DragEvent, EnterEvent, Interaction, Measure, PlotPoint, PressEvent,
     State, axis,
-    interaction::{self, InteractionStatus},
+    interaction::{self, InteractionStatus, IntoArea},
     plot::{Plot, PlotData},
     scale::Linear,
     shape::{self, Rectangle},
@@ -193,7 +193,8 @@ impl PlotData<f64, Message> for DrawingData {
                     .fill(color);
 
                     // Rectangle interactions has the highest priority of all shapes
-                    let interaction = plot.new_interaction(&shape).priority(0);
+                    let area = shape.resolve_area(plot);
+                    let interaction = Interaction::new(area).priority(0);
                     plot.render(shape);
                     interaction
                 }
@@ -207,7 +208,8 @@ impl PlotData<f64, Message> for DrawingData {
                     .inner_radius(Measure::Plot(5.0))
                     .fill(color);
 
-                    let interaction = plot.new_interaction(&shape);
+                    let area = shape.resolve_area(plot);
+                    let interaction = Interaction::new(area);
                     plot.render(shape);
                     interaction
                 }
