@@ -74,6 +74,12 @@ pub trait IntoArea<'a, D: Float, Renderer: crate::Renderer> {
     fn resolve_area(self, ctx: &AreaContext<'a, D, Renderer>) -> Option<Area>;
 }
 
+impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for Area {
+    fn resolve_area(self, _: &AreaContext<'a, D, Renderer>) -> Option<Area> {
+        Some(self)
+    }
+}
+
 #[derive(Debug)]
 pub enum Area {
     Rectangle {
