@@ -5,7 +5,12 @@ use iced_core::{Pixels, Point, Rectangle};
 pub enum InteractionQuery {
     /// A precise point check (e.g., hovering or clicking).
     /// `tolerance_px` expands the hit area to make thin lines/points clickable.
-    Point { position: Point, tolerance: Pixels },
+    Point {
+        /// The point on screen
+        position: Point,
+        /// How much tolerance (padding) to add to the point
+        tolerance: Pixels,
+    },
 
     /// A bounding box check (e.g., marquee drag selection).
     Bounds(Rectangle),

@@ -90,5 +90,6 @@ pub use crate::render::{LineArrows, LineExtensions};
 /// }
 /// ```
 pub trait Shape<D: Float, R: crate::Renderer = iced_renderer::Renderer> {
+    /// Render the shape to the plot
     fn render(self, context: &mut plot::Context<'_, D, R>);
 }

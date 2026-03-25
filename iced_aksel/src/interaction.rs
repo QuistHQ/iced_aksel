@@ -28,6 +28,35 @@ type ReleaseHandler<Message, Tag> = event::Handler<Message, (Id<Tag>, ReleaseEve
 type CursorHandler = event::Handler<mouse::Interaction, (InteractionStatus,)>;
 
 /// An interactable plot-area
+///
+/// # Examples
+///
+/// ```no_run
+/// use iced_aksel::{Interaction, PlotPoint, Measure};
+/// use iced_aksel::shape::Rectangle;
+/// use iced_aksel::interaction::IntoArea;
+///
+/// # fn example(plot: &mut iced_aksel::plot::Plot<f64, Message>) {
+/// #[derive(Debug, Clone)]
+/// enum Message {
+///     RectPressed,
+/// }
+///
+/// // Create a shape
+/// let shape = Rectangle::centered(
+///     PlotPoint::new(50.0, 50.0),
+///     Measure::Plot(20.0),
+///     Measure::Plot(10.0),
+/// );
+///
+/// // Convert shape to area and create interaction
+/// let area = shape.resolve_area(plot);
+/// let interaction = Interaction::new(area)
+///     .on_press(Message::RectPressed);
+///
+/// plot.render(shape);
+/// # }
+/// ```
 pub struct Interaction<Message: Clone, Tag = ()> {
     pub(crate) priority: u16,
     pub(crate) area: Area,
@@ -41,7 +70,7 @@ pub struct Interaction<Message: Clone, Tag = ()> {
 
 impl<Message: Clone, Tag: Hash + Eq + Clone> Interaction<Message, Tag> {
     /// Creates a new [`Interaction`]
-    pub fn new(area: Area) -> Self {
+    pub const fn new(area: Area) -> Self {
         Self {
             priority: u16::MAX,
             area,
@@ -144,7 +173,7 @@ impl<Message: Clone, Tag> ResolvedInteraction<Message, Tag> {
 
 /// The registry that collects hitboxes during the drawing phase.
 #[derive(Debug)]
-pub struct InteractionsCache<Message: Clone, Tag>(
+pub(crate) struct InteractionsCache<Message: Clone, Tag>(
     IndexMap<Id<Tag>, ResolvedInteraction<Message, Tag>, RandomState>,
 );
 

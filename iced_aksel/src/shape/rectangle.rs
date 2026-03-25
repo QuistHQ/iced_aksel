@@ -8,12 +8,44 @@ use aksel::{Float, PlotPoint};
 use iced_core::{Color, Point, Size};
 use std::fmt::Debug;
 
+/// A primitive representing an axis-aligned box.
+///
+/// Rectangles can be defined in two ways:
+/// 1. **By Corners:** Defining a region between two specific data points (e.g., for Bar Charts).
+/// 2. **Centered:** Defining a fixed-size box around a specific point (e.g., for Square Markers).
+///
+/// # Usage
+///
+/// ## 1. Data Region (Bar Chart)
+/// ```rust
+/// use iced_aksel::shape::Rectangle;
+/// use aksel::PlotPoint;
+///
+/// // Spans strictly from (0,0) to (1,5) in plot coordinates
+/// let bar = Rectangle::corners(
+///     PlotPoint::new(0.0, 0.0),
+///     PlotPoint::new(1.0, 5.0)
+/// );
+/// ```
+///
+/// ## 2. Fixed Marker (UI)
+/// ```rust
+/// use iced_aksel::shape::Rectangle;
+/// use iced_aksel::Measure;
+/// use aksel::PlotPoint;
+///
+/// // Always 20x20 pixels, centered at (5,5)
+/// let marker = Rectangle::centered(
+///     PlotPoint::new(5.0, 5.0),
+///     Measure::Screen(20.0),
+///     Measure::Screen(20.0)
+/// );
+/// ```
 #[derive(Debug, Clone)]
 enum Geometry<D> {
-    Corners {
-        p1: PlotPoint<D>,
-        p2: PlotPoint<D>,
-    },
+    /// Defined by two opposite corners in plot space.
+    Corners { p1: PlotPoint<D>, p2: PlotPoint<D> },
+    /// Defined by a center point and explicit dimensions.
     Centered {
         center: PlotPoint<D>,
         width: Measure<D>,
@@ -21,10 +53,13 @@ enum Geometry<D> {
     },
 }
 
+/// A rectangular shape that can be filled and/or stroked.
 #[derive(Debug, Clone)]
 pub struct Rectangle<D> {
     geometry: Geometry<D>,
+    /// The fill color for the rectangle interior
     pub fill: Option<Color>,
+    /// The stroke style for the rectangle border
     pub stroke: Option<Stroke<D>>,
 }
 
@@ -36,7 +71,7 @@ impl<D: Float, R: crate::Renderer> Shape<D, R> for Rectangle<D> {
             stroke,
         } = self;
 
-        // 1. Calculate visual screen coordinates
+        // Calculate visual screen coordinates
         let (screen_min, screen_max) = match &geometry {
             Geometry::Corners { p1, p2 } => {
                 let x1 = ctx.x_to_screen(&p1.x);
@@ -70,7 +105,7 @@ impl<D: Float, R: crate::Renderer> Shape<D, R> for Rectangle<D> {
             }
         };
 
-        // 3. Dispatch visual rendering
+        // Dispatch visual rendering
         let stroke = stroke.map(|s| s.resolve(ctx));
 
         ctx.add_primitive(Primitive::Rectangle {
@@ -83,6 +118,9 @@ impl<D: Float, R: crate::Renderer> Shape<D, R> for Rectangle<D> {
 }
 
 impl<D: Float> Rectangle<D> {
+    /// Creates a new `Rectangle` defined by two opposite corners in plot coordinates.
+    ///
+    /// Note: The shape is invisible by default. You must call `.fill()` or `.stroke()` to render it.
     pub const fn corners(p1: PlotPoint<D>, p2: PlotPoint<D>) -> Self {
         Self {
             geometry: Geometry::Corners { p1, p2 },
@@ -91,6 +129,9 @@ impl<D: Float> Rectangle<D> {
         }
     }
 
+    /// Creates a new `Rectangle` centered at a specific point with defined dimensions.
+    ///
+    /// Note: The shape is invisible by default. You must call `.fill()` or `.stroke()` to render it.
     pub const fn centered(center: PlotPoint<D>, width: Measure<D>, height: Measure<D>) -> Self {
         Self {
             geometry: Geometry::Centered {
@@ -103,11 +144,13 @@ impl<D: Float> Rectangle<D> {
         }
     }
 
+    /// Sets the fill color of the rectangle.
     pub const fn fill(mut self, color: Color) -> Self {
         self.fill = Some(color);
         self
     }
 
+    /// Sets the stroke style (border) of the rectangle.
     pub const fn stroke(mut self, stroke: Stroke<D>) -> Self {
         self.stroke = Some(stroke);
         self

@@ -133,15 +133,21 @@ impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Bez
                 let t = i as f32 / segments as f32;
                 let t_inv = 1.0 - t;
 
-                let x = t_inv.powi(3) * p0.x
-                    + 3.0 * t_inv.powi(2) * t * p1.x
-                    + 3.0 * t_inv * t.powi(2) * p2.x
-                    + t.powi(3) * p3.x;
+                let x = t.powi(3).mul_add(
+                    p3.x,
+                    (3.0 * t_inv * t.powi(2)).mul_add(
+                        p2.x,
+                        t_inv.powi(3).mul_add(p0.x, 3.0 * t_inv.powi(2) * t * p1.x),
+                    ),
+                );
 
-                let y = t_inv.powi(3) * p0.y
-                    + 3.0 * t_inv.powi(2) * t * p1.y
-                    + 3.0 * t_inv * t.powi(2) * p2.y
-                    + t.powi(3) * p3.y;
+                let y = t.powi(3).mul_add(
+                    p3.y,
+                    (3.0 * t_inv * t.powi(2)).mul_add(
+                        p2.y,
+                        t_inv.powi(3).mul_add(p0.y, 3.0 * t_inv.powi(2) * t * p1.y),
+                    ),
+                );
 
                 points.push(Point::new(x, y));
             }
@@ -151,8 +157,12 @@ impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Bez
                 let t = i as f32 / segments as f32;
                 let t_inv = 1.0 - t;
 
-                let x = t_inv.powi(2) * p0.x + 2.0 * t_inv * t * p1.x + t.powi(2) * p3.x;
-                let y = t_inv.powi(2) * p0.y + 2.0 * t_inv * t * p1.y + t.powi(2) * p3.y;
+                let x = t
+                    .powi(2)
+                    .mul_add(p3.x, t_inv.powi(2).mul_add(p0.x, 2.0 * t_inv * t * p1.x));
+                let y = t
+                    .powi(2)
+                    .mul_add(p3.y, t_inv.powi(2).mul_add(p0.y, 2.0 * t_inv * t * p1.y));
 
                 points.push(Point::new(x, y));
             }

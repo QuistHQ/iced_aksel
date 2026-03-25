@@ -133,8 +133,8 @@ impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Pol
         let points = self
             .points
             .iter()
-            .map(|p| {
-                let sc = ctx.chart_to_screen(&p);
+            .map(|plot_point| {
+                let sc = ctx.chart_to_screen(plot_point);
                 Point::new(sc.x, sc.y)
             })
             .collect();

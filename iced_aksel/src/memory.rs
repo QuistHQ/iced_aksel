@@ -2,7 +2,7 @@ use std::cell::{RefCell, RefMut};
 use std::hash::Hash;
 
 use aksel::Float;
-use iced_core::{Border, Color, Layout, Point, Rectangle, renderer::Quad};
+use iced_core::{Layout, Point, Rectangle};
 use iced_core::{keyboard, mouse};
 
 use crate::interaction::{self, InteractionsCache};
@@ -142,29 +142,6 @@ impl<AxisId, Tag: Hash + Eq + Clone, Message: Clone, Renderer: crate::Renderer>
         }
     }
 
-    pub fn draw_partitions(&self, renderer: &mut Renderer, plot_bounds: Rectangle) {
-        renderer.start_layer(plot_bounds);
-
-        let border = Border {
-            color: Color::from_rgba(0.3, 0.5, 0.8, 0.4),
-            width: 1.0,
-            radius: 0.0.into(),
-        };
-
-        for partition in &self.partition_grid {
-            renderer.fill_quad(
-                Quad {
-                    bounds: *partition,
-                    border,
-                    ..Default::default()
-                },
-                Color::TRANSPARENT,
-            );
-        }
-
-        renderer.end_layer();
-    }
-
     pub fn update(&mut self, signature: CacheSignature) {
         if signature.force_redraw || self.last_signature.as_ref() != Some(&signature) {
             // Update signature
@@ -180,12 +157,6 @@ impl<AxisId, Tag: Hash + Eq + Clone, Message: Clone, Renderer: crate::Renderer>
                 debug_cache.borrow_mut().request_redraw();
             };
         }
-    }
-
-    pub fn cache_needs_redraw(&self) -> bool {
-        self.cache
-            .as_ref()
-            .is_some_and(|cache| cache.borrow().needs_redraw())
     }
 
     pub fn make_sure_cache_is_initialized(&mut self, renderer: &Renderer, quality: Quality) {

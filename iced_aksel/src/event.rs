@@ -18,9 +18,10 @@ impl<P> MoveEvent<P> {
     }
 }
 
-/// An event omitted for `on_scroll` handlers
+/// An event omitted for `on_enter` handlers
 #[derive(Debug, Clone, Copy)]
 pub struct EnterEvent {
+    /// Keyboard modifiers
     pub modifiers: keyboard::Modifiers,
 }
 
@@ -30,8 +31,10 @@ impl EnterEvent {
     }
 }
 
+/// An event omitted for `on_exit` handlers
 #[derive(Debug, Clone, Copy)]
 pub struct ExitEvent {
+    /// Keyboard modifiers
     pub modifiers: keyboard::Modifiers,
 }
 
@@ -41,6 +44,7 @@ impl ExitEvent {
     }
 }
 
+/// An event omitted for `on_scroll` handlers
 #[derive(Debug, Clone, Copy)]
 pub struct ScrollEvent<P> {
     /// Normalized position of the cursor

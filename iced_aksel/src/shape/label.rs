@@ -249,7 +249,7 @@ impl<D: Float> Label<D> {
 impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Label<D> {
     fn resolve_area(self, ctx: &plot::Context<'a, D, Renderer>) -> Area {
         let sc = ctx.chart_to_screen(&self.position);
-        let screen_pos = Point::new(sc.x as f32, sc.y as f32); // Force f32
+        let screen_pos = Point::new(sc.x, sc.y);
 
         let font_size_px = self.size.resolve_y(ctx);
         let bounds_size = self.bounds.resolve(ctx, &self.position);
@@ -262,7 +262,7 @@ impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Lab
             line_height: iced_core::text::LineHeight::Relative(self.line_height),
             font,
             align_x: self.horizontal_alignment.into(),
-            align_y: self.vertical_alignment.into(),
+            align_y: self.vertical_alignment,
             shaping: iced_core::text::Shaping::Basic,
             wrapping: self.wrapping,
         });
@@ -291,8 +291,8 @@ impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Lab
 
         let mut rotated_corners = Vec::with_capacity(4);
         for c in corners {
-            let rx: f32 = c.x * cos_r - c.y * sin_r;
-            let ry: f32 = c.x * sin_r + c.y * cos_r;
+            let rx: f32 = c.x.mul_add(cos_r, -(c.y * sin_r));
+            let ry: f32 = c.x.mul_add(sin_r, c.y * cos_r);
             rotated_corners.push(Point::new(screen_pos.x + rx, screen_pos.y + ry));
         }
 

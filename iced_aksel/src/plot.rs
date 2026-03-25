@@ -7,7 +7,7 @@ use std::hash::Hash;
 use std::ops::Deref;
 
 use crate::{
-    interaction::{self, Interaction, IntoArea},
+    interaction::{self, Interaction},
     layer::LayerId,
     render::{Primitive, RenderCache},
 };
@@ -154,7 +154,7 @@ where
     /// Creates a new plot context.
     ///
     /// This is typically called internally by the Chart widget.
-    pub const fn new(
+    pub(crate) const fn new(
         renderer: &'a mut Renderer,
         cache: &'a mut RenderCache<Renderer>,
         transform: &'a Transform<'a, D, f32, f32>,

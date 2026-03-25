@@ -130,7 +130,8 @@ impl<D: Float> Radii<Measure<D>> {
 pub struct ResolvedRadius(pub f32);
 
 impl ResolvedRadius {
-    pub const ZERO: Self = ResolvedRadius(0.0);
+    /// A screen-space zero-radius
+    pub const ZERO: Self = Self(0.0);
 }
 
 /// A radii with all measurements resolved to screen-space pixels.
@@ -146,7 +147,8 @@ pub struct ResolvedRadii {
 }
 
 impl ResolvedRadii {
-    pub const ZERO: Self = ResolvedRadii { x: 0.0, y: 0.0 };
+    /// A screen-space zero-radius
+    pub const ZERO: Self = Self { x: 0.0, y: 0.0 };
 
     /// Checks wether or not the Radii values are close to equal (Accounting for sub-pixel
     /// tolerance)

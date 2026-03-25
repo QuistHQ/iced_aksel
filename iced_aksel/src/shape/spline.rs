@@ -124,16 +124,18 @@ impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Spl
                 let alpha = 1.0 - self.tension;
 
                 let x = 0.5
-                    * ((2.0 * p1.x)
-                        + (-p0.x + p2.x) * t * alpha
-                        + (2.0 * p0.x - 5.0 * p1.x + 4.0 * p2.x - p3.x) * t2 * alpha
-                        + (-p0.x + 3.0 * p1.x - 3.0 * p2.x + p3.x) * t3 * alpha);
+                    * ((3.0f32.mul_add(-p2.x, 3.0f32.mul_add(p1.x, -p0.x)) + p3.x) * t3).mul_add(
+                        alpha,
+                        ((4.0f32.mul_add(p2.x, 2.0f32.mul_add(p0.x, -(5.0 * p1.x))) - p3.x) * t2)
+                            .mul_add(alpha, 2.0f32.mul_add(p1.x, (-p0.x + p2.x) * t * alpha)),
+                    );
 
                 let y = 0.5
-                    * ((2.0 * p1.y)
-                        + (-p0.y + p2.y) * t * alpha
-                        + (2.0 * p0.y - 5.0 * p1.y + 4.0 * p2.y - p3.y) * t2 * alpha
-                        + (-p0.y + 3.0 * p1.y - 3.0 * p2.y + p3.y) * t3 * alpha);
+                    * ((3.0f32.mul_add(-p2.y, 3.0f32.mul_add(p1.y, -p0.y)) + p3.y) * t3).mul_add(
+                        alpha,
+                        ((4.0f32.mul_add(p2.y, 2.0f32.mul_add(p0.y, -(5.0 * p1.y))) - p3.y) * t2)
+                            .mul_add(alpha, 2.0f32.mul_add(p1.y, (-p0.y + p2.y) * t * alpha)),
+                    );
 
                 flattened.push(Point::new(x, y));
             }
