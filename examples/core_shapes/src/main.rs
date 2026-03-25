@@ -87,7 +87,7 @@ struct GridData {}
 impl GridData {
     // Helper to get center of a grid cell
     // Rows: 0 (Bottom) to 3 (Top). Cols: 0 (Left) to 3 (Right)
-    fn cell(&self, row: usize, col: usize) -> PlotPoint {
+    const fn cell(&self, row: usize, col: usize) -> PlotPoint {
         PlotPoint::new(
             (col as f64).mul_add(100.0, 50.0),
             (row as f64).mul_add(100.0, 50.0),
