@@ -476,6 +476,7 @@ impl<Renderer: crate::render::Renderer> PathCache<Renderer> {
                 fill,
                 line_height,
                 bounds,
+                wrapping,
                 .. // Quality and Wrapping can't be supported on the tiny-skia pipeline
             } => {
                 frame.with_save(|frame| {
@@ -525,6 +526,8 @@ impl<Renderer: crate::render::Renderer> PathCache<Renderer> {
                             align_y: *vertical_alignment,
                             shaping: Shaping::Advanced,
                             max_width,
+                            ellipsis: iced_core::text::Ellipsis::None,
+                            wrapping: *wrapping,
                         });
                     };
 

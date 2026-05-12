@@ -34,12 +34,12 @@ cpal = "0.17.0"
 derive_more = { version = "2.0", features = ["from", "error", "display", "into"] }
 derivative = "2.2"
 earcutr = "0.5"
-iced = { version = "0.14.0", features = ["tokio"] }
-iced_core = "0.14.0"
-iced_graphics = { version = "0.14.0", features = ["geometry"] }
-iced_renderer = { version = "0.14.0", features = ["wgpu-bare", "tiny-skia", "geometry"] }
-iced_tiny_skia = "0.14.0"
-iced_wgpu = "0.14.0"
+iced = { git = "https://github.com/iced-rs/iced.git", branch = "vello_cpu", features = ["tokio"] }
+iced_core = { git = "https://github.com/iced-rs/iced.git", branch = "vello_cpu" }
+iced_graphics = { git = "https://github.com/iced-rs/iced.git", branch = "vello_cpu", features = ["geometry"] }
+iced_renderer = { git = "https://github.com/iced-rs/iced.git", branch = "vello_cpu", features = ["wgpu-bare", "vello-cpu", "geometry"] }
+iced_wgpu = { git = "https://github.com/iced-rs/iced.git", branch = "vello_cpu" }
+iced_vello_cpu = { git = "https://github.com/iced-rs/iced.git", branch = "vello_cpu" }
 indexmap = "2.12"
 lru = "0.16"
 lyon_tessellation = "1.0"

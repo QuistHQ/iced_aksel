@@ -2,7 +2,7 @@ use crate::interaction::{Area, IntoArea};
 use crate::render::Primitive;
 use crate::{Measure, Shape, plot};
 use aksel::{Float, PlotPoint};
-use iced_core::text::LineHeight;
+use iced_core::text::{Ellipsis, LineHeight};
 use iced_core::{
     Color, Font, Point, Radians, Size,
     alignment::{Horizontal, Vertical},
@@ -265,6 +265,8 @@ impl<'a, D: Float, Renderer: crate::Renderer> IntoArea<'a, D, Renderer> for &Lab
             align_y: self.vertical_alignment,
             shaping: iced_core::text::Shaping::Basic,
             wrapping: self.wrapping,
+            ellipsis: Ellipsis::None,
+            hint_factor: None,
         });
 
         // 2. Explicitly type the offsets as f32

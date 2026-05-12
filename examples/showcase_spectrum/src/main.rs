@@ -179,14 +179,18 @@ impl AnalyzerApp {
         let pick_row = row![
             text("Audio Input: "),
             pick_list(
-                self.available_devices.as_slice(),
                 self.selected_device.as_ref(),
-                |device| Message::DeviceSelected(device.name().to_owned())
-            ),
+                self.available_devices.as_slice(),
+                |device| device.to_string(),
+            )
+            .on_select(|device| Message::DeviceSelected(device.name().to_owned())),
             text("Theme: "),
-            pick_list(iced::Theme::ALL, Some(&self.current_theme), |t| {
-                Message::SwitchTheme(t)
-            }),
+            pick_list(
+                Some(&self.current_theme),
+                iced::Theme::ALL,
+                Theme::to_string
+            )
+            .on_select(|t| { Message::SwitchTheme(t) }),
             space::horizontal(),
             text!("tilt: {:.1} db/oct", self.tilt),
             slider(0.0..=6.0, self.tilt, Message::ChangeTilt).step(0.1)
@@ -233,7 +237,7 @@ impl PlotData<f64, Message> for SpectrumLayer {
             return;
         }
 
-        let palette = theme.extended_palette();
+        let palette = theme.palette();
 
         let mut fill_points = Vec::with_capacity(self.curve.len() + 2);
         fill_points.push(PlotPoint::new(MIN_FREQ, MIN_DB));

@@ -213,9 +213,12 @@ impl ExampleApp {
     /// Helper method to build the settings UI.
     fn build_settings_ui(&self) -> Element<'_, Message> {
         // --- Theme toggle ---
-        let theme_toggle = pick_list(iced::Theme::ALL, Some(&self.current_theme), |t| {
-            Message::SwitchTheme(t)
-        });
+        let theme_toggle = pick_list(
+            Some(&self.current_theme),
+            iced::Theme::ALL,
+            Theme::to_string,
+        )
+        .on_select(Message::SwitchTheme);
 
         // --- Volume Toggle ---
         let volume_toggle = checkbox(self.show_volume)

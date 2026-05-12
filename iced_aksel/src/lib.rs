@@ -81,8 +81,8 @@
 use aksel::ScreenRect;
 use derive_more::{Display, Error};
 use iced_core::{
-    Clipboard, Color, Element, Event, Font, Layout, Length, Padding, Pixels, Point, Rectangle,
-    Shell, Size, Widget, keyboard,
+    Color, Element, Event, Font, Layout, Length, Padding, Pixels, Point, Rectangle, Shell, Size,
+    Widget, keyboard,
     layout::{self, Limits, Node},
     mouse,
     renderer::{Quad, Style},
@@ -1175,7 +1175,6 @@ where
         layout: layout::Layout<'_>,
         cursor: mouse::Cursor,
         _renderer: &Renderer,
-        _clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
     ) {

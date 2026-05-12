@@ -16,7 +16,7 @@ use iced_core::{
     alignment::Vertical,
     layout::{Limits, Node},
     renderer::Quad,
-    text::{Wrapping, paragraph::Plain},
+    text::{Ellipsis, Wrapping, paragraph::Plain},
     widget::text::Alignment,
 };
 
@@ -399,6 +399,8 @@ impl<D: Float, Theme> Axis<D, Theme> {
                     align_y: Vertical::Top,
                     shaping: iced_core::text::Shaping::Auto,
                     wrapping: Wrapping::None,
+                    ellipsis: Ellipsis::End,
+                    hint_factor: None,
                 });
 
                 let width = paragraph.min_bounds().width + label.padding.left + label.padding.right;
@@ -542,6 +544,8 @@ impl<D: Float, Theme> Axis<D, Theme> {
             align_y: Vertical::Top,
             shaping: iced_core::text::Shaping::Auto,
             wrapping: Wrapping::None,
+            ellipsis: iced_core::text::Ellipsis::End,
+            hint_factor: None,
         });
 
         let rail_pos = self.calculate_rail_position(&bounds, orientation, text_offset.0);
@@ -802,6 +806,8 @@ impl<D: Float, Theme> Axis<D, Theme> {
             align_y: Vertical::Top,
             shaping: iced_core::text::Shaping::Auto,
             wrapping: Wrapping::None,
+            ellipsis: Ellipsis::End,
+            hint_factor: None,
         });
 
         let rail_pos = self.calculate_rail_position(bounds, orientation, offset);

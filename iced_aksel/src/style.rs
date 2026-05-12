@@ -177,7 +177,7 @@ impl Catalog for Theme {
 
 /// The default style function for a chart.
 pub fn default(theme: &Theme) -> Style {
-    let palette = theme.extended_palette();
+    let palette = theme.palette();
 
     Style {
         axis: AxisStyle {

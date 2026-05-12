@@ -93,7 +93,7 @@ impl Renderer for iced_wgpu::Renderer {
     }
 }
 
-impl Renderer for iced_tiny_skia::Renderer {
+impl Renderer for iced_vello_cpu::Renderer {
     fn preferred_backend(&self) -> Backend {
         Backend::Path
     }

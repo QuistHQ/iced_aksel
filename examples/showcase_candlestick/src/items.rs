@@ -1,4 +1,4 @@
-use iced::{Color, theme::palette::Extended};
+use iced::{Color, theme::Palette};
 use iced_aksel::{Measure, Plot, PlotData, PlotPoint, Stroke, shape, stroke::StrokeStyle};
 
 /// Represents a single showcase_candlestick.
@@ -13,7 +13,7 @@ pub struct Candle {
 
 impl Candle {
     /// The color of the candle, based on its open and close prices.
-    fn color(&self, palette: &Extended) -> Color {
+    fn color(&self, palette: &Palette) -> Color {
         if self.close > self.open {
             palette.success.base.color
         } else if self.close < self.open {
@@ -25,7 +25,7 @@ impl Candle {
         }
     }
 
-    fn volume_color(&self, palette: &Extended) -> Color {
+    fn volume_color(&self, palette: &Palette) -> Color {
         if self.close > self.open {
             palette.success.base.color
         } else if self.close < self.open {
@@ -49,7 +49,7 @@ pub struct CandleItems {
 
 impl PlotData<f64, crate::Message> for CandleItems {
     fn draw(&self, plot: &mut Plot<f64, crate::Message>, theme: &iced::Theme) {
-        let palette = theme.extended_palette();
+        let palette = theme.palette();
         // Create rectangles from candle data during draw
         for (time, candle) in &self.candles {
             let x = *time as f64;
@@ -84,7 +84,7 @@ pub struct VolumeItems {
 
 impl PlotData<f64, crate::Message> for VolumeItems {
     fn draw(&self, plot: &mut Plot<f64, crate::Message>, theme: &iced::Theme) {
-        let palette = theme.extended_palette();
+        let palette = theme.palette();
         // Create volume bars from candle data during draw
         for (time, candle) in &self.candles {
             let color = candle.volume_color(palette);
@@ -114,7 +114,11 @@ impl PlotData<f64, crate::Message> for SmaItems {
         if !self.points.is_empty() {
             let sma_line = shape::Polyline::new(
                 self.points.clone(),
-                Stroke::with_style(palette.warning, Measure::Screen(1.5), StrokeStyle::Solid),
+                Stroke::with_style(
+                    palette.warning.base.color,
+                    Measure::Screen(1.5),
+                    StrokeStyle::Solid,
+                ),
             );
             plot.render(sma_line);
         }
@@ -136,7 +140,7 @@ impl PlotData<f64, crate::Message> for BbandsItems {
             let upper_line = shape::Polyline::new(
                 self.upper.clone(),
                 Stroke {
-                    fill: palette.text.scale_alpha(0.5),
+                    fill: palette.background.base.text.scale_alpha(0.5),
                     thickness: Measure::Screen(1.0),
                     style: StrokeStyle::Solid,
                 },
@@ -148,7 +152,7 @@ impl PlotData<f64, crate::Message> for BbandsItems {
             let middle_line = shape::Polyline::new(
                 self.middle.clone(),
                 Stroke {
-                    fill: palette.primary.scale_alpha(0.5),
+                    fill: palette.primary.base.color.scale_alpha(0.5),
                     thickness: Measure::Screen(1.0),
                     style: StrokeStyle::Solid,
                 },
@@ -160,7 +164,7 @@ impl PlotData<f64, crate::Message> for BbandsItems {
             let lower_line = shape::Polyline::new(
                 self.lower.clone(),
                 Stroke {
-                    fill: palette.text.scale_alpha(0.5),
+                    fill: palette.background.base.text.scale_alpha(0.5),
                     thickness: Measure::Screen(1.0),
                     style: StrokeStyle::Solid,
                 },
