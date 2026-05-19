@@ -117,7 +117,7 @@ impl Scatter {
     }
 }
 
-impl PlotData<f64> for Scatter {
+impl PlotData<f64, Message> for Scatter {
     fn draw(&self, plot: &mut Plot<f64>, theme: &Theme) {
         for point in &self.points {
             plot.add_shape(
