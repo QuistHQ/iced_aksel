@@ -27,15 +27,18 @@ use iced_core::{Font, Rectangle};
 /// use iced_aksel::{plot::{Plot, PlotData}, PlotPoint, shape::Ellipse, Measure};
 /// use iced::{Color, Theme};
 ///
+/// #[derive(Debug, Clone)]
+/// struct Message {}
+///
 /// struct DataPoints {
 ///     points: Vec<PlotPoint<f64>>,
 /// }
 ///
-/// impl PlotData<f64> for DataPoints {
-///     fn draw(&self, plot: &mut Plot<f64>, theme: &Theme) {
+/// impl PlotData<f64, Message> for DataPoints {
+///     fn draw(&self, plot: &mut Plot<f64, Message>, theme: &Theme) {
 ///         for point in &self.points {
 ///             plot.add_shape(
-///                 Ellipse::new(*point, Measure::Screen(20.0), Measure::Screen(10.0))
+///                 Ellipse::new(*point, Radii::new(Measure::Screen(20.0), Measure::Screen(10.0)))
 ///                     .fill(theme.palette().primary)
 ///             );
 ///         }
@@ -177,9 +180,11 @@ where
     ///
     /// ```rust
     /// # use iced_aksel::plot::{Plot, PlotData};
+    /// # #[derive(Debug, Clone)]
+    /// # struct Message {}
     /// # struct MyData;
-    /// # impl PlotData<f64> for MyData {
-    /// #     fn draw(&self, plot: &mut Plot<f64>, theme: &iced::Theme) {
+    /// # impl PlotData<f64, Message> for MyData {
+    /// #     fn draw(&self, plot: &mut Plot<f64, Message>, theme: &iced::Theme) {
     /// let bounds = plot.bounds();
     /// let (x_min, x_max) = (bounds.min_x(), bounds.max_x());
     /// let (y_min, y_max) = (bounds.min_y(), bounds.max_y());
@@ -197,11 +202,13 @@ where
     /// ```rust
     /// # use iced_aksel::{plot::{Plot, PlotData}, PlotPoint, shape::Ellipse, Measure};
     /// # use iced::Color;
+    /// # #[derive(Debug, Clone)]
+    /// # struct Message {}
     /// # struct MyData;
-    /// # impl PlotData<f64> for MyData {
-    /// #     fn draw(&self, plot: &mut Plot<f64>, theme: &iced::Theme) {
+    /// # impl PlotData<f64, Message> for MyData {
+    /// #     fn draw(&self, plot: &mut Plot<f64, Message>, theme: &iced::Theme) {
     /// plot.add_shape(
-    ///     Ellipse::new(PlotPoint::new(5.0, 10.0), Measure::Screen(20.0), Measure::Screen(10.0))
+    ///     Ellipse::new(PlotPoint::new(5.0, 10.0), Radii::new(Measure::Screen(20.0), Measure::Screen(10.0)))
     ///         .fill(Color::from_rgb(1.0, 0.0, 0.0))
     /// );
     /// #     }

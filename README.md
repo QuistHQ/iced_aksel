@@ -61,7 +61,7 @@ iced_aksel = { version = "0.3" }
 ```rust
 use iced::{Element, Theme};
 use iced_aksel::shape::Ellipse;
-use iced_aksel::{Axis, Chart, Measure, Plot, PlotData, PlotPoint, State, axis, scale::Linear};
+use iced_aksel::{Axis, Chart, Measure, Plot, PlotData, PlotPoint, State, axis, scale::Linear, Radii};
 
 // Initialize IDs for ***individual*** axes
 const X_ID: &'static str = "x_id";
@@ -118,10 +118,10 @@ impl Scatter {
 }
 
 impl PlotData<f64, Message> for Scatter {
-    fn draw(&self, plot: &mut Plot<f64>, theme: &Theme) {
+    fn draw(&self, plot: &mut Plot<f64, Message>, theme: &Theme) {
         for point in &self.points {
             plot.add_shape(
-                Ellipse::new(*point, Measure::Screen(5.0), Measure::Screen(5.0))
+                Ellipse::new(*point, Radii::uniform(Measure::Screen(5.0)))
                     .fill(theme.palette().primary),
             );
         }

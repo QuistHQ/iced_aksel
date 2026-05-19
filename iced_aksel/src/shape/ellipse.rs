@@ -38,8 +38,10 @@ use iced_core::{Color, Point};
 ///
 /// let oval = Ellipse::new(
 ///     PlotPoint::new(0.0, 0.0),
-///     Measure::Screen(20.0), // Radius X
-///     Measure::Screen(10.0)  // Radius Y
+///     Radii::new(
+///         Measure::Screen(20.0), // Radius X
+///         Measure::Screen(10.0)  // Radius Y
+///     )
 /// )
 /// .stroke(Stroke::new(Color::BLACK, Measure::Screen(2.0)));
 /// ```

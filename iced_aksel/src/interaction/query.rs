@@ -18,7 +18,7 @@ pub enum InteractionQuery {
 
 impl InteractionQuery {
     /// Returns the broad-phase bounding box of the query itself.
-    pub(crate) fn bounds(&self) -> Rectangle {
+    pub fn bounds(&self) -> Rectangle {
         match self {
             Self::Point {
                 position,

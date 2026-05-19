@@ -76,7 +76,7 @@ impl<P> ScrollEvent<P> {
 /// # Example
 ///
 /// ```rust
-/// use iced_aksel::plot::DragDelta;
+/// use iced_aksel::Delta;
 ///
 /// let delta = Delta { x: 0.1, y: 0.05 };
 /// // Use with state.pan_axes(..., delta.x, delta.y)

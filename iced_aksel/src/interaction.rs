@@ -36,11 +36,12 @@ type CursorHandler = event::Handler<mouse::Interaction, (InteractionStatus,)>;
 /// use iced_aksel::shape::Rectangle;
 /// use iced_aksel::interaction::IntoArea;
 ///
-/// # fn example(plot: &mut iced_aksel::plot::Plot<f64, Message>) {
 /// #[derive(Debug, Clone)]
 /// enum Message {
 ///     RectPressed,
 /// }
+///
+/// # fn example(plot: &mut iced_aksel::plot::Plot<f64, Message>) {
 ///
 /// // Create a shape
 /// let shape = Rectangle::centered(
