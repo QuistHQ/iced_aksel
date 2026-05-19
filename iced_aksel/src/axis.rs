@@ -334,6 +334,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
 
         // --- Prioritize Ticks (Center-Out) ---
         let prioritized_ticks = self.collect_prioritized_ticks();
+        let total_ticks = prioritized_ticks.len();
 
         let mut label_candidates = Vec::new();
         let mut candidate_max_bounds = Size::ZERO;
@@ -341,11 +342,14 @@ impl<D: Float, Theme> Axis<D, Theme> {
         // Iterate through the PRE-SORTED ticks
         for wrapper in prioritized_ticks {
             let tick = wrapper.tick;
+            let index = wrapper.index;
             let pos_norm = self.normalize(&tick.value);
 
             let tick_result = self.tick_renderer.as_ref().map(|renderer| {
                 renderer.borrow_mut()(TickContext {
                     tick,
+                    index,
+                    total_ticks,
                     normalized_position: pos_norm,
                     axis_bounds: &bounds,
                     scale_domain: (d_max, d_min),
@@ -1090,7 +1094,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
         major_tick_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         // 2. Score every tick
-        for tick in all_ticks {
+        for (index, tick) in all_ticks.into_iter().enumerate() {
             let val = tick.value.to_f32().unwrap_or(0.0);
 
             let score = if tick.level == 0 {
@@ -1122,7 +1126,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
                 }
             };
 
-            prioritized.push(PrioritizedTick { tick, score });
+            prioritized.push(PrioritizedTick { tick, score, index });
         }
 
         // 3. Sort (Stable sort to preserve any internal logic from the scale)

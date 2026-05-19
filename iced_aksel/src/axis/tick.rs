@@ -101,6 +101,10 @@ impl TickResult {
 pub struct TickContext<'a, D, Theme = iced_core::Theme> {
     /// The tick value and metadata from the scale.
     pub tick: Tick<D>,
+    /// The index of the current tick
+    pub index: usize,
+    /// The total amount of ticks to be rendered
+    pub total_ticks: usize,
     /// Normalized position (0.0-1.0) along the axis.
     pub normalized_position: f32,
     /// The bounds of the axis in screen coordinates.
@@ -239,6 +243,9 @@ pub struct PrioritizedTick<D> {
     ///
     /// This will vary based on the [`aksel::Scale`] you use.
     pub tick: aksel::Tick<D>,
+
+    /// The index of the tick
+    pub index: usize,
 
     /// The importance of this tick (lower values are higher priority).
     ///

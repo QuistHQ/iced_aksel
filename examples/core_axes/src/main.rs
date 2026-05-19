@@ -320,11 +320,22 @@ fn simple_tick_result() -> impl Fn(TickContext<f64>) -> TickResult + 'static {
     move |ctx: TickContext<f64>| {
         let text = format!("{:.2}", ctx.tick.value);
         let label = ctx.label(text);
+        let middle = ctx.total_ticks / 2;
+
+        let color = if ctx.index < middle {
+            Color::from_rgb8(0, 0, 255)
+        } else {
+            Color::from_rgb8(255, 0, 0)
+        };
 
         TickResult {
             label: Some(label),
             label_badge: Some(ctx.label_badge()),
-            tick_line: Some(ctx.tickline()),
+            tick_line: Some(TickLine {
+                color,
+                length: 5.0.into(),
+                width: 1.0.into(),
+            }),
             grid_line: Some(ctx.gridline()),
             label_priority: None,
         }
