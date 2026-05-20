@@ -16,7 +16,8 @@
 //! # Example
 //!
 //! ```rust
-//! use iced_aksel::{PlotPoint, Measure, shape::{Ellipse, Line, Rectangle}, Stroke};
+//! use iced_aksel::{PlotPoint, Measure, Radii, Stroke};
+//! use iced_aksel::shape::{Ellipse, Line, Rectangle};
 //! use iced::Color;
 //!
 //! // Circle at (10, 20) with radius 5 pixels

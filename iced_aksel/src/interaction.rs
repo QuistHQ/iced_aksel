@@ -34,7 +34,7 @@ type CursorHandler = event::Handler<mouse::Interaction, (InteractionStatus,)>;
 /// ```no_run
 /// use iced_aksel::{Interaction, PlotPoint, Measure};
 /// use iced_aksel::shape::Rectangle;
-/// use iced_aksel::interaction::IntoArea;
+/// use iced_aksel::interaction::{IntoArea, Id};
 ///
 /// #[derive(Debug, Clone)]
 /// enum Message {
@@ -56,6 +56,7 @@ type CursorHandler = event::Handler<mouse::Interaction, (InteractionStatus,)>;
 ///     .on_press(Message::RectPressed);
 ///
 /// plot.render(shape);
+/// plot.push_interaction(Id::unique(), interaction);
 /// # }
 /// ```
 pub struct Interaction<Message: Clone, Tag = ()> {

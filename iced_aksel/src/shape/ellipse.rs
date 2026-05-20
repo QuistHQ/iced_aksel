@@ -32,7 +32,7 @@ use iced_core::{Color, Point};
 /// ## 2. Stretched Ellipse
 /// ```rust
 /// use iced_aksel::shape::Ellipse;
-/// use iced_aksel::{Stroke, Measure};
+/// use iced_aksel::{Stroke, Measure, Radii};
 /// use iced::Color;
 /// use aksel::PlotPoint;
 ///

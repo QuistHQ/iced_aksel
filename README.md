@@ -120,7 +120,7 @@ impl Scatter {
 impl PlotData<f64, Message> for Scatter {
     fn draw(&self, plot: &mut Plot<f64, Message>, theme: &Theme) {
         for point in &self.points {
-            plot.add_shape(
+            plot.render(
                 Ellipse::new(*point, Radii::uniform(Measure::Screen(5.0)))
                     .fill(theme.palette().primary),
             );

@@ -118,10 +118,13 @@ type AxisReleaseHandler<AxisId, Message> = event::Handler<Message, (AxisId, Rele
 /// # Example
 ///
 /// ```rust,no_run
-/// use iced_aksel::{Chart, State, Axis, axis, scale::Linear, plot::PlotData};
+/// use iced::Point;
+/// use iced_aksel::{Chart, State, Axis, axis, ScrollEvent};
+/// use iced_aksel::scale::Linear;
+/// use iced_aksel::plot::PlotData;
 ///
 /// # #[derive(Clone)]
-/// # enum Message { Scroll(iced_aksel::event::ScrollEvent<PlotPoint<f64>>) }
+/// # enum Message { Scroll(ScrollEvent<Point>) }
 /// # struct MyData;
 /// # impl PlotData<f64, Message> for MyData {
 /// #     fn draw(&self, plot: &mut iced_aksel::Plot<f64, Message>, theme: &iced::Theme) {}
@@ -134,7 +137,7 @@ type AxisReleaseHandler<AxisId, Message> = event::Handler<Message, (AxisId, Rele
 ///
 /// let chart = Chart::new(&state)
 ///     .plot_data(&data, "x_axis", "y_axis")
-///     .on_scroll(|event| Message::Scroll(event));
+///     .on_scroll(Message::Scroll);
 /// ```
 pub struct Chart<
     'a,

@@ -24,7 +24,9 @@ use iced_core::{Font, Rectangle};
 /// # Example
 ///
 /// ```rust
-/// use iced_aksel::{plot::{Plot, PlotData}, PlotPoint, shape::Ellipse, Measure};
+/// use iced_aksel::{PlotPoint, Measure, Radii};
+/// use iced_aksel::plot::{Plot, PlotData};
+/// use iced_aksel::shape::Ellipse;
 /// use iced::{Color, Theme};
 ///
 /// #[derive(Debug, Clone)]
@@ -37,7 +39,7 @@ use iced_core::{Font, Rectangle};
 /// impl PlotData<f64, Message> for DataPoints {
 ///     fn draw(&self, plot: &mut Plot<f64, Message>, theme: &Theme) {
 ///         for point in &self.points {
-///             plot.add_shape(
+///             plot.render(
 ///                 Ellipse::new(*point, Radii::new(Measure::Screen(20.0), Measure::Screen(10.0)))
 ///                     .fill(theme.palette().primary)
 ///             );
@@ -185,7 +187,7 @@ where
     /// # struct MyData;
     /// # impl PlotData<f64, Message> for MyData {
     /// #     fn draw(&self, plot: &mut Plot<f64, Message>, theme: &iced::Theme) {
-    /// let bounds = plot.bounds();
+    /// let bounds = plot.plot_bounds();
     /// let (x_min, x_max) = (bounds.min_x(), bounds.max_x());
     /// let (y_min, y_max) = (bounds.min_y(), bounds.max_y());
     /// #     }
@@ -200,14 +202,14 @@ where
     /// # Example
     ///
     /// ```rust
-    /// # use iced_aksel::{plot::{Plot, PlotData}, PlotPoint, shape::Ellipse, Measure};
+    /// # use iced_aksel::{plot::{Plot, PlotData}, PlotPoint, shape::Ellipse, Measure, Radii};
     /// # use iced::Color;
     /// # #[derive(Debug, Clone)]
     /// # struct Message {}
     /// # struct MyData;
     /// # impl PlotData<f64, Message> for MyData {
     /// #     fn draw(&self, plot: &mut Plot<f64, Message>, theme: &iced::Theme) {
-    /// plot.add_shape(
+    /// plot.render(
     ///     Ellipse::new(PlotPoint::new(5.0, 10.0), Radii::new(Measure::Screen(20.0), Measure::Screen(10.0)))
     ///         .fill(Color::from_rgb(1.0, 0.0, 0.0))
     /// );

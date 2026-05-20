@@ -14,12 +14,12 @@ static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 /// use iced_aksel::interaction::Id;
 ///
 /// // Create a static identifier with a tag
-/// let id = Id::new("my-button");
+/// let id: Id<i32> = Id::new("my-button");
 /// let tagged_id = id.with_tag(42);
 /// assert_eq!(tagged_id.tag(), Some(42));
 ///
 /// // Create a unique identifier with a tag
-/// let unique_id = Id::unique();
+/// let unique_id: Id<i32> = Id::unique();
 /// let tagged_id = id.with_tag(1337);
 /// assert_eq!(tagged_id.tag(), Some(1337));
 /// ```
