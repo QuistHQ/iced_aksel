@@ -91,7 +91,7 @@ impl LineSeries {
         {
             let diff = *tgt - *cur;
             if diff.abs() > 1e-5 {
-                *cur += diff * alpha;
+                *cur = diff.mul_add(alpha, *cur);
             } else {
                 *cur = *tgt;
             }
@@ -310,8 +310,8 @@ impl LineChart {
 
         for (id, target) in target_ys {
             let current = self.current_y_domains.entry(id.clone()).or_insert(target);
-            current.0 += (target.0 - current.0) * alpha;
-            current.1 += (target.1 - current.1) * alpha;
+            current.0 = (target.0 - current.0).mul_add(alpha, current.0);
+            current.1 = (target.1 - current.1).mul_add(alpha, current.1);
 
             if let Some(axis) = self.state.axis_mut_opt(&id) {
                 axis.set_domain(current.0, current.1);
@@ -326,7 +326,7 @@ impl LineChart {
         // Animate Stacking Factor
         let diff_stack = self.target_stack_factor - self.current_stack_factor;
         if diff_stack.abs() > 1e-5 {
-            self.current_stack_factor += diff_stack * alpha;
+            self.current_stack_factor = diff_stack.mul_add(alpha, self.current_stack_factor);
         } else {
             self.current_stack_factor = self.target_stack_factor;
         }
@@ -587,8 +587,10 @@ impl PlotData<f64, crate::Message> for LineChart {
                     .rev()
                 {
                     let base_val = baseline[i] * self.current_stack_factor;
-                    let floor = chart_floor * (1.0 - self.current_stack_factor)
-                        + base_val * self.current_stack_factor;
+                    let floor = base_val.mul_add(
+                        self.current_stack_factor,
+                        chart_floor * (1.0 - self.current_stack_factor),
+                    );
                     fill_poly.push(PlotPoint::new(i as f64, floor));
                 }
                 let mut color = s.color;

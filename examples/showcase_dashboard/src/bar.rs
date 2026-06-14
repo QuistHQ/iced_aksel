@@ -150,7 +150,7 @@ impl BarChart {
 
             let diff = bar.value - bar.current_value;
             if diff.abs() > 1e-5 {
-                bar.current_value += diff * alpha;
+                bar.current_value = diff.mul_add(alpha, bar.current_value);
             } else {
                 bar.current_value = bar.value;
             }

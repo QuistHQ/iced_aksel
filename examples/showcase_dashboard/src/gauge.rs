@@ -171,7 +171,7 @@ impl Gauge {
         // 1. Animate Value
         let diff = self.target_value - self.value;
         if diff.abs() > 1e-5 {
-            self.value += diff * alpha;
+            self.value = diff.mul_add(alpha, self.value);
         } else {
             self.value = self.target_value;
         }
