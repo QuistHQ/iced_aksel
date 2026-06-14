@@ -596,10 +596,10 @@ fn add_arc_using_beziers(
     // Normalize sweep based on direction
     if clockwise {
         if total_sweep < 0.0 {
-            total_sweep += 2.0 * std::f32::consts::PI;
+            total_sweep = 2.0f32.mul_add(std::f32::consts::PI, total_sweep);
         }
     } else if total_sweep > 0.0 {
-        total_sweep -= 2.0 * std::f32::consts::PI;
+        total_sweep = 2.0f32.mul_add(-std::f32::consts::PI, total_sweep);
     }
 
     let num_segments = (total_sweep.abs() / (std::f32::consts::PI / 2.0)).ceil() as usize;
