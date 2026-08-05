@@ -408,7 +408,7 @@ impl LineChart {
             }
         }
 
-        for (_, bounds) in target_ys.iter_mut() {
+        for bounds in target_ys.values_mut() {
             let (min, max) = *bounds;
             let padding = if max > min { (max - min) * 0.05 } else { 1.0 };
             let final_min = if factor > 0.1 { min.min(0.0) } else { min };
