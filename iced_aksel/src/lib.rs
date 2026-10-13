@@ -32,6 +32,8 @@ pub mod radii;
 pub mod shape;
 pub mod stroke;
 pub mod style;
+#[cfg(feature = "svg")]
+pub mod svg;
 
 pub use axis::Axis;
 pub use event::*;
@@ -48,7 +50,7 @@ pub use style::Catalog;
 
 use crate::interaction::{Area, InteractionQuery};
 use crate::memory::{CacheSignature, HoverIdentity};
-use crate::render::{LineArrows, LineExtensions, Primitive};
+use crate::render::{LineArrows, LineExtensions, Primitive, Screen, Surface};
 use crate::stroke::ResolvedStroke;
 use action::Action;
 use axis::{MarkerContext, MarkerPosition, MarkerRequest, Orientation, Position};
@@ -864,12 +866,12 @@ where
     }
 
     /// Iterates over axes to find the inner-most spines and draws connecting squares at the corners.
-    fn draw_spine_corners(
+    fn draw_spine_corners<S: Surface>(
         &self,
         layout: Layout<'_>,
         style: &style::Style,
         plot: Rectangle,
-        renderer: &mut Renderer,
+        surface: &mut S,
     ) {
         // Track the "inner-most" spine properties for each side
         let mut left: Option<(f32, Color)> = None;
@@ -935,7 +937,7 @@ where
         if let (Some((lw, lc)), Some((bw, _))) = (left, bottom) {
             let top_left = Point::new(plot.x - lw, plot.y + plot.height);
             let size = Size::new(lw, bw);
-            renderer.fill_quad(
+            surface.fill_quad(
                 Quad {
                     bounds: Rectangle::new(top_left, size),
                     snap: true,
@@ -949,7 +951,7 @@ where
         if let (Some((lw, lc)), Some((tw, _))) = (left, top) {
             let top_left = Point::new(plot.x - lw, plot.y - tw);
             let size = Size::new(lw, tw);
-            renderer.fill_quad(
+            surface.fill_quad(
                 Quad {
                     bounds: Rectangle::new(top_left, size),
                     snap: true,
@@ -963,7 +965,7 @@ where
         if let (Some((rw, rc)), Some((bw, _))) = (right, bottom) {
             let top_left = Point::new(plot.x + plot.width, plot.y + plot.height);
             let size = Size::new(rw, bw);
-            renderer.fill_quad(
+            surface.fill_quad(
                 Quad {
                     bounds: Rectangle::new(top_left, size),
                     snap: true,
@@ -977,7 +979,7 @@ where
         if let (Some((rw, rc)), Some((tw, _))) = (right, top) {
             let top_left = Point::new(plot.x + plot.width, plot.y - tw);
             let size = Size::new(rw, tw);
-            renderer.fill_quad(
+            surface.fill_quad(
                 Quad {
                     bounds: Rectangle::new(top_left, size),
                     snap: true,
@@ -987,43 +989,9 @@ where
             );
         }
     }
-}
 
-impl<AxisId, Domain, Message, Theme, Tag, Renderer> Widget<Message, Theme, Renderer>
-    for Chart<'_, AxisId, Domain, Message, Tag, Theme, Renderer>
-where
-    AxisId: Hash + Eq + Debug + Clone + 'static,
-    Domain: Float + 'static,
-    Tag: Hash + Eq + Clone + Debug + 'static,
-    Renderer: crate::Renderer + iced_core::text::Renderer<Font = iced_core::Font> + 'static,
-    Theme: Catalog,
-    Message: Clone + 'static,
-{
-    fn tag(&self) -> tree::Tag {
-        tree::Tag::of::<Memory<AxisId, Message, Tag, Renderer>>()
-    }
-
-    fn state(&self) -> tree::State {
-        tree::State::new(Memory::<AxisId, Message, Tag, Renderer>::new())
-    }
-
-    fn children(&self) -> Vec<Tree> {
-        // One child per Axis + one for the content (plot area).
-        let mut children: Vec<Tree> = self.state.axes().iter().map(|_| Tree::empty()).collect();
-        children.push(Tree::empty()); // content
-        children
-    }
-
-    fn diff(&self, _tree: &mut Tree) {}
-
-    fn size(&self) -> Size<Length> {
-        Size::new(self.width, self.height)
-    }
-
-    fn layout(&mut self, tree: &mut Tree, renderer: &Renderer, limits: &Limits) -> Node {
-        let memory: &mut Memory<AxisId, Message, Tag, Renderer> = tree.state.downcast_mut();
-        memory.make_sure_cache_is_initialized(renderer, self.quality);
-
+    /// Computes the layout of the chart: one node per axis, followed by the plot area.
+    fn compute_layout(&self, limits: &Limits) -> Node {
         let bounds = limits.resolve(self.width, self.height, Size::ZERO);
 
         let axis_count = self.state.axes().len();
@@ -1091,6 +1059,135 @@ where
         children_nodes.push(chart_node);
 
         Node::with_children(bounds, children_nodes)
+    }
+
+    /// Draws the chart into an SVG document.
+    ///
+    /// `size` is the space available to the chart: a chart that fills its parent (default)
+    /// takes all of it, while a fixed [`width`](Self::width) or [`height`](Self::height) is kept.
+    ///
+    /// This doesn't need a renderer, so it can be called from your update logic. See the
+    /// [`svg`] module for details on the generated document.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use iced::{Size, Theme};
+    /// use iced_aksel::{Chart, State, Axis, axis, svg};
+    /// use iced_aksel::scale::Linear;
+    /// # use iced_aksel::plot::{Plot, PlotData};
+    /// # #[derive(Clone)]
+    /// # struct Message;
+    /// # struct MyData;
+    /// # impl PlotData<f64, Message> for MyData {
+    /// #     fn draw(&self, plot: &mut Plot<f64, Message>, theme: &Theme) {}
+    /// # }
+    /// # let data = MyData;
+    ///
+    /// let mut state: State<&str, f64> = State::new();
+    /// state.set_axis("x", Axis::new(Linear::new(0.0, 100.0), axis::Position::Bottom));
+    /// state.set_axis("y", Axis::new(Linear::new(0.0, 100.0), axis::Position::Left));
+    ///
+    /// let chart: Chart<_, _, Message> = Chart::new(&state).plot_data(&data, "x", "y");
+    /// let document = chart.to_svg(
+    ///     Size::new(800.0, 600.0),
+    ///     &Theme::Light,
+    ///     svg::Options::default(),
+    /// );
+    ///
+    /// std::fs::write("chart.svg", document).unwrap();
+    /// ```
+    #[cfg(feature = "svg")]
+    pub fn to_svg(&self, size: Size, theme: &Theme, options: svg::Options) -> String {
+        let style = theme.style(&self.class);
+        let node = self.compute_layout(&Limits::new(Size::ZERO, size));
+        let layout = Layout::new(&node);
+        let bounds = layout.bounds();
+        let plot_bounds = self.get_plot_layout(layout).bounds();
+        let screen_rect = ScreenRect {
+            x: plot_bounds.x,
+            y: plot_bounds.y,
+            width: plot_bounds.width,
+            height: plot_bounds.height,
+        };
+
+        let mut document = svg::Document::<Renderer>::new(options);
+
+        // Draw axes
+        for (i, (_, axis)) in self.state.axes().iter().enumerate() {
+            let axis_layout = layout.children().nth(i).unwrap();
+            axis.draw(
+                &mut document,
+                theme,
+                &style,
+                axis_layout,
+                &plot_bounds,
+                &bounds,
+            );
+        }
+
+        // Connect axis spines
+        self.draw_spine_corners(layout, &style, plot_bounds, &mut document);
+
+        // Draw data layers. Interactions have no meaning in a document, so they are discarded.
+        let mut interactions = interaction::InteractionsCache::new();
+
+        for layer in &self.layers {
+            // These axes are guaranteed to exist because of `verify_layer` check
+            let x_axis = self.state.axis(&layer.horizontal_axis_id);
+            let y_axis = self.state.axis(&layer.vertical_axis_id);
+            let transform = Transform::new(&screen_rect, x_axis.deref(), y_axis.deref());
+
+            let mut plot: Plot<Domain, Message, Tag, Renderer> = Plot::new(
+                options.default_font,
+                &mut document.cache,
+                &transform,
+                &mut interactions,
+            );
+
+            layer.items.draw(&mut plot, theme);
+        }
+
+        document.finish(bounds.size(), plot_bounds)
+    }
+}
+
+impl<AxisId, Domain, Message, Theme, Tag, Renderer> Widget<Message, Theme, Renderer>
+    for Chart<'_, AxisId, Domain, Message, Tag, Theme, Renderer>
+where
+    AxisId: Hash + Eq + Debug + Clone + 'static,
+    Domain: Float + 'static,
+    Tag: Hash + Eq + Clone + Debug + 'static,
+    Renderer: crate::Renderer + iced_core::text::Renderer<Font = iced_core::Font> + 'static,
+    Theme: Catalog,
+    Message: Clone + 'static,
+{
+    fn tag(&self) -> tree::Tag {
+        tree::Tag::of::<Memory<AxisId, Message, Tag, Renderer>>()
+    }
+
+    fn state(&self) -> tree::State {
+        tree::State::new(Memory::<AxisId, Message, Tag, Renderer>::new())
+    }
+
+    fn children(&self) -> Vec<Tree> {
+        // One child per Axis + one for the content (plot area).
+        let mut children: Vec<Tree> = self.state.axes().iter().map(|_| Tree::empty()).collect();
+        children.push(Tree::empty()); // content
+        children
+    }
+
+    fn diff(&self, _tree: &mut Tree) {}
+
+    fn size(&self) -> Size<Length> {
+        Size::new(self.width, self.height)
+    }
+
+    fn layout(&mut self, tree: &mut Tree, renderer: &Renderer, limits: &Limits) -> Node {
+        let memory: &mut Memory<AxisId, Message, Tag, Renderer> = tree.state.downcast_mut();
+        memory.make_sure_cache_is_initialized(renderer, self.quality);
+
+        self.compute_layout(limits)
     }
 
     fn update(
@@ -1291,25 +1388,30 @@ where
             return;
         };
 
+        let default_font = renderer.default_font();
+        let mut surface = Screen {
+            renderer: &mut *renderer,
+            cache: &mut cache,
+        };
+
         // Draw axes
         for (i, (_, axis)) in self.state.axes().iter().enumerate() {
             // We only care about layout bounds here to determine position
             let axis_layout = layout.children().nth(i).unwrap();
 
             // Draw the axis itself (Ticks, labels, spine and gridlines)
-            axis.draw::<Renderer>(
-                renderer,
+            axis.draw(
+                &mut surface,
                 theme,
                 &style,
                 axis_layout,
                 &plot_bounds,
-                &mut cache,
                 &bounds,
             );
         }
 
         // Connect axis spines
-        self.draw_spine_corners(layout, &style, plot_bounds, renderer);
+        self.draw_spine_corners(layout, &style, plot_bounds, &mut surface);
 
         // Draw data layers if the cache needs redraw
         if cache.needs_redraw() {
@@ -1323,7 +1425,7 @@ where
                 let transform = Transform::new(&screen_rect, x_axis.deref(), y_axis.deref());
 
                 let mut plot: Plot<Domain, Message, Tag, Renderer> =
-                    Plot::new(renderer, &mut cache, &transform, &mut interactions);
+                    Plot::new(default_font, &mut cache, &transform, &mut interactions);
 
                 // User code draws shapes into the plot here
                 layer.items.draw(&mut plot, theme);

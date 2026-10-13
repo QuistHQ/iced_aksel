@@ -135,6 +135,27 @@ impl PlotData<f64, Message> for Scatter {
   builder to push shapes into.
 - `Shape`, `Stroke`, and `Measure` describe how primitives are drawn.
 
+## 🖨️ SVG Export
+
+With the `svg` feature enabled, a chart can be drawn into an SVG document. No window or
+renderer is needed, so this can be called straight from your `update` logic:
+
+```toml
+[dependencies]
+iced_aksel = { version = "0.3", features = ["svg"] }
+```
+
+```rust,ignore
+let document = Chart::new(&state)
+    .plot_data(&data, "x", "y")
+    .to_svg(Size::new(800.0, 600.0), &theme, svg::Options::default());
+
+std::fs::write("chart.svg", document)?;
+```
+
+Text is exported as glyph outlines, so the document looks the same wherever it is displayed or
+printed. The background is transparent unless one is set through `svg::Options`.
+
 ## 🧩 Examples
 
 The workspace ships multiple runnable examples that showcase axes, shapes,
@@ -144,6 +165,7 @@ interactions, dashboards, and stress tests. From the repository root:
 # Core functionality examples
 cargo run -p core_axes
 cargo run -p core_scales
+cargo run -p core_svg
 cargo run -p core_template
 
 # Fancy Examples

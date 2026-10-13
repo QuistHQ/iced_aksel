@@ -30,6 +30,10 @@ smallvec.workspace = true
 rapidhash.workspace = true
 paste.workspace = true
 
+[features]
+# Enables exporting charts as SVG documents
+svg = []
+
 [dev-dependencies]
 rand.workspace = true
 realfft.workspace = true

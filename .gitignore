@@ -4,3 +4,4 @@
 
 Cargo.lock
 **/Cargo.lock
+.vscode/

@@ -21,7 +21,7 @@ use iced_core::{
 };
 
 use crate::{
-    render::{Primitive, RenderCache},
+    render::{Primitive, Surface},
     stroke::{ResolvedStroke, StrokeStyle},
     style::{AxisStyle, DashStyle, Style},
 };
@@ -311,18 +311,15 @@ impl<D: Float, Theme> Axis<D, Theme> {
     // And to make it have less arguments
     /// Draws the axis, including ticks, grid lines, labels, and the interactive marker.
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn draw<Renderer>(
+    pub(crate) fn draw<S: Surface>(
         &self,
-        renderer: &mut Renderer,
+        surface: &mut S,
         theme: &Theme,
         style: &Style,
         layout: Layout<'_>,
         plot_bounds: &Rectangle,
-        cache: &mut RenderCache<Renderer>,
         viewport: &Rectangle,
-    ) where
-        Renderer: crate::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
-    {
+    ) {
         if self.invisible && !self.render_grid {
             return;
         }
@@ -374,7 +371,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
             if self.render_grid
                 && let Some(line) = grid_line
             {
-                self.draw_grid_line(line, &bounds, plot_bounds, cache, pos_norm);
+                self.draw_grid_line(line, &bounds, plot_bounds, surface, pos_norm);
             }
 
             if self.invisible {
@@ -393,17 +390,18 @@ impl<D: Float, Theme> Axis<D, Theme> {
 
                 // 3.1 Run all candidates, find the biggest label as source of truth for all label sizes
                 // Make a paragraph for sizing
-                let paragraph: Plain<Renderer::Paragraph> = Plain::new(Text {
-                    content: label.content,
-                    bounds: bounds.size(),
-                    size: label.size,
-                    line_height: label.line_height,
-                    font: label.font.unwrap_or_else(|| renderer.default_font()),
-                    align_x: Alignment::Left,
-                    align_y: Vertical::Top,
-                    shaping: iced_core::text::Shaping::Auto,
-                    wrapping: Wrapping::None,
-                });
+                let paragraph: Plain<<S::Renderer as iced_core::text::Renderer>::Paragraph> =
+                    Plain::new(Text {
+                        content: label.content,
+                        bounds: bounds.size(),
+                        size: label.size,
+                        line_height: label.line_height,
+                        font: label.font.unwrap_or_else(|| surface.default_font()),
+                        align_x: Alignment::Left,
+                        align_y: Vertical::Top,
+                        shaping: iced_core::text::Shaping::Auto,
+                        wrapping: Wrapping::None,
+                    });
 
                 let width = paragraph.min_bounds().width + label.padding.left + label.padding.right;
                 let height =
@@ -419,11 +417,11 @@ impl<D: Float, Theme> Axis<D, Theme> {
 
             // Draw Tick Marks (Axis style + local config)
             if let Some(line) = tick_line {
-                self.draw_tick_line(line, &bounds, renderer, pos_norm);
+                self.draw_tick_line(line, &bounds, surface, pos_norm);
             }
         }
 
-        self.draw_spine(renderer, &bounds, &style.spine, viewport);
+        self.draw_spine(surface, &bounds, &style.spine, viewport);
 
         if self.invisible {
             return;
@@ -433,7 +431,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
         label_candidates.sort_by_key(|candidate| candidate.priority);
 
         self.layout_labels(
-            renderer,
+            surface,
             &style,
             &bounds,
             orientation,
@@ -444,15 +442,13 @@ impl<D: Float, Theme> Axis<D, Theme> {
     }
 
     /// Renders the axis spine (the continuous line along the axis) as a Quad in a separate layer.
-    fn draw_spine<Renderer>(
+    fn draw_spine<S: Surface>(
         &self,
-        renderer: &mut Renderer,
+        surface: &mut S,
         bounds: &Rectangle,
         style: &SpineStyle,
         viewport: &Rectangle,
-    ) where
-        Renderer: crate::Renderer,
-    {
+    ) {
         if style.width.0 <= 0.0 {
             return;
         }
@@ -500,15 +496,15 @@ impl<D: Float, Theme> Axis<D, Theme> {
         };
 
         // Render spine in a separate layer to ensure it's always on top
-        renderer.start_layer(*viewport);
-        renderer.fill_quad(
+        surface.start_layer(*viewport);
+        surface.fill_quad(
             Quad {
                 bounds: spine_rect,
                 ..Default::default()
             },
             color,
         );
-        renderer.end_layer();
+        surface.end_layer();
     }
 
     /// Draws the interactive marker badge and line.
@@ -696,25 +692,23 @@ impl<D: Float, Theme> Axis<D, Theme> {
     /// Lays out and renders axis labels, resolving overlaps if the policy requires it.
     // TODO: refactor arguments
     #[allow(clippy::too_many_arguments)]
-    fn layout_labels<Renderer>(
+    fn layout_labels<S: Surface>(
         &self,
-        renderer: &mut Renderer,
+        surface: &mut S,
         style: &AxisStyle,
         bounds: &Rectangle,
         orientation: Orientation,
         label_candidates: Vec<LabelCandidate<D>>,
         candidate_max_size: Size,
         viewport: &Rectangle,
-    ) where
-        Renderer: crate::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
-    {
+    ) {
         let mut accepted: Vec<PlacedLabelInfo<D>> = Vec::new();
 
         for candidate in label_candidates {
             let Some(resolved) = self.resolve_label_candidate(
                 candidate,
                 &candidate_max_size,
-                renderer,
+                surface.default_font(),
                 bounds,
                 orientation,
                 style.text_offset.0,
@@ -731,7 +725,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
                 badge,
                 badge_bounds,
                 color,
-            }: ResolvedLabelCandidate<Renderer, _> = resolved;
+            }: ResolvedLabelCandidate<S::Renderer, _> = resolved;
 
             let context = LabelDecisionContext {
                 tick,
@@ -744,7 +738,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
             if self.label_policy.should_render(context) {
                 // 1. Render Badge (Background)
                 if let Some(badge) = badge {
-                    renderer.fill_quad(
+                    surface.fill_quad(
                         Quad {
                             bounds: badge_bounds,
                             border: badge.border,
@@ -756,7 +750,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
                 }
 
                 // 2. Render Text
-                renderer.fill_text(
+                surface.fill_text(
                     paragraph
                         .as_text()
                         .with_content(paragraph.content().to_string()),
@@ -779,7 +773,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
         &self,
         candidate: LabelCandidate<D>,
         candidate_max_size: &Size,
-        renderer: &Renderer,
+        default_font: iced_core::Font,
         bounds: &Rectangle,
         orientation: Orientation,
         offset: f32,
@@ -801,7 +795,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
             bounds: bounds.size(),
             size: label.size,
             line_height: label.line_height,
-            font: label.font.unwrap_or_else(|| renderer.default_font()),
+            font: label.font.unwrap_or(default_font),
             align_x: Alignment::Left,
             align_y: Vertical::Top,
             shaping: iced_core::text::Shaping::Auto,
@@ -899,15 +893,13 @@ impl<D: Float, Theme> Axis<D, Theme> {
     }
 
     /// Renders a single tick mark
-    fn draw_tick_line<Renderer>(
+    fn draw_tick_line<S: Surface>(
         &self,
         line: TickLine,
         bounds: &Rectangle,
-        renderer: &mut Renderer,
+        surface: &mut S,
         pos_norm: f32,
-    ) where
-        Renderer: crate::Renderer,
-    {
+    ) {
         let thickness = line.width.0;
         let half_thickness = thickness / 2.0;
         let length = line.length.0;
@@ -916,7 +908,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
         match self.position {
             Position::Bottom => {
                 let x = bounds.width.mul_add(pos_norm, bounds.x) - half_thickness;
-                renderer.fill_quad(
+                surface.fill_quad(
                     Quad {
                         bounds: Rectangle::new(
                             Point { x, y: bounds.y },
@@ -933,7 +925,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
             }
             Position::Top => {
                 let x = bounds.width.mul_add(pos_norm, bounds.x) - half_thickness;
-                renderer.fill_quad(
+                surface.fill_quad(
                     Quad {
                         bounds: Rectangle::new(
                             Point { x, y: bounds.y },
@@ -950,7 +942,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
             }
             Position::Right => {
                 let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y) - half_thickness;
-                renderer.fill_quad(
+                surface.fill_quad(
                     Quad {
                         bounds: Rectangle::new(
                             Point { x: bounds.x, y },
@@ -967,7 +959,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
             }
             Position::Left => {
                 let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y) - half_thickness;
-                renderer.fill_quad(
+                surface.fill_quad(
                     Quad {
                         bounds: Rectangle::new(
                             Point {
@@ -989,16 +981,14 @@ impl<D: Float, Theme> Axis<D, Theme> {
     }
 
     /// Renders a single grid line into the cache.
-    fn draw_grid_line<Renderer>(
+    fn draw_grid_line<S: Surface>(
         &self,
         line: GridLine,
         axis_bounds: &Rectangle,
         plot_bounds: &Rectangle,
-        cache: &mut RenderCache<Renderer>,
+        surface: &mut S,
         pos_norm: f32,
-    ) where
-        Renderer: crate::Renderer,
-    {
+    ) {
         let orientation = self.orientation();
         let thickness = line.width.0;
         let fill = line.color;
@@ -1011,7 +1001,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
                     gap_length,
                 }) = line.dashed
                 {
-                    cache.add_primitive(Primitive::VerticalLine {
+                    surface.add_primitive(Primitive::VerticalLine {
                         x,
                         y_start: plot_bounds.y,
                         y_end: plot_bounds.y + plot_bounds.height,
@@ -1026,7 +1016,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
                         snap: true,
                     });
                 } else {
-                    cache.add_primitive(Primitive::VerticalLine {
+                    surface.add_primitive(Primitive::VerticalLine {
                         x,
                         y_start: plot_bounds.y,
                         y_end: plot_bounds.y + plot_bounds.height,
@@ -1046,7 +1036,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
                     gap_length,
                 }) = line.dashed
                 {
-                    cache.add_primitive(Primitive::HorizontalLine {
+                    surface.add_primitive(Primitive::HorizontalLine {
                         y,
                         x_start: plot_bounds.x,
                         x_end: plot_bounds.x + plot_bounds.width,
@@ -1061,7 +1051,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
                         snap: true,
                     });
                 } else {
-                    cache.add_primitive(Primitive::HorizontalLine {
+                    surface.add_primitive(Primitive::HorizontalLine {
                         y,
                         x_start: plot_bounds.x,
                         x_end: plot_bounds.x + plot_bounds.width,

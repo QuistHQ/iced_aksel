@@ -9,10 +9,15 @@ mod path;
 
 pub use mesh::{MeshCache, MeshData};
 pub use path::PathCache;
+#[cfg(feature = "svg")]
+pub use path::primitive_path;
 
 pub enum RenderCache<Renderer: crate::Renderer> {
     Mesh(Box<MeshCache>),
     Path(Box<PathCache<Renderer>>),
+    /// Records the primitives, to be written to an SVG document.
+    #[cfg(feature = "svg")]
+    Svg(Vec<Primitive>),
 }
 
 impl<Renderer: crate::Renderer> RenderCache<Renderer> {
@@ -24,6 +29,11 @@ impl<Renderer: crate::Renderer> RenderCache<Renderer> {
         Self::Path(Box::new(PathCache::new()))
     }
 
+    #[cfg(feature = "svg")]
+    pub const fn new_svg() -> Self {
+        Self::Svg(Vec::new())
+    }
+
     pub fn request_redraw(&mut self) {
         match self {
             Self::Path(cache) => {
@@ -32,6 +42,8 @@ impl<Renderer: crate::Renderer> RenderCache<Renderer> {
             Self::Mesh(cache) => {
                 cache.request_redraw();
             }
+            #[cfg(feature = "svg")]
+            Self::Svg(_) => {}
         }
     }
 
@@ -39,6 +51,8 @@ impl<Renderer: crate::Renderer> RenderCache<Renderer> {
         match self {
             Self::Mesh(cache) => cache.needs_redraw(),
             Self::Path(cache) => cache.needs_redraw(),
+            #[cfg(feature = "svg")]
+            Self::Svg(_) => true,
         }
     }
 
@@ -50,6 +64,8 @@ impl<Renderer: crate::Renderer> RenderCache<Renderer> {
             Self::Mesh(cache) => {
                 cache.draw(renderer, clip_bounds);
             }
+            #[cfg(feature = "svg")]
+            Self::Svg(_) => {}
         }
     }
 
@@ -60,6 +76,10 @@ impl<Renderer: crate::Renderer> RenderCache<Renderer> {
             }
             Self::Path(cache) => {
                 cache.add_primitive(primitive);
+            }
+            #[cfg(feature = "svg")]
+            Self::Svg(primitives) => {
+                primitives.push(primitive);
             }
         }
     }
@@ -72,6 +92,8 @@ impl<Renderer: crate::Renderer> RenderCache<Renderer> {
             Self::Path(_cache) => {
                 // todo!("Set quality on path-buffer")
             }
+            #[cfg(feature = "svg")]
+            Self::Svg(_) => {}
         }
     }
 }
