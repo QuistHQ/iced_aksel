@@ -10,7 +10,6 @@
 //! * **Memory Safety:** Uses an LRU (Least Recently Used) cache to prevent unbounded memory growth.
 
 use crate::render::Text;
-use core::f32;
 use iced_core::{
     Color, Point,
     alignment::{Horizontal, Vertical},
