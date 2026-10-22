@@ -3,7 +3,7 @@ members = ["iced_aksel", "examples/*"]
 resolver = "3"
 
 [workspace.package]
-version = "0.3.0"
+version = "0.3.2"
 edition = "2024"
 description = "A data-driven charting library for Iced"
 authors = ["Mads Ahlquist Jensen <madsaj10@outlook.com>", "Dennis Mellquist"]
@@ -30,7 +30,7 @@ nursery = { level = "deny", priority = -1 }
 [workspace.dependencies]
 aksel = "0.2"
 chrono = "0.4"
-cpal = "0.17.0"
+cpal = "0.18.2"
 derive_more = { version = "2.0", features = ["from", "error", "display", "into"] }
 derivative = "2.2"
 earcutr = "0.5"
@@ -41,15 +41,15 @@ iced_renderer = { version = "0.14.0", features = ["wgpu-bare", "tiny-skia", "geo
 iced_tiny_skia = "0.14.0"
 iced_wgpu = "0.14.0"
 indexmap = "2.12"
-lru = "0.16"
+lru = "0.19"
 lyon_tessellation = "1.0"
 lyon_path = "1.0"
 lyon = "1.0"
-rand = "0.9"
+rand = "0.10"
 realfft = "3.5.0"
 smallvec = "1.15"
-strum = "0.27"
-strum_macros = "0.27"
-triple_buffer = "8.1.1"
+strum = "0.28"
+strum_macros = "0.28"
+triple_buffer = "9.0"
 rapidhash = "4.4"
 paste = "1.0"

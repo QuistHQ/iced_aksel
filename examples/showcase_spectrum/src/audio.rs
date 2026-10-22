@@ -141,15 +141,15 @@ fn setup_audio_capture_for_device(
             return (None, None);
         }
     };
-    let config = StreamConfig::from(supported_config.clone());
+    let config = StreamConfig::from(supported_config);
 
     let mut planner = RealFftPlanner::<f32>::new();
     let fft = planner.plan_fft_forward(FFT_SIZE);
 
     let stream = match supported_config.sample_format() {
-        cpal::SampleFormat::F32 => build_input_stream::<f32>(device, &config, input, fft),
-        cpal::SampleFormat::I16 => build_input_stream::<i16>(device, &config, input, fft),
-        cpal::SampleFormat::U16 => build_input_stream::<u16>(device, &config, input, fft),
+        cpal::SampleFormat::F32 => build_input_stream::<f32>(device, config, input, fft),
+        cpal::SampleFormat::I16 => build_input_stream::<i16>(device, config, input, fft),
+        cpal::SampleFormat::U16 => build_input_stream::<u16>(device, config, input, fft),
         _ => {
             eprintln!(
                 "Unsupported sample format: {:?}",
@@ -178,10 +178,10 @@ fn setup_audio_capture_for_device(
 
 fn build_input_stream<T>(
     device: &cpal::Device,
-    config: &cpal::StreamConfig,
+    config: cpal::StreamConfig,
     mut input: triple_buffer::Input<Box<[f32]>>,
     fft: Arc<dyn realfft::RealToComplex<f32>>,
-) -> Result<cpal::Stream, cpal::BuildStreamError>
+) -> Result<cpal::Stream, cpal::Error>
 where
     T: cpal::Sample + cpal::SizedSample,
     f32: cpal::FromSample<T>,
