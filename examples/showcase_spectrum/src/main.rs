@@ -153,7 +153,7 @@ impl AnalyzerApp {
 
         let mut curve = Vec::with_capacity(num_points);
         for i in 0..num_points {
-            let freq = 10_f64.powf(log_min + step * i as f64);
+            let freq = 10_f64.powf(step.mul_add(i as f64, log_min));
             let width = math::fractional_width(freq);
             let db = math::sample_fractional_octave(magnitudes, freq, sample_rate, width, tilt);
             curve.push(PlotPoint::new(freq, db));

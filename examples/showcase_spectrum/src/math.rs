@@ -58,7 +58,7 @@ pub fn sample_fractional_octave(
         let weight = (-0.5 * dist * dist).exp();
         let amplitude = interpolate_fft_bin(magnitudes, sample_freq, sample_rate);
 
-        weighted += amplitude * weight;
+        weighted = amplitude.mul_add(weight, weighted);
         weight_sum += weight;
     }
 

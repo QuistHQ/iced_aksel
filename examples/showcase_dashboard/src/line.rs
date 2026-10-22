@@ -339,7 +339,7 @@ impl LineChart {
         };
         let diff_alpha = target_alpha - self.current_fill_alpha;
         if diff_alpha.abs() > 1e-5 {
-            self.current_fill_alpha += diff_alpha * (alpha as f32);
+            self.current_fill_alpha = diff_alpha.mul_add(alpha as f32, self.current_fill_alpha);
             self.update_series_fill();
         } else if self.current_fill_alpha != target_alpha {
             self.current_fill_alpha = target_alpha;

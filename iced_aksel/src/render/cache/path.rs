@@ -140,7 +140,7 @@ impl<Renderer: crate::render::Renderer> PathCache<Renderer> {
                     let step = (std::f32::consts::PI * 2.0) / (*vertices as f32);
 
                     for i in 0..count {
-                        let angle = start_angle + (step * i as f32);
+                        let angle = step.mul_add(i as f32, start_angle);
                         let px = radius.0.mul_add(angle.cos(), center.x);
                         let py = radius.0.mul_add(angle.sin(), center.y);
                         let point = Point::new(px, py);
@@ -444,8 +444,8 @@ impl<Renderer: crate::render::Renderer> PathCache<Renderer> {
                     } else {
                         // Donut: Line to inner end
                         let end_inner = Point::new(
-                            center.x + radius_inner * end_angle.0.cos(),
-                            center.y + radius_inner * end_angle.0.sin(),
+                            radius_inner.mul_add(end_angle.0.cos(), center.x),
+                            radius_inner.mul_add(end_angle.0.sin(), center.y)
                         );
                         builder.line_to(end_inner);
 
@@ -612,7 +612,7 @@ fn add_arc_using_beziers(
     let step = total_sweep / num_segments as f32;
 
     for i in 0..num_segments {
-        let current_start = start_angle + (step * i as f32);
+        let current_start = step.mul_add(i as f32, start_angle);
         let current_end = current_start + step;
 
         // Math: Control points for a circular arc
@@ -633,10 +633,13 @@ fn add_arc_using_beziers(
         // Control Points (Tangent to the circle)
         // Tangent vector is (-y, x) relative to radius vector
         let c1 = Point::new(
-            p0.x - k * current_start.sin(),
-            p0.y + k * current_start.cos(),
+            k.mul_add(-current_start.sin(), p0.x),
+            k.mul_add(current_start.cos(), p0.y),
         );
-        let c2 = Point::new(p3.x + k * current_end.sin(), p3.y - k * current_end.cos());
+        let c2 = Point::new(
+            k.mul_add(current_end.sin(), p3.x),
+            k.mul_add(-current_end.cos(), p3.y),
+        );
 
         builder.bezier_curve_to(c1, c2, p3);
     }

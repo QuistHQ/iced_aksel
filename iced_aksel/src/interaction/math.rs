@@ -21,7 +21,7 @@ pub fn distance_point_to_segment(pt: Point, v: Point, w: Point) -> f32 {
     // Clamp `t` between 0 and 1 so we don't project past the ends of the segment!
     let t = t.clamp(0.0, 1.0);
 
-    let projection = Point::new(v.x + t * (w.x - v.x), v.y + t * (w.y - v.y));
+    let projection = Point::new(t.mul_add(w.x - v.x, v.x), t.mul_add(w.y - v.y, v.y));
 
     // Return distance from point to the projected point on the segment
     (pt.x - projection.x).hypot(pt.y - projection.y)

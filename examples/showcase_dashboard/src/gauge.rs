@@ -205,7 +205,7 @@ impl Gauge {
             // Interpolate
             let diff = target - current_factor;
             if diff.abs() > 1e-5 {
-                self.zone_factors[i] += diff * alpha;
+                self.zone_factors[i] = diff.mul_add(alpha, self.zone_factors[i]);
             } else {
                 self.zone_factors[i] = target;
             }

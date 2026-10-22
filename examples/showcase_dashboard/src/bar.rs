@@ -125,7 +125,7 @@ impl BarChart {
 
         // Update Domain
         if diff_x.abs() > 1e-5 {
-            self.current_x_max += diff_x * alpha;
+            self.current_x_max = diff_x.mul_add(alpha, self.current_x_max);
         } else {
             self.current_x_max = target_x_max;
         }

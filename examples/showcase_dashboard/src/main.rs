@@ -88,36 +88,30 @@ impl ExampleApp {
                 self.gauge_chart.tick(now);
                 self.line_chart.tick(now);
                 self.bar_chart.tick(now);
-                Task::none()
             }
             Message::SwitchTheme(theme) => {
                 self.theme = theme;
-                Task::none()
             }
             Message::NextTheme => {
                 let all = Theme::ALL;
                 if let Some(index) = all.iter().position(|x| x == &self.theme) {
                     self.theme = all[(index + 1) % all.len()].clone();
                 }
-                Task::none()
             }
             Message::PrevTheme => {
                 let all = Theme::ALL;
                 if let Some(index) = all.iter().position(|x| x == &self.theme) {
                     self.theme = all[if index == 0 { all.len() - 1 } else { index - 1 }].clone();
                 }
-                Task::none()
             }
             Message::AddBarDataPoint => {
                 let len = self.bar_chart.get_data().len();
                 let new_value = rand::random_range(1.0..=10.0);
                 let label = format!("Q{}", len + 1);
                 self.bar_chart.add_data((label, new_value));
-                Task::none()
             }
             Message::AddLineDataPoint => {
                 self.line_chart.push_value(rand::random_range(0.0..10.0));
-                Task::none()
             }
             Message::AddLineSeries => {
                 // Curated color cycling
@@ -126,22 +120,19 @@ impl ExampleApp {
 
                 let new_series = LineSeries::new("Metric", color);
                 self.line_chart.push_series(new_series);
-                Task::none()
             }
             Message::ToggleStacked => {
                 self.line_chart.toggle_stacked();
-                Task::none()
             }
             Message::ToggleOrientation => {
                 self.bar_chart.toggle_orientation();
-                Task::none()
             }
             Message::UpdateGaugeValue(value) => {
                 let new_value = self.gauge_chart.get_value() + value;
                 self.gauge_chart.set_value(new_value);
-                Task::none()
             }
         }
+        Task::none()
     }
 
     fn view(&self) -> Element<'_, Message> {
