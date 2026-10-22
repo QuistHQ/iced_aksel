@@ -9,16 +9,11 @@
 </div>
 
 
-`iced_aksel` is a WIP, "batteries not included", charting crate for
+`iced_aksel` is a "batteries not included" charting crate for
 the [Iced] GUI toolkit, wrapping the [Aksel] plotting core in an ergonomic
 widget. It focuses on rendering large, interactive datasets with customizable
 axes, grids, styles, and event handlers that plug directly into your Iced
 application logic.
-
-> [!WARNING]
->
-> The library is still pretty early in development. Breaking changes will occur
-> as we iron out the API.
 
 ![Dashboard Demo](./assets/dashboard_demo.gif)
 
@@ -32,7 +27,7 @@ application logic.
 
 - 🖌️**Canvas-like API** – Implement `PlotData` to add any shape primitive
   (`shape::Line`, `shape::Ellipse`, `shape::Rectangle`, etc.) to the plot - Or
-  create your own shape primitives with the `Shape` trait (Very WIP)!
+  create your own shape primitives with the `Shape` trait!
 
 - 📏 **Internal Transformation** - Handles all the math headaches associated
   with calculating screen- vs. plot-coordinates.
