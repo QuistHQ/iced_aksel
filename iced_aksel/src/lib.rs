@@ -1,4 +1,4 @@
-#![doc = include_str!("../../README.md")]
+#![doc = include_str!(concat!(env!("OUT_DIR"), "/README.md"))]
 
 use aksel::ScreenRect;
 use derive_more::{Display, Error};

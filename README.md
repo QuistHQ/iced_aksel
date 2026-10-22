@@ -15,7 +15,7 @@ widget. It focuses on rendering large, interactive datasets with customizable
 axes, grids, styles, and event handlers that plug directly into your Iced
 application logic.
 
-![Dashboard Demo](./assets/dashboard_demo.gif)
+![Dashboard Demo](https://raw.githubusercontent.com/QuistHQ/iced_aksel/main/assets/dashboard_demo.gif)
 
 ## 🔍 Highlights
 
