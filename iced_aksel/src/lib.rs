@@ -1137,8 +1137,8 @@ where
                 self.handle_mouse_release(memory, layout, shell, previous_click_kind, *button);
                 memory.action = Action::Idle;
             }
-            Event::Mouse(mouse::Event::CursorMoved { position }) => {
-                let changed = self.handle_mouse_moved(memory, layout, shell, *position);
+            Event::Mouse(mouse::Event::CursorMoved { .. }) => {
+                let changed = self.handle_mouse_moved(memory, layout, shell, mouse_pos);
 
                 let Some(last) = changed else {
                     shell.request_redraw();
