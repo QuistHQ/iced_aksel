@@ -28,10 +28,7 @@ fn main() {
         .map(|candidate| Path::new(manifest_dir).join(candidate))
         .find(|path| path.is_file())
         .unwrap_or_else(|| {
-            panic!(
-                "could not find README.md next to the crate ({manifest_dir}) or at the \
-                 workspace root ({manifest_dir}/..)"
-            )
+            panic!("could not find README.md next to the crate ({manifest_dir}) or at the workspace root ({manifest_dir}/..)")
         });
 
     // Rebuild when the README we actually consumed changes.
