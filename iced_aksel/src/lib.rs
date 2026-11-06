@@ -865,6 +865,49 @@ where
         layout.children().last().unwrap()
     }
 
+    /// Draws the requested axis markers (badge and line).
+    ///
+    /// Markers positioned at the cursor are only drawn if `cursor` is over the plot or an axis.
+    fn draw_markers<S: Surface>(
+        &self,
+        surface: &mut S,
+        layout: Layout<'_>,
+        style: &style::Style,
+        plot_bounds: Rectangle,
+        cursor: mouse::Cursor,
+        theme: &Theme,
+    ) {
+        let bounds = layout.bounds();
+
+        for marker_request in &self.markers {
+            let Some((idx, _id, axis)) = self.state.axes().get_full(marker_request.axis_id) else {
+                continue;
+            };
+
+            let axis_bounds = layout.child(idx).bounds();
+
+            let Some((marker, normalized_position)) = marker_request.create_marker(
+                axis,
+                &axis_bounds,
+                &plot_bounds,
+                cursor,
+                &style.axis,
+                theme,
+            ) else {
+                continue;
+            };
+
+            axis.draw_marker_overlay(
+                surface,
+                normalized_position,
+                marker,
+                axis_bounds,
+                &bounds,
+                style.axis.text_offset,
+            );
+        }
+    }
+
     /// Iterates over axes to find the inner-most spines and draws connecting squares at the corners.
     fn draw_spine_corners<S: Surface>(
         &self,
@@ -1147,6 +1190,17 @@ where
 
             layer.items.draw(&mut plot, theme);
         }
+
+        // Draw markers at fixed positions. There is no cursor in a document, so markers
+        // following the cursor are not drawn.
+        self.draw_markers(
+            &mut document,
+            layout,
+            &style,
+            plot_bounds,
+            mouse::Cursor::Unavailable,
+            theme,
+        );
 
         document.finish(bounds.size(), plot_bounds)
     }
@@ -1456,33 +1510,17 @@ where
         }
 
         // Draw markers
-        for marker_request in &self.markers {
-            let Some((idx, _id, axis)) = self.state.axes().get_full(marker_request.axis_id) else {
-                continue;
-            };
-
-            let axis_bounds = layout.child(idx).bounds();
-
-            let Some((marker, normalized_position)) = marker_request.create_marker(
-                axis,
-                &axis_bounds,
-                &plot_bounds,
-                cursor,
-                &style.axis,
-                theme,
-            ) else {
-                continue;
-            };
-
-            axis.draw_marker_overlay(
-                renderer,
-                normalized_position,
-                marker,
-                axis_bounds,
-                &bounds,
-                style.axis.text_offset,
-            );
-        }
+        self.draw_markers(
+            &mut Screen {
+                renderer: &mut *renderer,
+                cache: &mut cache,
+            },
+            layout,
+            &style,
+            plot_bounds,
+            cursor,
+            theme,
+        );
 
         // DEBUG!
         // memory.draw_partitions(renderer, plot_bounds);

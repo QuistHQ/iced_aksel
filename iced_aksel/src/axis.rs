@@ -514,17 +514,15 @@ impl<D: Float, Theme> Axis<D, Theme> {
     ///
     /// # Arguments
     /// * `normalized_position` - A value in the range 0.0..=1.0 that matches the axis orientation
-    pub(super) fn draw_marker_overlay<Renderer>(
+    pub(super) fn draw_marker_overlay<S: Surface>(
         &self,
-        renderer: &mut Renderer,
+        surface: &mut S,
         normalized_position: f32,
         marker: Marker,
         bounds: Rectangle,
         chart_bounds: &Rectangle,
         text_offset: Pixels,
-    ) where
-        Renderer: crate::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
-    {
+    ) {
         let orientation = self.orientation();
 
         // Convert normalized position (0.0..=1.0) to screen coordinates
@@ -532,12 +530,12 @@ impl<D: Float, Theme> Axis<D, Theme> {
             Orientation::Horizontal => bounds.width.mul_add(normalized_position, bounds.x),
             Orientation::Vertical => bounds.height.mul_add(1.0 - normalized_position, bounds.y),
         };
-        let paragraph = Plain::<Renderer::Paragraph>::new(Text {
+        let paragraph = Plain::<<S::Renderer as iced_core::text::Renderer>::Paragraph>::new(Text {
             content: marker.label.content,
             bounds: bounds.size(),
             size: marker.label.size,
             line_height: marker.label.line_height,
-            font: marker.label.font.unwrap_or_else(|| renderer.default_font()),
+            font: marker.label.font.unwrap_or_else(|| surface.default_font()),
             align_x: Alignment::Left,
             align_y: Vertical::Top,
             shaping: iced_core::text::Shaping::Auto,
@@ -640,9 +638,9 @@ impl<D: Float, Theme> Axis<D, Theme> {
         };
 
         // Render using the full chart_bounds clip to allow the badge to "bleed" out of the axis bounds
-        renderer.start_layer(*chart_bounds);
+        surface.start_layer(*chart_bounds);
 
-        renderer.fill_quad(
+        surface.fill_quad(
             Quad {
                 bounds: marker_line_rect,
                 ..Default::default()
@@ -650,7 +648,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
             marker.line.color,
         );
 
-        renderer.fill_quad(
+        surface.fill_quad(
             Quad {
                 bounds: badge_rect,
                 border: marker.badge.border,
@@ -662,7 +660,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
 
         let text_pos = Point::new(badge_rect.x + padding.left, badge_rect.y + padding.top);
 
-        renderer.fill_text(
+        surface.fill_text(
             paragraph
                 .as_text()
                 .with_content(paragraph.content().to_string()),
@@ -671,7 +669,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
             *chart_bounds,
         );
 
-        renderer.end_layer();
+        surface.end_layer();
     }
 
     /// Calculates the base line position (the "rail") for text and decorations.
