@@ -9,7 +9,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use aksel::{Float, Scale};
+use aksel::{Float, Scale, Tick};
 use derivative::Derivative;
 use iced_core::{
     Layout, Pixels, Point, Rectangle, Size, Text,
@@ -1067,7 +1067,8 @@ impl<D: Float, Theme> Axis<D, Theme> {
 
     /// Collects ticks and sorts them so that "Center" ticks in minor intervals come before "Edge" ticks.
     fn collect_prioritized_ticks(&self) -> Vec<PrioritizedTick<D>> {
-        let all_ticks = self.ticks();
+        let (&d_min, &d_max) = self.domain();
+        let all_ticks = drop_snapped_edge_ticks(self.ticks(), d_min, d_max);
         let mut prioritized = Vec::with_capacity(all_ticks.len());
 
         // 1. Identify Major Intervals
@@ -1139,5 +1140,88 @@ impl<D: Float, Theme> Deref for Axis<D, Theme> {
 impl<D: Float, Theme> DerefMut for Axis<D, Theme> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut *self.scale
+    }
+}
+
+/// Removes ticks which the scale moved onto the edge of the domain.
+///
+/// The linear scale of `aksel` snaps a tick lying up to one minor step outside the domain onto
+/// the domain edge, so it gets the value of the edge, e.g. `21738.655229` instead of `21750`.
+/// Such a tick is recognized by being exactly at the edge while being closer to its neighbor
+/// than the regular tick spacing. Ticks which are regularly placed at the edge are kept.
+fn drop_snapped_edge_ticks<D: Float>(mut ticks: Vec<Tick<D>>, min: D, max: D) -> Vec<Tick<D>> {
+    if ticks.len() < 3 {
+        return ticks;
+    }
+
+    ticks.sort_by(|a, b| {
+        a.value
+            .partial_cmp(&b.value)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    // The spacing is compared with a small tolerance to ignore floating point noise
+    let tolerance = D::from(1e-6).unwrap_or_else(D::epsilon);
+    let is_snapped = |gap: D, spacing: D| gap < spacing * (D::one() - tolerance);
+
+    let n = ticks.len();
+    let snapped_last = ticks[n - 1].value == max
+        && is_snapped(
+            ticks[n - 1].value - ticks[n - 2].value,
+            ticks[n - 2].value - ticks[n - 3].value,
+        );
+    let snapped_first = ticks[0].value == min
+        && is_snapped(
+            ticks[1].value - ticks[0].value,
+            ticks[2].value - ticks[1].value,
+        );
+
+    if snapped_last {
+        ticks.pop();
+    }
+    if snapped_first {
+        ticks.remove(0);
+    }
+
+    ticks
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aksel::scale::Linear;
+
+    fn values(min: f64, max: f64) -> Vec<f64> {
+        let scale: Linear<f64, f32> = Linear::new(min, max);
+        drop_snapped_edge_ticks(scale.ticks(), min, max)
+            .into_iter()
+            .map(|t| t.value)
+            .collect()
+    }
+
+    #[test]
+    fn snapped_edge_ticks_are_removed() {
+        // Precondition: the scale snaps ticks onto both edges of this domain
+        let raw: Vec<f64> = Linear::<f64, f32>::new(-123.4, 21738.655229)
+            .ticks()
+            .into_iter()
+            .map(|t| t.value)
+            .collect();
+        assert!(raw.contains(&21738.655229) && raw.contains(&-123.4));
+
+        let ticks = values(-123.4, 21738.655229);
+
+        assert!(!ticks.contains(&21738.655229));
+        assert!(!ticks.contains(&-123.4));
+        assert_eq!(ticks.last(), Some(&21500.0));
+        assert_eq!(ticks.first(), Some(&0.0));
+    }
+
+    #[test]
+    fn regular_edge_ticks_are_kept() {
+        let ticks = values(0.0, 20000.0);
+
+        assert_eq!(ticks.first(), Some(&0.0));
+        assert_eq!(ticks.last(), Some(&20000.0));
     }
 }
