@@ -678,6 +678,46 @@ mod tests {
     }
 
     #[test]
+    fn only_markers_at_fixed_positions_are_exported() {
+        use crate::axis::{Marker, MarkerContext, MarkerPosition};
+
+        fn colored(ctx: MarkerContext<'_, f64, Theme>, color: Color) -> Option<Marker> {
+            let mut marker = ctx.marker(format!("{:.1}", ctx.value));
+            marker.badge.background = color;
+            Some(marker)
+        }
+
+        let mut state: State<&str, f64> = State::new();
+        state.set_axis(
+            "x",
+            Axis::new(Linear::new(0.0, 10.0), Position::Bottom).with_thickness(20.0),
+        );
+        state.set_axis(
+            "y",
+            Axis::new(Linear::new(0.0, 10.0), Position::Left).with_thickness(20.0),
+        );
+
+        let chart: Chart<_, _, Message> = Chart::new(&state)
+            .plot_data(&Shapes, "x", "y")
+            .marker(&"x", MarkerPosition::Value(5.0), |ctx| {
+                colored(ctx, Color::from_rgb8(0xff, 0x00, 0x00))
+            })
+            .marker(&"x", MarkerPosition::Value(50.0), |ctx| {
+                colored(ctx, Color::from_rgb8(0x00, 0x00, 0xff))
+            })
+            .marker(&"x", MarkerPosition::Cursor, |ctx| {
+                colored(ctx, Color::from_rgb8(0x00, 0xff, 0x00))
+            });
+        let document = chart.to_svg(Size::new(220.0, 120.0), &Theme::Light, Options::default());
+
+        assert!(document.contains("fill=\"#ff0000\""));
+        // Outside of the domain
+        assert!(!document.contains("fill=\"#0000ff\""));
+        // There is no cursor in a document
+        assert!(!document.contains("fill=\"#00ff00\""));
+    }
+
+    #[test]
     fn rounded_rectangles_use_arcs() {
         let mut out = String::new();
         write_rectangle(
