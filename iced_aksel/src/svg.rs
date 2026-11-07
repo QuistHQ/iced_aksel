@@ -10,7 +10,10 @@
 //! # Limitations
 //! * Glyphs without an outline (e.g. bitmap emoji) are skipped.
 //! * Shadows of label badges are not exported.
-//! * Markers and the debug overlay are interactive and therefore not exported.
+//! * There is no cursor in a document, so markers positioned at the cursor
+//!   ([`MarkerPosition::Cursor`](crate::axis::MarkerPosition::Cursor)) are not exported. Markers at
+//!   fixed positions are.
+//! * The debug overlay is not exported.
 
 use std::fmt::Write;
 use std::marker::PhantomData;
