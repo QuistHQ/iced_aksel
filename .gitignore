@@ -4,4 +4,4 @@
 
 Cargo.lock
 **/Cargo.lock
-.vscode/
+*.svg
