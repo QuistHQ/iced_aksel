@@ -113,8 +113,11 @@ impl MeshCache {
                 Self::draw_primitive(&mut mesh_buffer, primitive, &mut self.tessellator);
             });
 
-            if let Some(mesh) = mesh_buffer.into_mesh(*clip_bounds) {
-                self.cached.update([mesh].into());
+            // Without any geometry, the cache must be emptied as well.
+            // Otherwise the previous frame stays visible.
+            match mesh_buffer.into_mesh(*clip_bounds) {
+                Some(mesh) => self.cached.update([mesh].into()),
+                None => self.cached.update(Arc::new([])),
             }
 
             self.needs_redraw = false;
