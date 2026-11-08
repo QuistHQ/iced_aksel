@@ -105,6 +105,15 @@ impl MeshCache {
     where
         R: Renderer,
     {
+        self.update_cache(clip_bounds);
+
+        // Cache is cheap to clone thanks to Arc - This is intended
+        renderer.draw_mesh_cache(self.cached.clone());
+    }
+
+    /// Tessellates the pending primitives into the cached meshes, if a redraw
+    /// was requested, and clears the pending primitives.
+    fn update_cache(&mut self, clip_bounds: &Rectangle) {
         // If the buffer is filled with primitives - Rerender the cache.
         if self.needs_redraw {
             let mut mesh_buffer = MeshData::default();
@@ -123,9 +132,7 @@ impl MeshCache {
             self.needs_redraw = false;
         }
 
-        // Cache is cheap to clone thanks to Arc - This is intended
         self.buffer.clear();
-        renderer.draw_mesh_cache(self.cached.clone());
     }
 
     pub fn add_primitive(&mut self, primitive: Primitive) {
@@ -367,5 +374,59 @@ impl MeshCache {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use iced_core::{Color, Point};
+
+    fn rectangle() -> Primitive {
+        Primitive::Rectangle {
+            xy1: Point::new(10.0, 10.0),
+            xy2: Point::new(50.0, 50.0),
+            fill: Some(Color::WHITE),
+            stroke: None,
+        }
+    }
+
+    fn bounds() -> Rectangle {
+        Rectangle::new(Point::ORIGIN, iced_core::Size::new(100.0, 100.0))
+    }
+
+    #[test]
+    fn primitives_are_cached() {
+        let mut cache = MeshCache::new();
+        cache.add_primitive(rectangle());
+        cache.update_cache(&bounds());
+
+        assert_eq!(cache.cached.batch().len(), 1);
+        assert!(!cache.needs_redraw());
+    }
+
+    #[test]
+    fn cache_is_kept_without_redraw_request() {
+        let mut cache = MeshCache::new();
+        cache.add_primitive(rectangle());
+        cache.update_cache(&bounds());
+
+        // The same frame again: nothing is tessellated, the cache stays
+        cache.update_cache(&bounds());
+        assert_eq!(cache.cached.batch().len(), 1);
+    }
+
+    #[test]
+    fn redraw_without_primitives_empties_the_cache() {
+        let mut cache = MeshCache::new();
+        cache.add_primitive(rectangle());
+        cache.update_cache(&bounds());
+        assert_eq!(cache.cached.batch().len(), 1);
+
+        // All shapes have been removed from the chart (e.g. all data series
+        // hidden): the previous meshes must not be drawn anymore
+        cache.request_redraw();
+        cache.update_cache(&bounds());
+        assert!(cache.cached.batch().is_empty());
     }
 }
