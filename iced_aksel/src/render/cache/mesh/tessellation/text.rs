@@ -9,16 +9,13 @@
 //! * **Dynamic LOD:** The engine automatically adjusts the triangle count based on the size of the text on screen.
 //! * **Memory Safety:** Uses an LRU (Least Recently Used) cache to prevent unbounded memory growth.
 
-use crate::render::Text;
-use iced_core::{
-    Color, Point,
-    alignment::{Horizontal, Vertical},
-};
+use crate::render::text::{Text, TextLayout, glyph_position, layout_text};
+use iced_core::{Color, Point};
+use iced_graphics::mesh::SolidVertex2D;
 use iced_graphics::{
     color::pack,
     text::{
         cosmic_text::{
-            Buffer, Metrics,
             fontdb::ID,
             skrifa::{
                 FontRef, GlyphId16, MetadataProvider,
@@ -29,7 +26,6 @@ use iced_graphics::{
         font_system,
     },
 };
-use iced_graphics::{mesh::SolidVertex2D, text::cosmic_text};
 use lru::LruCache;
 use lyon::math::point;
 use lyon::path::Path;
@@ -220,69 +216,20 @@ fn tol_bucket(px: f32) -> u16 {
 // Main Render Logic
 // -----------------------------------------------------------------------------
 
-/// An owned LayoutRun
-#[derive(Clone)]
-struct OwnedRun {
-    line_width: f32,
-    line_y: f32,
-    line_height: f32,
-    glyphs: Vec<cosmic_text::LayoutGlyph>,
-}
-
 /// Draws text as a geometric mesh (triangles).
 ///
 /// This is the core function of the text-to-mesh engine. It performs layout,
 /// retrieves/generates glyph geometry, and flushes it to the mesh buffer.
 pub fn draw_geometric_text(ctx: &mut TextRenderContext, req: Text) {
-    if req.content.is_empty() || req.size.0 <= 2.0 {
-        return;
-    }
-
     let mut lock = font_system().write().expect("Failed to get font-system");
     let font_system = lock.raw();
-    let mut text_buffer = Buffer::new(
-        font_system,
-        Metrics::new(req.size.into(), req.line_height.into()),
-    );
 
-    text_buffer.set_size(font_system, Some(req.bounds.width), Some(req.bounds.height));
-    text_buffer.set_wrap(font_system, iced_graphics::text::to_wrap(req.wrapping));
-    text_buffer.set_text(
-        font_system,
-        &req.content,
-        &iced_graphics::text::to_attributes(req.font),
-        iced_graphics::text::to_shaping(iced_core::text::Shaping::Auto, &req.content),
-        None,
-    );
-
-    // --- Get layout runs ---
-    let runs: Vec<OwnedRun> = {
-        let bw = text_buffer.borrow_with(font_system);
-        bw.layout_runs()
-            .map(|run| OwnedRun {
-                line_y: run.line_y,
-                line_width: run.line_w,
-                line_height: run.line_height,
-                glyphs: run.glyphs.to_vec(),
-            })
-            .collect()
-    };
-
-    if runs.is_empty() {
+    let Some(TextLayout {
+        runs,
+        vertical_offset,
+    }) = layout_text(font_system, &req)
+    else {
         return;
-    }
-
-    // --- Compute vertical alignment ---
-    let min_y = runs.first().unwrap().line_y;
-    let max_y = runs
-        .iter()
-        .map(|r| r.line_y + r.line_height)
-        .fold(f32::NEG_INFINITY, f32::max);
-    let block_height = max_y - min_y;
-    let vertical_offset = match req.vertical_alignment {
-        Vertical::Top => 0.0,
-        Vertical::Center => -block_height / 2.0,
-        Vertical::Bottom => -block_height,
     };
 
     // --- Decide pixel tolerance ---
@@ -298,12 +245,7 @@ pub fn draw_geometric_text(ctx: &mut TextRenderContext, req: Text) {
 
     // --- Render glyphs ---
     for run in runs {
-        // Horizontal offset
-        let horizontal_offset = match req.horizontal_alignment {
-            Horizontal::Left => 0.0,
-            Horizontal::Center => -run.line_width / 2.0,
-            Horizontal::Right => -run.line_width,
-        };
+        let horizontal_offset = run.horizontal_offset(req.horizontal_alignment);
 
         for glyph in run.glyphs {
             // Find the chosen face index in fontdb (important for TTC)
@@ -386,11 +328,9 @@ pub fn draw_geometric_text(ctx: &mut TextRenderContext, req: Text) {
             if let Some(cached) = ctx.glyph_cache.get(key)
                 && !cached.is_empty()
             {
-                let local_x = horizontal_offset + glyph.font_size.mul_add(glyph.x_offset, glyph.x);
-                let local_y = vertical_offset
-                    + glyph
-                        .font_size
-                        .mul_add(-glyph.y_offset, run.line_y + glyph.y);
+                let (glyph_x, glyph_y) = glyph_position(&glyph, run.line_y);
+                let local_x = horizontal_offset + glyph_x;
+                let local_y = vertical_offset + glyph_y;
 
                 flush_character_to_mesh(
                     ctx.mesh_buffer,
