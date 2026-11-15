@@ -6,7 +6,6 @@ publish = false
 
 [dependencies]
 iced.workspace = true
-rand.workspace = true
 
 iced_aksel = { path = "../../iced_aksel/" }
 

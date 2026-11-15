@@ -27,6 +27,7 @@ struct TemplateApp {
     data: MyData, // <--- Your custom data struct
 }
 
+#[allow(clippy::empty_enums)]
 #[derive(Debug, Clone)]
 enum Message {}
 

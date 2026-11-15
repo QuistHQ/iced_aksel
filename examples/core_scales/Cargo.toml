@@ -6,8 +6,6 @@ publish = false
 
 [dependencies]
 iced.workspace = true
-strum.workspace = true
-strum_macros.workspace = true
 
 iced_aksel = { path = "../../iced_aksel/" }
 

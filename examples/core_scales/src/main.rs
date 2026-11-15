@@ -43,6 +43,7 @@ struct ScalesExample {
     log_representation: StyleableData,
 }
 
+#[allow(clippy::empty_enums)]
 #[derive(Debug, Clone)]
 enum Message {}
 

@@ -36,6 +36,7 @@ struct GridTestApp {
     data: Cached<GridData>,
 }
 
+#[allow(clippy::empty_enums)]
 #[derive(Debug, Clone)]
 enum Message {}
 
