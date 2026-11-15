@@ -67,8 +67,8 @@ pub fn draw_stroke_triangle(
 
     // Offset indices by start_index
     let len = mesh.indices.len();
-    for i in (len - 18)..len {
-        mesh.indices[i] += start_index;
+    for index in mesh.indices.iter_mut().take(len).skip(len - 18) {
+        *index += start_index;
     }
 }
 
