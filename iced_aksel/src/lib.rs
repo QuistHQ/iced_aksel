@@ -1122,13 +1122,13 @@ where
 
         // Only handle events if the cursor is near the chart
         let bounds = layout.bounds();
-        let Some(mouse_pos) = cursor.position_over(bounds) else {
-            return;
-        };
+        let cursor_over_chart = cursor.position_over(bounds);
 
         // Handle input events
         match event {
-            Event::Mouse(mouse::Event::ButtonPressed(button)) => {
+            Event::Mouse(mouse::Event::ButtonPressed(button))
+                if let Some(mouse_pos) = cursor_over_chart =>
+            {
                 let new_click = memory.update_click(mouse_pos, *button);
                 self.handle_mouse_press(memory, layout, shell, new_click, *button);
             }
@@ -1137,7 +1137,9 @@ where
                 self.handle_mouse_release(memory, layout, shell, previous_click_kind, *button);
                 memory.action = Action::Idle;
             }
-            Event::Mouse(mouse::Event::CursorMoved { .. }) => {
+            Event::Mouse(mouse::Event::CursorMoved { .. })
+                if let Some(mouse_pos) = cursor_over_chart =>
+            {
                 let changed = self.handle_mouse_moved(memory, layout, shell, mouse_pos);
 
                 let Some(last) = changed else {
@@ -1196,7 +1198,7 @@ where
                     shell.publish(message);
                 }
             }
-            Event::Mouse(mouse::Event::WheelScrolled { delta }) => {
+            Event::Mouse(mouse::Event::WheelScrolled { delta }) if cursor_over_chart.is_some() => {
                 if let Some(cursor_pos) = cursor.position() {
                     let plot_bounds = self.get_plot_layout(layout).bounds();
 
