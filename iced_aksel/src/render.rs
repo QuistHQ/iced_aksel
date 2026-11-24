@@ -1,10 +1,11 @@
-mod cache;
+pub mod cache;
 mod primitive;
-mod text;
+mod surface;
+pub mod text;
 
 pub use cache::RenderCache;
 pub use primitive::{LineArrows, LineExtensions, Primitive};
-pub use text::Text;
+pub use surface::{Screen, Surface};
 
 /// The rendering quality of a buffer.
 ///

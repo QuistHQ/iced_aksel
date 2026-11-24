@@ -77,7 +77,7 @@ where
 /// Manages layer ordering and caching for efficient rendering.
 pub struct Context<'a, D: Float, Renderer: crate::Renderer = iced_renderer::Renderer> {
     pub(crate) transform: &'a Transform<'a, D, f32, f32>,
-    pub(crate) renderer: &'a mut Renderer,
+    default_font: Font,
     cache: &'a mut RenderCache<Renderer>,
 }
 
@@ -92,8 +92,8 @@ impl<'a, D: Float, Renderer: crate::Renderer> Deref for Context<'a, D, Renderer>
 impl<'a, D: Float, Renderer: crate::Renderer> Context<'a, D, Renderer> {
     /// Returns the default font of the underlying renderer
     #[inline(always)]
-    pub fn default_font(&self) -> Font {
-        self.renderer.default_font()
+    pub const fn default_font(&self) -> Font {
+        self.default_font
     }
 
     /// Returns a mutable reference to the underlying [`RenderCache`].
@@ -160,14 +160,14 @@ where
     ///
     /// This is typically called internally by the Chart widget.
     pub(crate) const fn new(
-        renderer: &'a mut Renderer,
+        default_font: Font,
         cache: &'a mut RenderCache<Renderer>,
         transform: &'a Transform<'a, D, f32, f32>,
         interactions: &'a mut InteractionsCache<Message, Tag>,
     ) -> Self {
         let context = Context {
             transform,
-            renderer,
+            default_font,
             cache,
         };
         Self {

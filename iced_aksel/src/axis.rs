@@ -9,7 +9,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use aksel::{Float, Scale};
+use aksel::{Float, Scale, Tick};
 use derivative::Derivative;
 use iced_core::{
     Layout, Pixels, Point, Rectangle, Size, Text,
@@ -21,7 +21,7 @@ use iced_core::{
 };
 
 use crate::{
-    render::{Primitive, RenderCache},
+    render::{Primitive, Surface},
     stroke::{ResolvedStroke, StrokeStyle},
     style::{AxisStyle, DashStyle, Style},
 };
@@ -311,18 +311,15 @@ impl<D: Float, Theme> Axis<D, Theme> {
     // And to make it have less arguments
     /// Draws the axis, including ticks, grid lines, labels, and the interactive marker.
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn draw<Renderer>(
+    pub(crate) fn draw<S: Surface>(
         &self,
-        renderer: &mut Renderer,
+        surface: &mut S,
         theme: &Theme,
         style: &Style,
         layout: Layout<'_>,
         plot_bounds: &Rectangle,
-        cache: &mut RenderCache<Renderer>,
         viewport: &Rectangle,
-    ) where
-        Renderer: crate::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
-    {
+    ) {
         if self.invisible && !self.render_grid {
             return;
         }
@@ -374,7 +371,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
             if self.render_grid
                 && let Some(line) = grid_line
             {
-                self.draw_grid_line(line, &bounds, plot_bounds, cache, pos_norm);
+                self.draw_grid_line(line, &bounds, plot_bounds, surface, pos_norm);
             }
 
             if self.invisible {
@@ -393,17 +390,18 @@ impl<D: Float, Theme> Axis<D, Theme> {
 
                 // 3.1 Run all candidates, find the biggest label as source of truth for all label sizes
                 // Make a paragraph for sizing
-                let paragraph: Plain<Renderer::Paragraph> = Plain::new(Text {
-                    content: label.content,
-                    bounds: bounds.size(),
-                    size: label.size,
-                    line_height: label.line_height,
-                    font: label.font.unwrap_or_else(|| renderer.default_font()),
-                    align_x: Alignment::Left,
-                    align_y: Vertical::Top,
-                    shaping: iced_core::text::Shaping::Auto,
-                    wrapping: Wrapping::None,
-                });
+                let paragraph: Plain<<S::Renderer as iced_core::text::Renderer>::Paragraph> =
+                    Plain::new(Text {
+                        content: label.content,
+                        bounds: bounds.size(),
+                        size: label.size,
+                        line_height: label.line_height,
+                        font: label.font.unwrap_or_else(|| surface.default_font()),
+                        align_x: Alignment::Left,
+                        align_y: Vertical::Top,
+                        shaping: iced_core::text::Shaping::Auto,
+                        wrapping: Wrapping::None,
+                    });
 
                 let width = paragraph.min_bounds().width + label.padding.left + label.padding.right;
                 let height =
@@ -419,11 +417,11 @@ impl<D: Float, Theme> Axis<D, Theme> {
 
             // Draw Tick Marks (Axis style + local config)
             if let Some(line) = tick_line {
-                self.draw_tick_line(line, &bounds, renderer, pos_norm);
+                self.draw_tick_line(line, &bounds, surface, pos_norm);
             }
         }
 
-        self.draw_spine(renderer, &bounds, &style.spine, viewport);
+        self.draw_spine(surface, &bounds, &style.spine, viewport);
 
         if self.invisible {
             return;
@@ -433,7 +431,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
         label_candidates.sort_by_key(|candidate| candidate.priority);
 
         self.layout_labels(
-            renderer,
+            surface,
             &style,
             &bounds,
             orientation,
@@ -444,15 +442,13 @@ impl<D: Float, Theme> Axis<D, Theme> {
     }
 
     /// Renders the axis spine (the continuous line along the axis) as a Quad in a separate layer.
-    fn draw_spine<Renderer>(
+    fn draw_spine<S: Surface>(
         &self,
-        renderer: &mut Renderer,
+        surface: &mut S,
         bounds: &Rectangle,
         style: &SpineStyle,
         viewport: &Rectangle,
-    ) where
-        Renderer: crate::Renderer,
-    {
+    ) {
         if style.width.0 <= 0.0 {
             return;
         }
@@ -500,15 +496,15 @@ impl<D: Float, Theme> Axis<D, Theme> {
         };
 
         // Render spine in a separate layer to ensure it's always on top
-        renderer.start_layer(*viewport);
-        renderer.fill_quad(
+        surface.start_layer(*viewport);
+        surface.fill_quad(
             Quad {
                 bounds: spine_rect,
                 ..Default::default()
             },
             color,
         );
-        renderer.end_layer();
+        surface.end_layer();
     }
 
     /// Draws the interactive marker badge and line.
@@ -518,17 +514,15 @@ impl<D: Float, Theme> Axis<D, Theme> {
     ///
     /// # Arguments
     /// * `normalized_position` - A value in the range 0.0..=1.0 that matches the axis orientation
-    pub(super) fn draw_marker_overlay<Renderer>(
+    pub(super) fn draw_marker_overlay<S: Surface>(
         &self,
-        renderer: &mut Renderer,
+        surface: &mut S,
         normalized_position: f32,
         marker: Marker,
         bounds: Rectangle,
         chart_bounds: &Rectangle,
         text_offset: Pixels,
-    ) where
-        Renderer: crate::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
-    {
+    ) {
         let orientation = self.orientation();
 
         // Convert normalized position (0.0..=1.0) to screen coordinates
@@ -536,12 +530,12 @@ impl<D: Float, Theme> Axis<D, Theme> {
             Orientation::Horizontal => bounds.width.mul_add(normalized_position, bounds.x),
             Orientation::Vertical => bounds.height.mul_add(1.0 - normalized_position, bounds.y),
         };
-        let paragraph = Plain::<Renderer::Paragraph>::new(Text {
+        let paragraph = Plain::<<S::Renderer as iced_core::text::Renderer>::Paragraph>::new(Text {
             content: marker.label.content,
             bounds: bounds.size(),
             size: marker.label.size,
             line_height: marker.label.line_height,
-            font: marker.label.font.unwrap_or_else(|| renderer.default_font()),
+            font: marker.label.font.unwrap_or_else(|| surface.default_font()),
             align_x: Alignment::Left,
             align_y: Vertical::Top,
             shaping: iced_core::text::Shaping::Auto,
@@ -644,9 +638,9 @@ impl<D: Float, Theme> Axis<D, Theme> {
         };
 
         // Render using the full chart_bounds clip to allow the badge to "bleed" out of the axis bounds
-        renderer.start_layer(*chart_bounds);
+        surface.start_layer(*chart_bounds);
 
-        renderer.fill_quad(
+        surface.fill_quad(
             Quad {
                 bounds: marker_line_rect,
                 ..Default::default()
@@ -654,7 +648,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
             marker.line.color,
         );
 
-        renderer.fill_quad(
+        surface.fill_quad(
             Quad {
                 bounds: badge_rect,
                 border: marker.badge.border,
@@ -666,7 +660,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
 
         let text_pos = Point::new(badge_rect.x + padding.left, badge_rect.y + padding.top);
 
-        renderer.fill_text(
+        surface.fill_text(
             paragraph
                 .as_text()
                 .with_content(paragraph.content().to_string()),
@@ -675,7 +669,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
             *chart_bounds,
         );
 
-        renderer.end_layer();
+        surface.end_layer();
     }
 
     /// Calculates the base line position (the "rail") for text and decorations.
@@ -696,25 +690,23 @@ impl<D: Float, Theme> Axis<D, Theme> {
     /// Lays out and renders axis labels, resolving overlaps if the policy requires it.
     // TODO: refactor arguments
     #[allow(clippy::too_many_arguments)]
-    fn layout_labels<Renderer>(
+    fn layout_labels<S: Surface>(
         &self,
-        renderer: &mut Renderer,
+        surface: &mut S,
         style: &AxisStyle,
         bounds: &Rectangle,
         orientation: Orientation,
         label_candidates: Vec<LabelCandidate<D>>,
         candidate_max_size: Size,
         viewport: &Rectangle,
-    ) where
-        Renderer: crate::Renderer + iced_core::text::Renderer<Font = iced_core::Font>,
-    {
+    ) {
         let mut accepted: Vec<PlacedLabelInfo<D>> = Vec::new();
 
         for candidate in label_candidates {
             let Some(resolved) = self.resolve_label_candidate(
                 candidate,
                 &candidate_max_size,
-                renderer,
+                surface.default_font(),
                 bounds,
                 orientation,
                 style.text_offset.0,
@@ -731,7 +723,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
                 badge,
                 badge_bounds,
                 color,
-            }: ResolvedLabelCandidate<Renderer, _> = resolved;
+            }: ResolvedLabelCandidate<S::Renderer, _> = resolved;
 
             let context = LabelDecisionContext {
                 tick,
@@ -744,7 +736,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
             if self.label_policy.should_render(context) {
                 // 1. Render Badge (Background)
                 if let Some(badge) = badge {
-                    renderer.fill_quad(
+                    surface.fill_quad(
                         Quad {
                             bounds: badge_bounds,
                             border: badge.border,
@@ -756,7 +748,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
                 }
 
                 // 2. Render Text
-                renderer.fill_text(
+                surface.fill_text(
                     paragraph
                         .as_text()
                         .with_content(paragraph.content().to_string()),
@@ -779,7 +771,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
         &self,
         candidate: LabelCandidate<D>,
         candidate_max_size: &Size,
-        renderer: &Renderer,
+        default_font: iced_core::Font,
         bounds: &Rectangle,
         orientation: Orientation,
         offset: f32,
@@ -801,7 +793,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
             bounds: bounds.size(),
             size: label.size,
             line_height: label.line_height,
-            font: label.font.unwrap_or_else(|| renderer.default_font()),
+            font: label.font.unwrap_or(default_font),
             align_x: Alignment::Left,
             align_y: Vertical::Top,
             shaping: iced_core::text::Shaping::Auto,
@@ -899,15 +891,13 @@ impl<D: Float, Theme> Axis<D, Theme> {
     }
 
     /// Renders a single tick mark
-    fn draw_tick_line<Renderer>(
+    fn draw_tick_line<S: Surface>(
         &self,
         line: TickLine,
         bounds: &Rectangle,
-        renderer: &mut Renderer,
+        surface: &mut S,
         pos_norm: f32,
-    ) where
-        Renderer: crate::Renderer,
-    {
+    ) {
         let thickness = line.width.0;
         let half_thickness = thickness / 2.0;
         let length = line.length.0;
@@ -916,7 +906,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
         match self.position {
             Position::Bottom => {
                 let x = bounds.width.mul_add(pos_norm, bounds.x) - half_thickness;
-                renderer.fill_quad(
+                surface.fill_quad(
                     Quad {
                         bounds: Rectangle::new(
                             Point { x, y: bounds.y },
@@ -933,7 +923,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
             }
             Position::Top => {
                 let x = bounds.width.mul_add(pos_norm, bounds.x) - half_thickness;
-                renderer.fill_quad(
+                surface.fill_quad(
                     Quad {
                         bounds: Rectangle::new(
                             Point { x, y: bounds.y },
@@ -950,7 +940,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
             }
             Position::Right => {
                 let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y) - half_thickness;
-                renderer.fill_quad(
+                surface.fill_quad(
                     Quad {
                         bounds: Rectangle::new(
                             Point { x: bounds.x, y },
@@ -967,7 +957,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
             }
             Position::Left => {
                 let y = bounds.height.mul_add(1.0 - pos_norm, bounds.y) - half_thickness;
-                renderer.fill_quad(
+                surface.fill_quad(
                     Quad {
                         bounds: Rectangle::new(
                             Point {
@@ -989,16 +979,14 @@ impl<D: Float, Theme> Axis<D, Theme> {
     }
 
     /// Renders a single grid line into the cache.
-    fn draw_grid_line<Renderer>(
+    fn draw_grid_line<S: Surface>(
         &self,
         line: GridLine,
         axis_bounds: &Rectangle,
         plot_bounds: &Rectangle,
-        cache: &mut RenderCache<Renderer>,
+        surface: &mut S,
         pos_norm: f32,
-    ) where
-        Renderer: crate::Renderer,
-    {
+    ) {
         let orientation = self.orientation();
         let thickness = line.width.0;
         let fill = line.color;
@@ -1011,7 +999,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
                     gap_length,
                 }) = line.dashed
                 {
-                    cache.add_primitive(Primitive::VerticalLine {
+                    surface.add_primitive(Primitive::VerticalLine {
                         x,
                         y_start: plot_bounds.y,
                         y_end: plot_bounds.y + plot_bounds.height,
@@ -1026,7 +1014,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
                         snap: true,
                     });
                 } else {
-                    cache.add_primitive(Primitive::VerticalLine {
+                    surface.add_primitive(Primitive::VerticalLine {
                         x,
                         y_start: plot_bounds.y,
                         y_end: plot_bounds.y + plot_bounds.height,
@@ -1046,7 +1034,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
                     gap_length,
                 }) = line.dashed
                 {
-                    cache.add_primitive(Primitive::HorizontalLine {
+                    surface.add_primitive(Primitive::HorizontalLine {
                         y,
                         x_start: plot_bounds.x,
                         x_end: plot_bounds.x + plot_bounds.width,
@@ -1061,7 +1049,7 @@ impl<D: Float, Theme> Axis<D, Theme> {
                         snap: true,
                     });
                 } else {
-                    cache.add_primitive(Primitive::HorizontalLine {
+                    surface.add_primitive(Primitive::HorizontalLine {
                         y,
                         x_start: plot_bounds.x,
                         x_end: plot_bounds.x + plot_bounds.width,
@@ -1079,7 +1067,8 @@ impl<D: Float, Theme> Axis<D, Theme> {
 
     /// Collects ticks and sorts them so that "Center" ticks in minor intervals come before "Edge" ticks.
     fn collect_prioritized_ticks(&self) -> Vec<PrioritizedTick<D>> {
-        let all_ticks = self.ticks();
+        let (&d_min, &d_max) = self.domain();
+        let all_ticks = drop_snapped_edge_ticks(self.ticks(), d_min, d_max);
         let mut prioritized = Vec::with_capacity(all_ticks.len());
 
         // 1. Identify Major Intervals
@@ -1151,5 +1140,88 @@ impl<D: Float, Theme> Deref for Axis<D, Theme> {
 impl<D: Float, Theme> DerefMut for Axis<D, Theme> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut *self.scale
+    }
+}
+
+/// Removes ticks which the scale moved onto the edge of the domain.
+///
+/// The linear scale of `aksel` snaps a tick lying up to one minor step outside the domain onto
+/// the domain edge, so it gets the value of the edge, e.g. `21738.655229` instead of `21750`.
+/// Such a tick is recognized by being exactly at the edge while being closer to its neighbor
+/// than the regular tick spacing. Ticks which are regularly placed at the edge are kept.
+fn drop_snapped_edge_ticks<D: Float>(mut ticks: Vec<Tick<D>>, min: D, max: D) -> Vec<Tick<D>> {
+    if ticks.len() < 3 {
+        return ticks;
+    }
+
+    ticks.sort_by(|a, b| {
+        a.value
+            .partial_cmp(&b.value)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    // The spacing is compared with a small tolerance to ignore floating point noise
+    let tolerance = D::from(1e-6).unwrap_or_else(D::epsilon);
+    let is_snapped = |gap: D, spacing: D| gap < spacing * (D::one() - tolerance);
+
+    let n = ticks.len();
+    let snapped_last = ticks[n - 1].value == max
+        && is_snapped(
+            ticks[n - 1].value - ticks[n - 2].value,
+            ticks[n - 2].value - ticks[n - 3].value,
+        );
+    let snapped_first = ticks[0].value == min
+        && is_snapped(
+            ticks[1].value - ticks[0].value,
+            ticks[2].value - ticks[1].value,
+        );
+
+    if snapped_last {
+        ticks.pop();
+    }
+    if snapped_first {
+        ticks.remove(0);
+    }
+
+    ticks
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aksel::scale::Linear;
+
+    fn values(min: f64, max: f64) -> Vec<f64> {
+        let scale: Linear<f64, f32> = Linear::new(min, max);
+        drop_snapped_edge_ticks(scale.ticks(), min, max)
+            .into_iter()
+            .map(|t| t.value)
+            .collect()
+    }
+
+    #[test]
+    fn snapped_edge_ticks_are_removed() {
+        // Precondition: the scale snaps ticks onto both edges of this domain
+        let raw: Vec<f64> = Linear::<f64, f32>::new(-123.4, 21738.655229)
+            .ticks()
+            .into_iter()
+            .map(|t| t.value)
+            .collect();
+        assert!(raw.contains(&21738.655229) && raw.contains(&-123.4));
+
+        let ticks = values(-123.4, 21738.655229);
+
+        assert!(!ticks.contains(&21738.655229));
+        assert!(!ticks.contains(&-123.4));
+        assert_eq!(ticks.last(), Some(&21500.0));
+        assert_eq!(ticks.first(), Some(&0.0));
+    }
+
+    #[test]
+    fn regular_edge_ticks_are_kept() {
+        let ticks = values(0.0, 20000.0);
+
+        assert_eq!(ticks.first(), Some(&0.0));
+        assert_eq!(ticks.last(), Some(&20000.0));
     }
 }
